@@ -112,11 +112,23 @@ const globalCSS = `
 `;
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
+// Convierte links de Google Drive a URL directa de imagen
+function fixImgUrl(url) {
+  if (!url) return "";
+  // https://drive.google.com/file/d/FILE_ID/view...
+  const m = url.match(/\/file\/d\/([^/]+)/);
+  if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+  // https://drive.google.com/open?id=FILE_ID
+  const m2 = url.match(/[?&]id=([^&]+)/);
+  if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
+  return url;
+}
+
 function Av({ nom, foto, size=40 }) {
   const palette = ["#3D5AFE","#00C2A8","#FF6D00","#E53935","#8B4FD8","#0097A7","#F4511E"];
   const color   = palette[(nom||"?").charCodeAt(0)%palette.length];
   const init    = (nom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-  if (foto) return <img src={foto} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid #fff",boxShadow:G.sh1}} onError={e=>e.target.style.display="none"} />;
+  if (foto) return <img src={fixImgUrl(foto)} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid #fff",boxShadow:G.sh1}} onError={e=>e.target.style.display="none"} />;
   return <div style={{width:size,height:size,borderRadius:"50%",background:color,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:size*.38,color:"#fff",flexShrink:0,border:"2px solid #fff",boxShadow:G.sh1,letterSpacing:-.5}}>{init}</div>;
 }
 
@@ -317,7 +329,7 @@ export default function App() {
           {user && comActiva && pantalla==="partido"   && <PPartido comunidad={comActiva} partido={partido} user={user} loadComs={loadComs} setPantalla={setPantalla} />}
           {user && comActiva && pantalla==="equipos"   && <PEquipos comunidad={comActiva} partido={partido} user={user} />}
           {user && comActiva && pantalla==="votar"     && <PVotar   comunidad={comActiva} partido={partido} user={user} />}
-          {user && comActiva && pantalla==="historial" && <PHistorial comunidad={comActiva} />}
+          {user && comActiva && pantalla==="historial" && <PHistorial comunidad={comActiva} esAdmin={esAdminCom} />}
           {user && comActiva && pantalla==="stats"     && <PStats   comunidad={comActiva} user={user} esAdmin={esAdminCom} />}
           {user && comActiva && pantalla==="com"       && <PComunidad comunidad={comActiva} user={user} loadComs={loadComs} setPantalla={setPantalla} />}
         </div>
@@ -437,7 +449,7 @@ function PHome({ user, coms, setComActiva, loadComs }) {
         return (
           <Card key={c.id} onClick={()=>setComActiva(c)} style={{cursor:"pointer",padding:0,overflow:"hidden"}}
             accent={G.primary+"20"}>
-            {c.foto && <img src={c.foto} style={{width:"100%",height:120,objectFit:"cover"}} onError={e=>e.target.style.display="none"} />}
+            {c.foto && <img src={fixImgUrl(c.foto)} style={{width:"100%",height:120,objectFit:"cover"}} onError={e=>e.target.style.display="none"} />}
             {!c.foto && <div style={{height:80,background:`linear-gradient(135deg,${G.primary}22,${G.secondary}22)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🏘️</div>}
             <div style={{padding:"14px 16px"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -501,7 +513,16 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
 
   const attrs=ud.atributos||{};
   const attrsAnt=ud.atributosAnteriores||{};
-  const tend=key=>{ const a=attrs[key]||0,b=attrsAnt[key]||0; if(!a&&!b)return null; if(a>b)return{icon:"↑",c:G.secondary}; if(a<b)return{icon:"↓",c:G.danger}; return{icon:"—",c:G.t3}; };
+  // Solo mostrar tendencia si ya hubo al menos un partido (historial tiene entradas)
+  const tuvoPartidos = (ud.partidos||0) > 0;
+  const tend=key=>{ 
+    if(!tuvoPartidos) return null;
+    const a=attrs[key]||0,b=attrsAnt[key]||0; 
+    if(!a&&!b)return null; 
+    if(a>b)return{icon:"↑",c:G.secondary}; 
+    if(a<b)return{icon:"↓",c:G.danger}; 
+    return{icon:"—",c:G.t3}; 
+  };
 
   return (
     <div style={{padding:20}}>
@@ -788,6 +809,78 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
   );
 }
 
+// ── LUGAR AUTOCOMPLETE (Google Places) ───────────────────────────────────────
+function LugarAutocomplete({ onSelect }) {
+  const [sugs, setSugs] = useState([]);
+  const [query, setQuery] = useState("");
+  const timer = useRef(null);
+
+  function buscar(q) {
+    setQuery(q);
+    if (!q || q.length < 3) { setSugs([]); return; }
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=4&countrycodes=ar&addressdetails=1`, {headers:{"Accept-Language":"es"}});
+        const data = await r.json();
+        setSugs(data.map(d=>({label:d.display_name, short: d.name||d.display_name.split(",")[0]})));
+      } catch { setSugs([]); }
+    }, 400);
+  }
+
+  if (sugs.length === 0) return null;
+  return (
+    <div style={{background:G.surf0,border:"1.5px solid #DDE3F0",borderRadius:G.r1,marginTop:4,boxShadow:G.sh2,zIndex:50,position:"relative"}}>
+      {sugs.map((s,i)=>(
+        <div key={i} onClick={()=>{onSelect(s.label);setSugs([]);}}
+          style={{padding:"10px 14px",fontSize:13,cursor:"pointer",borderBottom:i<sugs.length-1?"1px solid #EEF0F8":"none",color:G.t2,lineHeight:1.4}}
+          onMouseEnter={e=>e.target.style.background=G.surf1}
+          onMouseLeave={e=>e.target.style.background="transparent"}>
+          📍 {s.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── CALENDAR LINKS ────────────────────────────────────────────────────────────
+function CalendarLinks({ partido, comunidad }) {
+  if (!partido) return null;
+  const fecha = partido.fecha || "";
+  const hora  = partido.hora  || "00:00";
+  const title = `⚽ Partido - ${comunidad?.nombre||"Fútbol"}`;
+  const det   = `Formato: ${partido.formato}\nLugar: ${partido.lugar}`;
+  const loc   = partido.lugar || "";
+
+  // Formato YYYYMMDDTHHmm00 para Google/Outlook
+  const dt  = fecha.replace(/-/g,"") + "T" + hora.replace(":","") + "00";
+  const dtE = fecha.replace(/-/g,"") + "T" + (()=>{ const [h,m]=hora.split(":"); return String(parseInt(h)+2).padStart(2,"0")+m; })() + "00";
+
+  const google  = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dt}/${dtE}&details=${encodeURIComponent(det)}&location=${encodeURIComponent(loc)}`;
+  const outlook = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(title)}&startdt=${fecha}T${hora}:00&enddt=${fecha}T${(()=>{ const [h,m]=hora.split(":"); return String(parseInt(h)+2).padStart(2,"0")+":"+m; })()}:00&body=${encodeURIComponent(det)}&location=${encodeURIComponent(loc)}`;
+  const ics     = `data:text/calendar;charset=utf8,BEGIN:VCALENDAR%0AVERSION:2.0%0ABEGIN:VEVENT%0ADTSTART:${dt}%0ADTEND:${dtE}%0ASUMMARY:${encodeURIComponent(title)}%0ALOCATION:${encodeURIComponent(loc)}%0ADESCRIPTION:${encodeURIComponent(det)}%0AEND:VEVENT%0AEND:VCALENDAR`;
+
+  const cals = [
+    { label:"Google",  icon:"🗓️", href:google,  target:"_blank" },
+    { label:"Outlook", icon:"📧", href:outlook, target:"_blank" },
+    { label:"iCal",    icon:"🍎", href:ics,     target:"_self",  download:"partido.ics" },
+  ];
+
+  return (
+    <div style={{marginTop:10}}>
+      <div style={{fontSize:11,color:G.t3,fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Agregar al calendario</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {cals.map(c=>(
+          <a key={c.label} href={c.href} target={c.target} download={c.download}
+            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",background:G.surf1,borderRadius:G.r2,textDecoration:"none",color:G.t2,fontWeight:600,fontSize:13,border:"1px solid #EEF0F8",boxShadow:G.sh1}}>
+            {c.icon} {c.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── PARTIDO ───────────────────────────────────────────────────────────────────
 function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   const [fecha,setFecha]=useState(""); const [hora,setHora]=useState(""); const [lugar,setLugar]=useState(""); const [formato,setFormato]=useState("");
@@ -854,11 +947,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
     await loadComs();
   }
 
-  // Google Calendar link
-  function calendarLink(){
-    if(!partido)return"#";
-    const dt=partido.fecha?.replace(/-/g,"")+"T"+partido.hora?.replace(":","")+"00";
-    const title=encodeURIComponent(`⚽ Partido - ${comunidad.nombre}`);
+`);
     const details=encodeURIComponent(`Formato: ${partido.formato}\nLugar: ${partido.lugar}`);
     const loc=encodeURIComponent(partido.lugar||"");
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dt}/${dt}&details=${details}&location=${loc}`;
@@ -873,7 +962,13 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
             <h3 style={{fontWeight:700,marginBottom:16,color:G.primary}}>🗓️ Crear partido</h3>
             <Inp label="Fecha" type="date" value={fecha} onChange={e=>setFecha(e.target.value)} />
             <Inp label="Hora" type="time" value={hora} onChange={e=>setHora(e.target.value)} />
-            <Inp label="Lugar" value={lugar} onChange={e=>setLugar(e.target.value)} placeholder="Cancha..." />
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:600,color:G.t3,marginBottom:5,letterSpacing:.3}}>Lugar</div>
+              <input id="lugar-input" type="text" value={lugar} onChange={e=>setLugar(e.target.value)} placeholder="Escribí la dirección o nombre de la cancha..."
+                style={{width:"100%",padding:"12px 16px",borderRadius:G.r2,border:"1.5px solid #DDE3F0",background:G.surf0,color:G.t1,fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"'Outfit',sans-serif"}}
+                onFocus={e=>e.target.style.borderColor=G.primary} onBlur={e=>e.target.style.borderColor="#DDE3F0"} />
+              <LugarAutocomplete onSelect={setLugar} />
+            </div>
             <p style={{fontSize:12,color:G.t3,marginBottom:8}}>Formato</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
               {FORMATOS.map(f=><button key={f.label} onClick={()=>setFormato(f.label)} style={{padding:"7px 14px",borderRadius:99,border:`1.5px solid ${formato===f.label?G.primary:"#DDE3F0"}`,background:formato===f.label?G.primary+"15":"transparent",color:formato===f.label?G.primary:G.t2,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>{f.label}</button>)}
@@ -919,10 +1014,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
           <Chip color={cupoLibre>0?G.secondary:G.danger}>{cupoLibre>0?`✅ ${cupoLibre} lugares libres`:"🚫 Completo"}</Chip>
           <span style={{fontSize:13,color:G.t3,fontWeight:600}}>{inscripos.length}/{cupo} inscriptos</span>
         </div>
-        {/* Google Calendar */}
-        <a href={calendarLink()} target="_blank" rel="noreferrer" style={{display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"8px 12px",background:G.surf1,borderRadius:G.r1,textDecoration:"none",color:G.primary,fontWeight:600,fontSize:13}}>
-          📅 Agregar a Google Calendar
-        </a>
+        <CalendarLinks partido={partido} comunidad={comunidad} />
       </Card>
 
       {/* Precio/Pozo */}
@@ -1193,8 +1285,17 @@ function PVotar({ comunidad, partido, user }) {
       const evs=(partido.eventos||{})[id]||{};
       await setDoc(rUser(id),{atributos:nuevos,atributosAnteriores:attrsAnt,goles:j.goles+(evs.goles||0),partidos:(j.partidos||0)+1,historial:[...(j.historial||[]),{fecha:new Date().toLocaleDateString("es-AR"),mvp:id===mvpId,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}}]},{merge:true});
     }
+    // Resultado automático desde goles por equipo
+    let resultado="";
+    if(partido.equipos){
+      const golesO=(partido.equipos.oscuro||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+      const golesB=(partido.equipos.blanco||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+      if(golesO>golesB) resultado=`🖤 Oscuro ganó ${golesO}-${golesB}`;
+      else if(golesB>golesO) resultado=`🤍 Blanco ganó ${golesB}-${golesO}`;
+      else resultado=`Empate ${golesO}-${golesB}`;
+    }
     const comSnap=await getDoc(rCom(comunidad.id));
-    const hist=[...(comSnap.data()?.historialPartidos||[]),{fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,jugadores,invitados:partido.invitados||{},resultado:""}];
+    const hist=[...(comSnap.data()?.historialPartidos||[]),{fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,jugadores,invitados:partido.invitados||{},resultado}];
     await setDoc(rCom(comunidad.id),{historialPartidos:hist,partidoActivo:null},{merge:true});
     await deleteDoc(rPart(partido.id));
     setMsg("✓ ¡Resultados guardados!");
@@ -1315,10 +1416,10 @@ function PVotar({ comunidad, partido, user }) {
 }
 
 // ── HISTORIAL ─────────────────────────────────────────────────────────────────
-function PHistorial({ comunidad }) {
+function PHistorial({ comunidad, esAdmin }) {
   const [historial,setHistorial]=useState([]); const [jugData,setJugData]=useState({});
   const [expandido,setExpandido]=useState(null); const [editando,setEditando]=useState(null);
-  const [resultado,setResultado]=useState(""); const [esAdmin,setEsAdmin]=useState(false);
+  const [resultado,setResultado]=useState("");
 
   useEffect(()=>{
     const load=async()=>{
@@ -1363,7 +1464,8 @@ function PHistorial({ comunidad }) {
           {expandido===i && (
             <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #EEF0F8"}}>
               {/* Resultado editable */}
-              {editando===i ? (
+              {/* Resultado — solo admin puede editar */}
+              {esAdmin && (editando===i ? (
                 <div style={{marginBottom:14}}>
                   <Inp label="Resultado del partido" value={resultado} onChange={e=>setResultado(e.target.value)} placeholder='Ej: "Oscuro ganó 4-2"' />
                   <div style={{display:"flex",gap:8}}>
@@ -1373,9 +1475,9 @@ function PHistorial({ comunidad }) {
                 </div>
               ):(
                 <button onClick={()=>{setEditando(i);setResultado(p.resultado||"");}} style={{background:G.surf1,border:"none",borderRadius:G.r1,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:600,color:G.primary,marginBottom:12,width:"100%",textAlign:"left"}}>
-                  ✏️ {p.resultado?"Editar resultado":"+ Agregar resultado del partido"}
+                  ✏️ {p.resultado?"Editar resultado":"+ Editar resultado"}
                 </button>
-              )}
+              ))}
 
               {/* Equipos */}
               {p.equipos && (
@@ -1419,6 +1521,7 @@ function PHistorial({ comunidad }) {
 // ── STATS ─────────────────────────────────────────────────────────────────────
 function PStats({ comunidad, user, esAdmin }) {
   const [jugadores,setJugadores]=useState([]); const [loading,setLoading]=useState(true);
+  const [expandido,setExpandido]=useState(null);
 
   useEffect(()=>{
     const load=async()=>{
@@ -1462,8 +1565,15 @@ function PStats({ comunidad, user, esAdmin }) {
             </div>
           )}
 
-          {/* Admin: puntajes */}
+          {/* Admin: promedio visible en la card directamente */}
           {esAdmin && (
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:G.primary+"10",borderRadius:G.r2,marginBottom:8,cursor:"pointer"}} onClick={()=>setExpandido(expandido===j.dni?null:j.dni)}>
+              <span style={{fontWeight:700,fontSize:13,color:G.primary,flex:1}}>📊 Promedio: {calcProm(j.atributos||{}).toFixed(2)}</span>
+              <span style={{fontSize:12,color:G.primary}}>{expandido===j.dni?"▲ ocultar":"▼ ver atributos"}</span>
+            </div>
+          )}
+          {/* Admin: puntajes detallados — expandibles */}
+          {esAdmin && expandido===j.dni && (
             <div style={{paddingTop:10,borderTop:"1px solid #EEF0F8"}}>
               <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8}}>👑 PUNTAJES (Admin)</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
