@@ -947,12 +947,6 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
     await loadComs();
   }
 
-`);
-    const details=encodeURIComponent(`Formato: ${partido.formato}\nLugar: ${partido.lugar}`);
-    const loc=encodeURIComponent(partido.lugar||"");
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dt}/${dt}&details=${details}&location=${loc}`;
-  }
-
   if(!partido) return (
     <div style={{padding:20}}>
       <STitle>Partido</STitle>
