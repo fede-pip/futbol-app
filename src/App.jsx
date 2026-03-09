@@ -1140,20 +1140,21 @@ function PEquipos({ comunidad, partido, user }) {
 
   const sumaEq=ids=>ids.map(id=>calcProm((jugData[id]||{}).atributos||{})).reduce((s,v)=>s+v,0);
 
-  const EqCol=({ids,nom,color,key_})=>{
+  const EqCol=({ids,nom,color})=>{
     const jug=ids.map(id=>({id,...(jugData[id]||{})})).filter(j=>j.nombre);
     const suma=sumaEq(ids);
     return (
       <div style={{flex:1,background:`linear-gradient(160deg,${color}12 0%,${G.surf0} 100%)`,border:`1.5px solid ${color}40`,borderRadius:G.r3,padding:16}}>
         <div style={{fontWeight:800,fontSize:15,marginBottom:2,color}}>{nom==="o"?"🖤 Oscuro":"🤍 Blanco"}</div>
-        <div style={{fontSize:12,color:G.t3,marginBottom:4}}>Total: <b style={{color}}>{suma.toFixed(1)}</b></div>
-        <div style={{fontSize:12,color:G.t3,marginBottom:12}}>Prom: {jug.length?(suma/jug.length).toFixed(1):"—"}</div>
+        {esAdmin && <div style={{fontSize:12,color:G.t3,marginBottom:4}}>Total: <b style={{color}}>{suma.toFixed(1)}</b></div>}
+        {esAdmin && <div style={{fontSize:12,color:G.t3,marginBottom:12}}>Prom: {jug.length?(suma/jug.length).toFixed(1):"—"}</div>}
+        {!esAdmin && <div style={{marginBottom:12}}/>}
         {jug.map(j=>(
           <div key={j.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:G.surf0,borderRadius:G.r1,marginBottom:6,boxShadow:G.sh1}}>
             <Av nom={j.nombre||"?"} foto={j.foto} size={28} />
             <div style={{flex:1,fontSize:12,fontWeight:600,lineHeight:1.3}}>
               <div>{j.nombre||"?"}</div>
-              <div style={{color:G.t3,fontSize:11}}>{calcProm(j.atributos||{}).toFixed(1)} pts</div>
+              {esAdmin && <div style={{color:G.t3,fontSize:11}}>{calcProm(j.atributos||{}).toFixed(1)} pts</div>}
             </div>
             {esAdmin && !publicado && <button onClick={()=>mover(j.id,nom)} style={{background:color+"20",border:`1px solid ${color}50`,color,borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11,fontWeight:700}}>→</button>}
           </div>
