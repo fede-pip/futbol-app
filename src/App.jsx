@@ -849,25 +849,32 @@ function ShareWhatsApp({ partido, comunidad, jugData, inscripos }) {
   function compartir() {
     const lista = (inscripos||[]).map((id,i) => {
       const j = jugData[id];
-      const nombre = j?.nombre || (id.startsWith("inv_") ? "Invitado" : id);
+      const nombre = j?.nombre || (id.startsWith("inv_") ? "Invitado" : "?");
       const inv = (j?.esInvitado || id.startsWith("inv_")) ? " (inv.)" : "";
       return `${i+1}. ${nombre}${inv}`;
     }).join("\n");
 
-    const lineas = [
+    const texto = [
       `*${comunidad?.nombre||"Futbol"}*`,
-      `Fecha: ${partido.fecha||""} - Hora: ${partido.hora||""}`,
+      `Fecha: ${partido.fecha||""} | Hora: ${partido.hora||""}`,
       `Lugar: ${partido.lugar||""}`,
       `Formato: ${partido.formato||""}`,
-      ``,
+      "",
       `*Inscriptos (${inscripos?.length||0}):*`,
       lista || "Nadie anotado aun",
-      ``,
-      `_Anotate en App8_`,
-    ];
-    const texto = lineas.join("\n");
-    const url = "https://wa.me/?text=" + encodeURIComponent(texto);
-    window.open(url, "_blank");
+      "",
+      "_Anotate en App8_",
+    ].join("\n");
+
+    // Usar clipboard + abrir WhatsApp Web sin texto en URL
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(texto).then(()=>{
+        alert("Texto copiado al portapapeles!\nPega el mensaje en WhatsApp.");
+        window.open("https://wa.me/", "_blank");
+      });
+    } else {
+      window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
+    }
   }
   return (
     <div style={{marginTop:10}}>
