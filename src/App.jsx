@@ -42,11 +42,22 @@ function calcProm(attrs) {
   const v = ATTRS.map(a=>attrs[a.key]||0).filter(x=>x>0);
   return v.length ? +(v.reduce((s,x)=>s+x,0)/v.length).toFixed(2) : 0;
 }
+function calcPuntos(historial) {
+  // 3 pts ganado, 1 empate, 0 perdido — inferido del campo mvp/resultado del historial
+  // Se guarda en historial como {resultado: "ganado"|"empatado"|"perdido"}
+  return (historial||[]).reduce((s,h)=>{
+    if(h.resultado==="ganado") return s+3;
+    if(h.resultado==="empatado") return s+1;
+    return s;
+  },0);
+}
 function balancear(lista) {
   const s = [...lista].sort((a,b)=>calcProm(b.atributos)-calcProm(a.atributos));
   const o=[],b=[];
   s.forEach((j,i)=>(i%2===0?o:b).push(j));
-  return {oscuro:o,blanco:b};
+  // Mezclar orden de display para no revelar ranking por puntaje
+  const shuffle = arr => [...arr].sort(()=>Math.random()-.5);
+  return {oscuro:shuffle(o), blanco:shuffle(b)};
 }
 function asignarVotaciones(inscriptos) {
   const jugadores = inscriptos.filter(id=>!id.startsWith("inv_"));
@@ -854,7 +865,15 @@ function ShareWhatsApp({ partido, comunidad, jugData, inscripos }) {
       return `${i+1}. ${nombre}${inv}`;
     }).join("\n");
 
-    const texto = [
+    const cena = partido.cena || [];
+    const listaCena = cena.map((id,i) => {
+      const j = jugData[id];
+      const nombre = j?.nombre || id;
+      return `${i+1}. ${nombre}`;
+    }).join("\n");
+
+    const APP_URL = window.location.origin;
+    const lineas = [
       `*${comunidad?.nombre||"Futbol"}*`,
       `Fecha: ${partido.fecha||""} | Hora: ${partido.hora||""}`,
       `Lugar: ${partido.lugar||""}`,
@@ -862,18 +881,26 @@ function ShareWhatsApp({ partido, comunidad, jugData, inscripos }) {
       "",
       `*Inscriptos (${inscripos?.length||0}):*`,
       lista || "Nadie anotado aun",
-      "",
-      "_Anotate en App8_",
-    ].join("\n");
+    ];
 
-    // Usar clipboard + abrir WhatsApp Web sin texto en URL
+    if (cena.length > 0) {
+      lineas.push("");
+      lineas.push(`*Se quedan a comer (${cena.length}):*`);
+      lineas.push(listaCena);
+    }
+
+    lineas.push("");
+    lineas.push(`_Anotate en App8: ${APP_URL}_`);
+
+    const textoFinal = lineas.join("\n");
+
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(texto).then(()=>{
+      navigator.clipboard.writeText(textoFinal).then(()=>{
         alert("Texto copiado al portapapeles!\nPega el mensaje en WhatsApp.");
         window.open("https://wa.me/", "_blank");
       });
     } else {
-      window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
+      window.open("https://wa.me/?text=" + encodeURIComponent(textoFinal), "_blank");
     }
   }
   return (
@@ -1071,6 +1098,45 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
           : <Btn onClick={anotarme} disabled={cupoLibre<=0} full>{cupoLibre>0?"📝 Anotarme":"🚫 Sin lugares"}</Btn>}
         <Msg ok={msg?.startsWith("✓")}>{msg}</Msg>
       </Card>
+
+      {/* Quedarse a comer */}
+      {(() => {
+        const cena = partido.cena || [];
+        const yoEnCena = cena.includes(user.dni);
+        async function anotarCena() {
+          await setDoc(rPart(partido.id),{cena:[...cena, user.dni]},{merge:true});
+        }
+        async function salirCena() {
+          await setDoc(rPart(partido.id),{cena:cena.filter(d=>d!==user.dni)},{merge:true});
+        }
+        return (
+          <Card accent={"#FF6D0030"}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <span style={{fontSize:24}}>🍕</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:15}}>¿Te quedás a comer?</div>
+                <div style={{fontSize:12,color:G.t3}}>Abierto a todos, no hace falta jugar</div>
+              </div>
+              <Chip color={G.warn}>{cena.length} confirmados</Chip>
+            </div>
+            {yoEnCena
+              ? <><div style={{color:G.warn,fontWeight:700,marginBottom:8,fontSize:14}}>🍕 ¡Te anotaste a comer!</div><Btn v="ghost" onClick={salirCena} full>Ya no me quedo</Btn></>
+              : <Btn v="warn" onClick={anotarCena} full>Me quedo a comer</Btn>}
+            {cena.length > 0 && (
+              <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid #EEF0F8"}}>
+                <div style={{fontSize:12,color:G.t3,marginBottom:8,fontWeight:600}}>Confirmados:</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {cena.map(id=>{
+                    const j=jugData[id];
+                    if(!j) return <Chip key={id} color={G.warn}>{id}</Chip>;
+                    return <Chip key={id} color={G.warn}>{j.nombre?.split(" ")[0]}</Chip>;
+                  })}
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })()}
 
       {/* Lista */}
       <Card>
@@ -1326,12 +1392,31 @@ function PVotar({ comunidad, partido, user }) {
     }
     // Resultado automático desde goles por equipo
     let resultado="";
+    let golesO=0, golesB=0;
     if(partido.equipos){
-      const golesO=(partido.equipos.oscuro||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
-      const golesB=(partido.equipos.blanco||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
-      if(golesO>golesB) resultado=`🖤 Oscuro ganó ${golesO}-${golesB}`;
-      else if(golesB>golesO) resultado=`🤍 Blanco ganó ${golesB}-${golesO}`;
+      golesO=(partido.equipos.oscuro||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+      golesB=(partido.equipos.blanco||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+      if(golesO>golesB) resultado=`Oscuro gano ${golesO}-${golesB}`;
+      else if(golesB>golesO) resultado=`Blanco gano ${golesB}-${golesO}`;
       else resultado=`Empate ${golesO}-${golesB}`;
+    }
+    // Guardar resultado individual por jugador (ganado/empatado/perdido)
+    const getResJug=(id)=>{
+      if(!partido.equipos) return "jugado";
+      const enOscuro=(partido.equipos.oscuro||[]).includes(id);
+      const enBlanco=(partido.equipos.blanco||[]).includes(id);
+      if(!enOscuro&&!enBlanco) return "jugado";
+      if(golesO===golesB) return "empatado";
+      if((enOscuro&&golesO>golesB)||(enBlanco&&golesB>golesO)) return "ganado";
+      return "perdido";
+    };
+    // Actualizar historial de cada jugador con resultado individual
+    for(const id of jugadores){
+      const s=await getDoc(rUser(id));if(!s.exists())continue;
+      const j=s.data();
+      const evs=(partido.eventos||{})[id]||{};
+      const resJug=getResJug(id);
+      await setDoc(rUser(id),{historial:[...(j.historial||[]).slice(0,-1),{...(j.historial||[]).slice(-1)[0]||{},resultado:resJug}]},{merge:true});
     }
     const comSnap=await getDoc(rCom(comunidad.id));
     const hist=[...(comSnap.data()?.historialPartidos||[]),{fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,jugadores,invitados:partido.invitados||{},resultado}];
@@ -1585,7 +1670,7 @@ function PStats({ comunidad, user, esAdmin }) {
     const load=async()=>{
       const arr=[];
       for(const dni of comunidad.miembros||[]){const s=await getDoc(rUser(dni));if(s.exists())arr.push(s.data());}
-      arr.sort((a,b)=>(b.partidos||0)-(a.partidos||0));
+      arr.sort((a,b)=>calcPuntos(b.historial)-calcPuntos(a.historial));
       setJugadores(arr);setLoading(false);
     };
     load();
@@ -1608,11 +1693,13 @@ function PStats({ comunidad, user, esAdmin }) {
               <tr>
                 <th style={{...thStyle,textAlign:"left",paddingLeft:14}}>#</th>
                 <th style={{...thStyle,textAlign:"left"}}>Jugador</th>
-                <th style={thStyle}>🏟️</th>
+                <th style={thStyle}>PJ</th>
+                <th style={thStyle}>G</th>
+                <th style={thStyle}>E</th>
+                <th style={thStyle}>P</th>
+                <th style={{...thStyle,color:G.primary}}>Pts</th>
                 <th style={thStyle}>⚽</th>
-                <th style={thStyle}>⚽/PJ</th>
                 <th style={thStyle}>🥇</th>
-                <th style={thStyle}>🟨</th>
               </tr>
             </thead>
             <tbody>
@@ -1620,8 +1707,10 @@ function PStats({ comunidad, user, esAdmin }) {
                 const partidos=j.partidos||0;
                 const goles=(j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0);
                 const mvps=(j.historial||[]).filter(h=>h.mvp).length;
-                const amarillas=(j.historial||[]).reduce((s,h)=>s+(h.eventos?.amarillas||0),0);
-                const golPJ=partidos>0?(goles/partidos).toFixed(1):"—";
+                const ganados=(j.historial||[]).filter(h=>h.resultado==="ganado").length;
+                const empatados=(j.historial||[]).filter(h=>h.resultado==="empatado").length;
+                const perdidos=(j.historial||[]).filter(h=>h.resultado==="perdido").length;
+                const pts=calcPuntos(j.historial);
                 return (
                   <tr key={j.dni} onClick={()=>setExpandido(expandido===j.dni?null:j.dni)}
                     style={{cursor:"pointer",background:expandido===j.dni?G.primary+"08":"transparent",transition:"background .15s"}}>
@@ -1637,11 +1726,13 @@ function PStats({ comunidad, user, esAdmin }) {
                         </div>
                       </div>
                     </td>
-                    <td style={{...tdStyle,fontWeight:700,color:G.t1}}>{partidos}</td>
-                    <td style={{...tdStyle,fontWeight:700,color:goles>0?G.secondary:G.t3}}>{goles}</td>
-                    <td style={{...tdStyle,color:G.t2}}>{golPJ}</td>
-                    <td style={{...tdStyle,fontWeight:700,color:mvps>0?G.gold:G.t3}}>{mvps||"—"}</td>
-                    <td style={{...tdStyle,color:amarillas>0?G.warn:G.t3}}>{amarillas||"—"}</td>
+                    <td style={{...tdStyle,color:G.t2}}>{partidos||"—"}</td>
+                    <td style={{...tdStyle,fontWeight:600,color:G.secondary}}>{ganados||"—"}</td>
+                    <td style={{...tdStyle,color:G.t2}}>{empatados||"—"}</td>
+                    <td style={{...tdStyle,color:G.danger}}>{perdidos||"—"}</td>
+                    <td style={{...tdStyle,fontWeight:900,color:G.primary,fontSize:15}}>{pts}</td>
+                    <td style={{...tdStyle,color:goles>0?G.secondary:G.t3}}>{goles||"—"}</td>
+                    <td style={{...tdStyle,color:mvps>0?G.gold:G.t3}}>{mvps||"—"}</td>
                   </tr>
                 );
               })}
@@ -1649,7 +1740,7 @@ function PStats({ comunidad, user, esAdmin }) {
           </table>
         </div>
         <div style={{padding:"8px 14px",background:G.surf1,fontSize:11,color:G.t3,textAlign:"center"}}>
-          🏟️ Partidos · ⚽ Goles · ⚽/PJ Goles por partido · 🥇 MVPs · 🟨 Amarillas
+          PJ Partidos · G Ganados · E Empatados · P Perdidos · Pts Puntos · ⚽ Goles · 🥇 MVPs
         </div>
       </Card>
 
@@ -1671,15 +1762,19 @@ function PStats({ comunidad, user, esAdmin }) {
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
               {[
                 {l:"Partidos jugados",v:j.partidos||0,i:"🏟️"},
+                {l:"Puntos",v:calcPuntos(j.historial),i:"🏆",highlight:true},
+                {l:"Ganados",v:(j.historial||[]).filter(h=>h.resultado==="ganado").length,i:"✅"},
+                {l:"Empatados",v:(j.historial||[]).filter(h=>h.resultado==="empatado").length,i:"➡️"},
+                {l:"Perdidos",v:(j.historial||[]).filter(h=>h.resultado==="perdido").length,i:"❌"},
                 {l:"Goles totales",v:(j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0),i:"⚽"},
                 {l:"Goles por partido",v:j.partidos>0?((j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0)/j.partidos).toFixed(1):"—",i:"📈"},
                 {l:"MVPs",v:(j.historial||[]).filter(h=>h.mvp).length,i:"🥇"},
                 {l:"Amarillas",v:(j.historial||[]).reduce((s,h)=>s+(h.eventos?.amarillas||0),0),i:"🟨"},
                 {l:"Último partido",v:(j.historial||[]).slice(-1)[0]?.fecha||"—",i:"📅"},
               ].map(s=>(
-                <div key={s.l} style={{background:G.surf1,borderRadius:G.r2,padding:"10px 12px"}}>
-                  <div style={{fontSize:11,color:G.t3,marginBottom:2}}>{s.i} {s.l}</div>
-                  <div style={{fontWeight:800,fontSize:16,color:G.primary}}>{s.v}</div>
+                <div key={s.l} style={{background:s.highlight?G.primary+"15":G.surf1,borderRadius:G.r2,padding:"10px 12px",border:s.highlight?`1px solid ${G.primary}30`:"none"}}>
+                  <div style={{fontSize:11,color:s.highlight?G.primary:G.t3,marginBottom:2}}>{s.i} {s.l}</div>
+                  <div style={{fontWeight:800,fontSize:16,color:s.highlight?G.primary:G.t1}}>{s.v}</div>
                 </div>
               ))}
             </div>
