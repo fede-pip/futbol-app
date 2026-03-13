@@ -849,17 +849,24 @@ function ShareWhatsApp({ partido, comunidad, jugData, inscripos }) {
   function compartir() {
     const lista = (inscripos||[]).map((id,i) => {
       const j = jugData[id];
-      if (!j) return null;
-      return `${i+1}. ${j.nombre||"Invitado"}${j.esInvitado?" (inv.)":""}`;
-    }).filter(Boolean).join("\n");
-    const texto =
-      `⚽ *${comunidad?.nombre||"Fútbol"}*\n` +
-      `📆 ${partido.fecha||""} 🕐 ${partido.hora||""}\n` +
-      `📍 ${partido.lugar||""}\n` +
-      `👥 Formato: ${partido.formato||""}\n` +
-      `\n*Inscriptos (${inscripos?.length||0}):*\n${lista||"Nadie anotado aún"}\n` +
-      `\n_Anotate en App8_ 📲`;
-    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+      const nombre = j?.nombre || (id.startsWith("inv_") ? "Invitado" : id);
+      const inv = (j?.esInvitado || id.startsWith("inv_")) ? " (inv.)" : "";
+      return `${i+1}. ${nombre}${inv}`;
+    }).join("\n");
+
+    const lineas = [
+      `*${comunidad?.nombre||"Futbol"}*`,
+      `Fecha: ${partido.fecha||""} - Hora: ${partido.hora||""}`,
+      `Lugar: ${partido.lugar||""}`,
+      `Formato: ${partido.formato||""}`,
+      ``,
+      `*Inscriptos (${inscripos?.length||0}):*`,
+      lista || "Nadie anotado aun",
+      ``,
+      `_Anotate en App8_`,
+    ];
+    const texto = lineas.join("\n");
+    const url = "https://wa.me/?text=" + encodeURIComponent(texto);
     window.open(url, "_blank");
   }
   return (
