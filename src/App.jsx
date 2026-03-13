@@ -844,6 +844,34 @@ function LugarAutocomplete({ onSelect }) {
 }
 
 // ── CALENDAR LINKS ────────────────────────────────────────────────────────────
+function ShareWhatsApp({ partido, comunidad, jugData, inscripos }) {
+  if (!partido) return null;
+  function compartir() {
+    const lista = (inscripos||[]).map((id,i) => {
+      const j = jugData[id];
+      if (!j) return null;
+      return `${i+1}. ${j.nombre||"Invitado"}${j.esInvitado?" (inv.)":""}`;
+    }).filter(Boolean).join("\n");
+    const texto =
+      `⚽ *${comunidad?.nombre||"Fútbol"}*\n` +
+      `📆 ${partido.fecha||""} 🕐 ${partido.hora||""}\n` +
+      `📍 ${partido.lugar||""}\n` +
+      `👥 Formato: ${partido.formato||""}\n` +
+      `\n*Inscriptos (${inscripos?.length||0}):*\n${lista||"Nadie anotado aún"}\n` +
+      `\n_Anotate en App8_ 📲`;
+    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank");
+  }
+  return (
+    <div style={{marginTop:10}}>
+      <div style={{fontSize:11,color:G.t3,fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Compartir</div>
+      <button onClick={compartir} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:"#25D36620",border:"1.5px solid #25D36640",borderRadius:G.r2,cursor:"pointer",color:"#128C7E",fontWeight:700,fontSize:14,width:"100%",justifyContent:"center"}}>
+        <span style={{fontSize:20}}>💬</span> Compartir inscriptos por WhatsApp
+      </button>
+    </div>
+  );
+}
+
 function CalendarLinks({ partido, comunidad }) {
   if (!partido) return null;
   const fecha = partido.fecha || "";
@@ -854,7 +882,7 @@ function CalendarLinks({ partido, comunidad }) {
 
   // Formato YYYYMMDDTHHmm00 para Google/Outlook
   const dt  = fecha.replace(/-/g,"") + "T" + hora.replace(":","") + "00";
-  const dtE = fecha.replace(/-/g,"") + "T" + (()=>{ const [h,m]=hora.split(":"); return String(parseInt(h)+2).padStart(2,"0")+m; })() + "00";
+  const dtE = fecha.replace(/-/g,"") + "T" + (()=>{ const [h,m]=hora.split(":"); return String(parseInt(h)+1).padStart(2,"0")+m; })() + "00";
 
   const google  = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dt}/${dtE}&details=${encodeURIComponent(det)}&location=${encodeURIComponent(loc)}`;
   const outlook = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(title)}&startdt=${fecha}T${hora}:00&enddt=${fecha}T${(()=>{ const [h,m]=hora.split(":"); return String(parseInt(h)+2).padStart(2,"0")+":"+m; })()}:00&body=${encodeURIComponent(det)}&location=${encodeURIComponent(loc)}`;
@@ -1009,6 +1037,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
           <span style={{fontSize:13,color:G.t3,fontWeight:600}}>{inscripos.length}/{cupo} inscriptos</span>
         </div>
         <CalendarLinks partido={partido} comunidad={comunidad} />
+        <ShareWhatsApp partido={partido} comunidad={comunidad} jugData={jugData} inscripos={inscripos} />
       </Card>
 
       {/* Precio/Pozo */}
@@ -1216,7 +1245,7 @@ function PVotar({ comunidad, partido, user }) {
       const misAsig=(partido.votacionesAsignadas||{})[user.dni]||[];
       setAsignados(misAsig);
       const init={};
-      misAsig.forEach(id=>{init[id]={};ATTRS.forEach(a=>{init[id][a.key]=0;});});
+      misAsig.forEach(id=>{init[id]={};ATTRS.forEach(a=>{init[id][a.key]=null;});});
       setNotas(init);
     };
     load();
@@ -1240,7 +1269,7 @@ function PVotar({ comunidad, partido, user }) {
   );
 
   async function enviar(){
-    for(const id of asignados){ for(const a of ATTRS){ if(!notas[id]?.[a.key]){setMsg(`Puntuá ${a.label} de ${jugData[id]?.nombre||id}`);return;} } }
+    for(const id of asignados){ for(const a of ATTRS){ if(notas[id]?.[a.key]===undefined||notas[id]?.[a.key]===null){setMsg(`Votá ${a.label} de ${jugData[id]?.nombre||id}`);return;} } }
     if(!mvp){setMsg("Elegí el MVP");return;}
     await setDoc(rVots(partido.id),{[user.dni]:true},{merge:true});
     const notasAc={...(partido.notasAtributos||{})};
@@ -1270,12 +1299,13 @@ function PVotar({ comunidad, partido, user }) {
       ATTRS.forEach(a=>{
         const n=notasAc[id]?.[a.key];
         if(n&&n.cant>0){
-          // Solo actualizar si recibió votos — no contemplar como 0
+          // prom es entre -1 y 1 (promedio de votos -1/0/+1)
           const prom=n.suma/n.cant;
           const actual=nuevos[a.key]||5;
-          nuevos[a.key]=Math.min(10,Math.max(1,+(actual*0.7+prom*0.3).toFixed(2)));
+          // delta máximo ±0.25, escalado por el promedio de votos
+          const delta = Math.min(0.25, Math.max(-0.25, prom * 0.25));
+          nuevos[a.key]=Math.min(10,Math.max(1,+(actual+delta).toFixed(2)));
         }
-        // Si cant===0 → no cambiar el atributo (jugador no recibió votos suficientes)
       });
       const evs=(partido.eventos||{})[id]||{};
       await setDoc(rUser(id),{atributos:nuevos,atributosAnteriores:attrsAnt,goles:j.goles+(evs.goles||0),partidos:(j.partidos||0)+1,historial:[...(j.historial||[]),{fecha:new Date().toLocaleDateString("es-AR"),mvp:id===mvpId,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}}]},{merge:true});
@@ -1354,20 +1384,21 @@ function PVotar({ comunidad, partido, user }) {
                 </div>
               </div>
 
+              <p style={{fontSize:11,color:G.t3,marginBottom:12,textAlign:"center",background:G.surf1,borderRadius:G.r1,padding:"8px 12px"}}>
+                👍 Mejor que siempre &nbsp;·&nbsp; ➡️ Como siempre &nbsp;·&nbsp; 👎 Menos que siempre
+              </p>
               {ATTRS.map(a=>{
-                const nota=notas[compActual]?.[a.key]||0;
+                const voto=notas[compActual]?.[a.key]??null;
+                const opts=[{v:1,icon:"👍",color:G.secondary},{v:0,icon:"➡️",color:G.t3},{v:-1,icon:"👎",color:G.danger}];
                 return (
-                  <div key={a.key} style={{marginBottom:16}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                      <span style={{fontSize:18}}>{a.icon}</span>
-                      <span style={{flex:1,fontWeight:700,fontSize:14}}>{a.label}</span>
-                      <Chip color={nota?G.primary:G.t3}>{nota||"—"}/10</Chip>
-                    </div>
-                    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                      {[1,2,3,4,5,6,7,8,9,10].map(n=>(
-                        <button key={n} onClick={()=>setNotas(p=>({...p,[compActual]:{...p[compActual],[a.key]:n}}))}
-                          style={{width:30,height:30,borderRadius:8,border:`1.5px solid ${n<=nota?G.primary:"#DDE3F0"}`,background:n<=nota?G.primary+"15":"transparent",color:n<=nota?G.primary:G.t3,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                          {n}
+                  <div key={a.key} style={{marginBottom:8,padding:"10px 14px",background:G.surf1,borderRadius:G.r2,display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:18}}>{a.icon}</span>
+                    <span style={{flex:1,fontWeight:700,fontSize:13}}>{a.label}</span>
+                    <div style={{display:"flex",gap:6}}>
+                      {opts.map(o=>(
+                        <button key={o.v} onClick={()=>setNotas(p=>({...p,[compActual]:{...p[compActual],[a.key]:o.v}}))}
+                          style={{width:42,height:42,borderRadius:G.r2,border:`2px solid ${voto===o.v?o.color:"#DDE3F0"}`,background:voto===o.v?o.color+"25":"transparent",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>
+                          {o.icon}
                         </button>
                       ))}
                     </div>
@@ -1403,6 +1434,24 @@ function PVotar({ comunidad, partido, user }) {
       )}
 
       {/* Cerrar votación — solo admin */}
+      {/* Panel quién votó / falta — visible para todos */}
+      <Card>
+        <h3 style={{fontWeight:700,marginBottom:12,fontSize:14}}>📋 Estado de votaciones</h3>
+        {jugadores.map(id=>{
+          const j=jugData[id]; if(!j) return null;
+          const voto=yaVotaron.includes(id);
+          return (
+            <div key={id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #EEF0F8"}}>
+              <Av nom={j.nombre} foto={j.foto} size={30} />
+              <span style={{flex:1,fontSize:13,fontWeight:600}}>{j.nombre}</span>
+              {voto
+                ? <Chip color={G.secondary}>✅ Votó</Chip>
+                : <Chip color={G.t3}>⏳ Pendiente</Chip>}
+            </div>
+          );
+        })}
+      </Card>
+
       {esAdmin && partido.finalizado && (
         <Btn v="warn" onClick={cerrarVotacion} full style={{marginTop:8}}>🏆 Cerrar votación y guardar resultados</Btn>
       )}
@@ -1530,64 +1579,119 @@ function PStats({ comunidad, user, esAdmin }) {
 
   if(loading) return <div style={{padding:20}}><Spinner /></div>;
 
+  const thStyle={padding:"10px 8px",fontWeight:700,fontSize:11,color:G.t3,textAlign:"center",borderBottom:`2px solid ${G.surf2}`,whiteSpace:"nowrap"};
+  const tdStyle={padding:"10px 8px",fontSize:13,textAlign:"center",borderBottom:`1px solid ${G.surf2}`};
+
   return (
     <div style={{padding:20}}>
       <STitle>Estadísticas</STitle>
-      {jugadores.map((j,i)=>(
-        <Card key={j.dni}>
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-            <div style={{fontSize:16,fontWeight:900,color:i<3?G.gold:G.t3,width:24,textAlign:"center"}}>#{i+1}</div>
-            <Av nom={j.nombre} foto={j.foto} size={44} />
-            <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:15}}>{j.nombre}</div>
-              {j.apodo && <div style={{color:G.primary,fontSize:12}}>"{j.apodo}"</div>}
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-            {[{i:"🏟️",l:"Partidos",v:j.partidos||0},{i:"⚽",l:"Goles",v:(j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0)},{i:"🥇",l:"MVPs",v:(j.historial||[]).filter(h=>h.mvp).length}].map(s=>(
-              <div key={s.l} style={{background:G.surf1,borderRadius:G.r2,padding:"10px 8px",textAlign:"center"}}>
-                <div style={{fontSize:16}}>{s.i}</div>
-                <div style={{fontSize:17,fontWeight:800,color:G.primary,marginTop:2}}>{s.v}</div>
-                <div style={{fontSize:11,color:G.t3,marginTop:1}}>{s.l}</div>
-              </div>
-            ))}
-          </div>
 
-          {/* Amarillas acumuladas */}
-          {(j.historial||[]).reduce((s,h)=>s+(h.eventos?.amarillas||0),0)>0 && (
-            <div style={{marginBottom:10}}>
-              <Chip color={G.gold}>🟨 {(j.historial||[]).reduce((s,h)=>s+(h.eventos?.amarillas||0),0)} amarillas</Chip>
-            </div>
-          )}
+      {/* TABLA PRINCIPAL */}
+      <Card style={{padding:0,overflow:"hidden"}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:340}}>
+            <thead style={{background:G.surf1}}>
+              <tr>
+                <th style={{...thStyle,textAlign:"left",paddingLeft:14}}>#</th>
+                <th style={{...thStyle,textAlign:"left"}}>Jugador</th>
+                <th style={thStyle}>🏟️</th>
+                <th style={thStyle}>⚽</th>
+                <th style={thStyle}>⚽/PJ</th>
+                <th style={thStyle}>🥇</th>
+                <th style={thStyle}>🟨</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jugadores.map((j,i)=>{
+                const partidos=j.partidos||0;
+                const goles=(j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0);
+                const mvps=(j.historial||[]).filter(h=>h.mvp).length;
+                const amarillas=(j.historial||[]).reduce((s,h)=>s+(h.eventos?.amarillas||0),0);
+                const golPJ=partidos>0?(goles/partidos).toFixed(1):"—";
+                return (
+                  <tr key={j.dni} onClick={()=>setExpandido(expandido===j.dni?null:j.dni)}
+                    style={{cursor:"pointer",background:expandido===j.dni?G.primary+"08":"transparent",transition:"background .15s"}}>
+                    <td style={{...tdStyle,textAlign:"left",paddingLeft:14}}>
+                      <span style={{fontWeight:900,color:i<3?G.gold:G.t3,fontSize:12}}>#{i+1}</span>
+                    </td>
+                    <td style={{...tdStyle,textAlign:"left"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <Av nom={j.nombre} foto={j.foto} size={28} />
+                        <div>
+                          <div style={{fontWeight:700,fontSize:13,lineHeight:1.2}}>{j.nombre.split(" ")[0]}</div>
+                          {j.apodo && <div style={{color:G.primary,fontSize:10}}>"{j.apodo}"</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{...tdStyle,fontWeight:700,color:G.t1}}>{partidos}</td>
+                    <td style={{...tdStyle,fontWeight:700,color:goles>0?G.secondary:G.t3}}>{goles}</td>
+                    <td style={{...tdStyle,color:G.t2}}>{golPJ}</td>
+                    <td style={{...tdStyle,fontWeight:700,color:mvps>0?G.gold:G.t3}}>{mvps||"—"}</td>
+                    <td style={{...tdStyle,color:amarillas>0?G.warn:G.t3}}>{amarillas||"—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:"8px 14px",background:G.surf1,fontSize:11,color:G.t3,textAlign:"center"}}>
+          🏟️ Partidos · ⚽ Goles · ⚽/PJ Goles por partido · 🥇 MVPs · 🟨 Amarillas
+        </div>
+      </Card>
 
-          {/* Admin: promedio visible en la card directamente */}
-          {esAdmin && (
-            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:G.primary+"10",borderRadius:G.r2,marginBottom:8,cursor:"pointer"}} onClick={()=>setExpandido(expandido===j.dni?null:j.dni)}>
-              <span style={{fontWeight:700,fontSize:13,color:G.primary,flex:1}}>📊 Promedio: {calcProm(j.atributos||{}).toFixed(2)}</span>
-              <span style={{fontSize:12,color:G.primary}}>{expandido===j.dni?"▲ ocultar":"▼ ver atributos"}</span>
-            </div>
-          )}
-          {/* Admin: puntajes detallados — expandibles */}
-          {esAdmin && expandido===j.dni && (
-            <div style={{paddingTop:10,borderTop:"1px solid #EEF0F8"}}>
-              <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8}}>👑 PUNTAJES (Admin)</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                {ATTRS.map(a=>(
-                  <div key={a.key} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:G.surf1,borderRadius:G.r1}}>
-                    <span style={{fontSize:13}}>{a.icon}</span>
-                    <span style={{flex:1,fontSize:11,color:G.t2}}>{a.label}</span>
-                    <span style={{fontWeight:700,color:G.primary,fontSize:13}}>{((j.atributos||{})[a.key]||0).toFixed(1)}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",padding:"8px 10px",background:G.primary+"10",borderRadius:G.r1,marginTop:6}}>
-                <span style={{fontWeight:700,fontSize:12}}>Promedio general</span>
-                <span style={{fontWeight:800,color:G.primary,fontSize:14}}>{calcProm(j.atributos||{}).toFixed(2)}</span>
+      {/* DETALLE EXPANDIBLE */}
+      {expandido && (()=>{
+        const j=jugadores.find(x=>x.dni===expandido);
+        if(!j)return null;
+        return (
+          <Card accent={G.primary+"30"}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+              <Av nom={j.nombre} foto={j.foto} size={44} />
+              <div>
+                <div style={{fontWeight:800,fontSize:16}}>{j.nombre}</div>
+                {j.apodo && <div style={{color:G.primary,fontSize:12}}>"{j.apodo}"</div>}
               </div>
             </div>
-          )}
-        </Card>
-      ))}
+
+            {/* Stats detalladas */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+              {[
+                {l:"Partidos jugados",v:j.partidos||0,i:"🏟️"},
+                {l:"Goles totales",v:(j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0),i:"⚽"},
+                {l:"Goles por partido",v:j.partidos>0?((j.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0)/j.partidos).toFixed(1):"—",i:"📈"},
+                {l:"MVPs",v:(j.historial||[]).filter(h=>h.mvp).length,i:"🥇"},
+                {l:"Amarillas",v:(j.historial||[]).reduce((s,h)=>s+(h.eventos?.amarillas||0),0),i:"🟨"},
+                {l:"Último partido",v:(j.historial||[]).slice(-1)[0]?.fecha||"—",i:"📅"},
+              ].map(s=>(
+                <div key={s.l} style={{background:G.surf1,borderRadius:G.r2,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:G.t3,marginBottom:2}}>{s.i} {s.l}</div>
+                  <div style={{fontWeight:800,fontSize:16,color:G.primary}}>{s.v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Admin: atributos */}
+            {esAdmin && (
+              <>
+                <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8}}>👑 PUNTAJES (Admin)</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {ATTRS.map(a=>(
+                    <div key={a.key} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",background:G.surf1,borderRadius:G.r1}}>
+                      <span>{a.icon}</span>
+                      <span style={{flex:1,fontSize:11,color:G.t2}}>{a.label}</span>
+                      <span style={{fontWeight:800,color:G.primary,fontSize:13}}>{((j.atributos||{})[a.key]||0).toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:G.primary+"12",borderRadius:G.r1,marginTop:8}}>
+                  <span style={{fontWeight:700,fontSize:12}}>Promedio general</span>
+                  <span style={{fontWeight:900,color:G.primary}}>{calcProm(j.atributos||{}).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+          </Card>
+        );
+      })()}
     </div>
   );
 }
