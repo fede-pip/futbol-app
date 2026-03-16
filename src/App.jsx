@@ -631,11 +631,95 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
   const [precio,   setPrecio]   = useState(comunidad.precioCancha||0);
   const [pozo,     setPozo]     = useState(comunidad.pozoAcumulado||0);
   const [msgCom,   setMsgCom]   = useState("");
+  const [invitadosSueltos, setInvitadosSueltos] = useState([]);
+  const [vincDni, setVincDni]   = useState({});
+  const [msgVinc, setMsgVinc]   = useState("");
 
   const esAdmin=(comunidad.admins||[]).includes(user.dni);
   const esCreador=comunidad.creadorDni===user.dni;
 
-  useEffect(()=>{loadMiembros();},[comunidad.id]);
+  useEffect(()=>{loadMiembros(); if(esAdmin) cargarInvitadosSueltos();},[comunidad.id]);
+
+  async function cargarInvitadosSueltos(){
+    // Recopilar todos los inv_ únicos del historialPartidos de la comunidad
+    const hist = comunidad.historialPartidos || [];
+    const mapaInv = {};
+    for(const p of hist){
+      const invs = p.invitados || {};
+      for(const [id, data] of Object.entries(invs)){
+        if(id.startsWith("inv_") && !mapaInv[id]) mapaInv[id] = data;
+      }
+    }
+    setInvitadosSueltos(Object.entries(mapaInv).map(([id,data])=>({id,...data})));
+  }
+
+  async function vincularInvitado(invId){
+    const dni = (vincDni[invId]||"").trim();
+    if(!dni){setMsgVinc("Ingresá el DNI");return;}
+
+    // Verificar que el DNI existe en la app
+    const userSnap = await getDoc(rUser(dni));
+    if(!userSnap.exists()){setMsgVinc("❌ No existe un usuario con ese DNI");return;}
+    const userReal = userSnap.data();
+
+    // Recopilar historial acumulado del invitado desde historialPartidos
+    const hist = comunidad.historialPartidos || [];
+    const histInv = [];
+    for(const p of hist){
+      const jugadores = [
+        ...(p.equipos?.oscuro||[]),
+        ...(p.equipos?.blanco||[]),
+      ];
+      if(!jugadores.includes(invId)) continue;
+      const evs = (p.eventos||{})[invId] || {};
+      histInv.push({
+        fecha: p.fecha || "",
+        mvp: p.mvp === invId,
+        resultado: p.resultadoJugadores?.[invId] || "jugado",
+        eventos: { goles: evs.goles||0, amarillas: evs.amarillas||0 },
+      });
+    }
+
+    // Fusionar historial en el usuario real
+    const histReal = userReal.historial || [];
+    const histFusionado = [...histReal, ...histInv];
+
+    // Actualizar usuario real con historial fusionado y sumar partidos/goles
+    const golesExtra = histInv.reduce((s,h)=>s+(h.eventos?.goles||0),0);
+    await setDoc(rUser(dni), {
+      historial: histFusionado,
+      partidos: (userReal.partidos||0) + histInv.length,
+      goles: (userReal.goles||0) + golesExtra,
+    },{merge:true});
+
+    // Reemplazar inv_ por DNI real en historialPartidos de la comunidad
+    const histActualizado = hist.map(p => {
+      const nuevoEquipos = {
+        oscuro: (p.equipos?.oscuro||[]).map(id=>id===invId?dni:id),
+        blanco: (p.equipos?.blanco||[]).map(id=>id===invId?dni:id),
+        publicado: p.equipos?.publicado,
+      };
+      const nuevoEventos = {...(p.eventos||{})};
+      if(nuevoEventos[invId]){nuevoEventos[dni]=nuevoEventos[invId];delete nuevoEventos[invId];}
+      const nuevoInvitados = {...(p.invitados||{})};
+      delete nuevoInvitados[invId];
+      const nuevoMvp = p.mvp===invId ? dni : p.mvp;
+      return {...p, equipos:nuevoEquipos, eventos:nuevoEventos, invitados:nuevoInvitados, mvp:nuevoMvp};
+    });
+
+    await setDoc(rCom(comunidad.id), {historialPartidos: histActualizado},{merge:true});
+
+    // Si no es miembro aún, agregarlo
+    if(!(comunidad.miembros||[]).includes(dni)){
+      await setDoc(rCom(comunidad.id),{miembros:[...(comunidad.miembros||[]),dni]},{merge:true});
+    }
+
+    setMsgVinc(`✓ ${userReal.nombre} vinculado! Se transfirieron ${histInv.length} partido(s).`);
+    setVincDni(p=>({...p,[invId]:""}));
+    await loadComs();
+    await cargarInvitadosSueltos();
+    setTimeout(()=>setMsgVinc(""),4000);
+  }
 
   async function loadMiembros(){
     const arr=[];
@@ -807,6 +891,36 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
         </>
       )}
 
+      {/* Vincular invitados a DNI — solo admin */}
+      {esAdmin && invitadosSueltos.length > 0 && (
+        <Card accent={G.primary+"20"}>
+          <h3 style={{fontWeight:700,marginBottom:4}}>🔗 Vincular invitados a DNI</h3>
+          <p style={{fontSize:12,color:G.t3,marginBottom:14}}>Si un invitado se registró en la app, podés vincular su historial a su DNI real para que no pierda partidos ni estadísticas.</p>
+          {invitadosSueltos.map(inv=>(
+            <div key={inv.id} style={{padding:"12px 0",borderBottom:"1px solid #EEF0F8"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <Av nom={inv.nombre||"?"} size={32} />
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>{inv.nombre||"Invitado"}</div>
+                  <div style={{fontSize:11,color:G.t3}}>Invitado sin DNI</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <input
+                  placeholder="DNI del jugador registrado"
+                  value={vincDni[inv.id]||""}
+                  onChange={e=>setVincDni(p=>({...p,[inv.id]:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&vincularInvitado(inv.id)}
+                  style={{flex:1,padding:"8px 12px",borderRadius:G.r1,border:"1.5px solid #DDE3F0",background:G.surf0,fontSize:14,fontFamily:"'Outfit',sans-serif"}}
+                />
+                <Btn sm onClick={()=>vincularInvitado(inv.id)} style={{whiteSpace:"nowrap"}}>Vincular</Btn>
+              </div>
+            </div>
+          ))}
+          <Msg ok={msgVinc?.startsWith("✓")} style={{marginTop:10}}>{msgVinc}</Msg>
+        </Card>
+      )}
+
       <Divider />
       {/* Salir del grupo */}
       {!esCreador && (
@@ -953,7 +1067,7 @@ function CalendarLinks({ partido, comunidad }) {
 // ── PARTIDO ───────────────────────────────────────────────────────────────────
 function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   const [fecha,setFecha]=useState(""); const [hora,setHora]=useState(""); const [lugar,setLugar]=useState(""); const [formato,setFormato]=useState("");
-  const [nomInv,setNomInv]=useState(""); const [msg,setMsg]=useState(""); const [invMsg,setInvMsg]=useState("");
+  const [nomInv,setNomInv]=useState(""); const [nivelInv,setNivelInv]=useState(5); const [msg,setMsg]=useState(""); const [invMsg,setInvMsg]=useState("");
   const [jugData,setJugData]=useState({});
 
   const esAdmin=(comunidad.admins||[]).includes(user.dni);
@@ -994,8 +1108,11 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   async function agregarInvitado(){
     if(!nomInv.trim()){setInvMsg("Poné un nombre");return;}
     const id=`inv_${uid()}`;
-    await setDoc(rPart(partido.id),{invitados:{...(partido.invitados||{}),[id]:{nombre:nomInv.trim(),esInvitado:true}},inscriptos:[...inscripos,id]},{merge:true});
-    setNomInv("");setInvMsg("✓ Invitado agregado");setTimeout(()=>setInvMsg(""),2000);
+    // Construir atributos con el nivel elegido para el balanceo
+    const nivel=Number(nivelInv)||5;
+    const atributos=Object.fromEntries(ATTRS.map(a=>[a.key,nivel]));
+    await setDoc(rPart(partido.id),{invitados:{...(partido.invitados||{}),[id]:{nombre:nomInv.trim(),esInvitado:true,atributos}},inscriptos:[...inscripos,id]},{merge:true});
+    setNomInv("");setNivelInv(5);setInvMsg("✓ Invitado agregado");setTimeout(()=>setInvMsg(""),2000);
   }
   async function actualizarEvento(id,key,delta){
     const evs={...(partido.eventos||{})};
@@ -1167,6 +1284,19 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
           <Card>
             <h3 style={{fontWeight:700,marginBottom:12}}>👤 Agregar invitado</h3>
             <Inp value={nomInv} onChange={e=>setNomInv(e.target.value)} placeholder='"Amigo de Juan"' onKeyDown={e=>e.key==="Enter"&&agregarInvitado()} />
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:12,color:G.t3,fontWeight:600,display:"block",marginBottom:6}}>Nivel del jugador (para balanceo de equipos)</label>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <input type="range" min={1} max={10} step={0.5} value={nivelInv} onChange={e=>setNivelInv(e.target.value)}
+                  style={{flex:1,accentColor:G.primary}} />
+                <div style={{minWidth:36,background:G.primary,color:"#fff",borderRadius:8,padding:"4px 8px",fontWeight:700,fontSize:14,textAlign:"center"}}>
+                  {nivelInv}
+                </div>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:G.t3,marginTop:2}}>
+                <span>Principiante</span><span>Promedio</span><span>Crack</span>
+              </div>
+            </div>
             <Btn v="soft" onClick={agregarInvitado} full>+ Agregar invitado</Btn>
             <Msg ok={invMsg?.startsWith("✓")}>{invMsg}</Msg>
           </Card>
@@ -1225,7 +1355,7 @@ function PEquipos({ comunidad, partido, user }) {
       if(!partido)return;
       const obj={};
       for(const id of inscripos){
-        if(id.startsWith("inv_")){obj[id]={...partido.invitados?.[id],atributos:{}};continue;}
+        if(id.startsWith("inv_")){obj[id]={...partido.invitados?.[id]};continue;}
         const s=await getDoc(rUser(id));if(s.exists())obj[id]=s.data();
       }
       setJugData(obj);
@@ -1699,6 +1829,7 @@ function PStats({ comunidad, user, esAdmin }) {
                 <th style={thStyle}>P</th>
                 <th style={{...thStyle,color:G.primary}}>Pts</th>
                 <th style={thStyle}>⚽</th>
+                <th style={thStyle}>⚽/PJ</th>
                 <th style={thStyle}>🥇</th>
               </tr>
             </thead>
@@ -1711,6 +1842,7 @@ function PStats({ comunidad, user, esAdmin }) {
                 const empatados=(j.historial||[]).filter(h=>h.resultado==="empatado").length;
                 const perdidos=(j.historial||[]).filter(h=>h.resultado==="perdido").length;
                 const pts=calcPuntos(j.historial);
+                const golPJ=partidos>0?(goles/partidos).toFixed(1):"—";
                 return (
                   <tr key={j.dni} onClick={()=>setExpandido(expandido===j.dni?null:j.dni)}
                     style={{cursor:"pointer",background:expandido===j.dni?G.primary+"08":"transparent",transition:"background .15s"}}>
@@ -1732,6 +1864,7 @@ function PStats({ comunidad, user, esAdmin }) {
                     <td style={{...tdStyle,color:G.danger}}>{perdidos||"—"}</td>
                     <td style={{...tdStyle,fontWeight:900,color:G.primary,fontSize:15}}>{pts}</td>
                     <td style={{...tdStyle,color:goles>0?G.secondary:G.t3}}>{goles||"—"}</td>
+                    <td style={{...tdStyle,color:G.t2}}>{golPJ}</td>
                     <td style={{...tdStyle,color:mvps>0?G.gold:G.t3}}>{mvps||"—"}</td>
                   </tr>
                 );
@@ -1740,7 +1873,7 @@ function PStats({ comunidad, user, esAdmin }) {
           </table>
         </div>
         <div style={{padding:"8px 14px",background:G.surf1,fontSize:11,color:G.t3,textAlign:"center"}}>
-          PJ Partidos · G Ganados · E Empatados · P Perdidos · Pts Puntos · ⚽ Goles · 🥇 MVPs
+          PJ Partidos · G Ganados · E Empatados · P Perdidos · Pts Puntos · ⚽ Goles · ⚽/PJ Goles por partido · 🥇 MVPs
         </div>
       </Card>
 
