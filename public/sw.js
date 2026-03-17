@@ -1,56 +1,65 @@
-// Service Worker simple y robusto para iOS Safari
-const CACHE_NAME = 'app8-v2';
+// Service Worker — App8
+// Estrategia: network-first siempre, sin cachear assets con hash
+// Esto evita que nuevos deploys rompan la PWA instalada
+
+const CACHE_NAME = 'app8-shell-v1';
+const SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
+  self.skipWaiting(); // activar inmediatamente
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(['/', '/index.html']))
-      .catch(() => {})
+      .then(cache => cache.addAll(SHELL))
+      .catch(() => {}) // nunca fallar en install
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      ))
-      .then(() => self.clients.claim())
+    Promise.all([
+      // Limpiar caches viejos
+      caches.keys().then(keys =>
+        Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      ),
+      self.clients.claim()
+    ])
   );
 });
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+  const req = event.request;
+  const url = new URL(req.url);
 
-  // No interceptar requests externos (Firebase, APIs, etc.)
-  if (
-    url.hostname !== self.location.hostname ||
-    event.request.method !== 'GET'
-  ) {
-    return;
-  }
+  // Solo manejar GET del mismo origen
+  if (req.method !== 'GET' || url.hostname !== self.location.hostname) return;
 
-  // Navegación: network-first, fallback a index.html
-  if (event.request.mode === 'navigate') {
+  // Para assets con hash en el nombre (JS/CSS de Vite) — network-first, sin cachear
+  // Esto evita que un deploy nuevo quede bloqueado por caché viejo
+  if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
+      fetch(req).catch(() => caches.match(req))
     );
     return;
   }
 
-  // Assets: network-first con caché como fallback
+  // Para navegación (HTML) — siempre ir a la red, fallback a index.html
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Para íconos y manifest — cache-first (no cambian con los deploys)
+  if (url.pathname.startsWith('/icons/') || url.pathname === '/manifest.json') {
+    event.respondWith(
+      caches.match(req).then(cached => cached || fetch(req))
+    );
+    return;
+  }
+
+  // Todo lo demás — network-first
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(event.request, clone))
-            .catch(() => {});
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    fetch(req).catch(() => caches.match(req))
   );
 });
