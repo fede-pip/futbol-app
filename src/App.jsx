@@ -189,6 +189,24 @@ const globalCSS = `
   @keyframes spin   { to{transform:rotate(360deg)} }
   @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.5} }
   .fade-up { animation: fadeUp .3s ease both; }
+  /* PWA safe areas para notch/barra de estado */
+  .top-bar { padding-top: max(14px, env(safe-area-inset-top)) !important; }
+  .bottom-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)) !important; }
+  /* Responsive base */
+  *, *::before, *::after { box-sizing: border-box; }
+  img { max-width: 100%; }
+  input, select, textarea { font-size: 16px !important; } /* evita zoom en iOS al hacer focus */
+  /* Tablas horizontalmente scrolleables en móvil */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Texto que no se desborda */
+  .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Grid responsivo — 2 cols en > 360px, 1 col en pantallas muy chicas */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 360px) { .grid-2 { grid-template-columns: 1fr; } }
+  /* Tap target mínimo 44px para accesibilidad */
+  button, a { min-height: 44px; }
+  /* Evitar contenido cortado en iPhone con Dynamic Island */
+  .app-wrapper { padding-left: max(0px, env(safe-area-inset-left)); padding-right: max(0px, env(safe-area-inset-right)); }
 `;
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
@@ -456,7 +474,7 @@ export default function App() {
   return (
     <>
       <style>{globalCSS}</style>
-      <div style={{minHeight:"100vh",background:G.bg,maxWidth:480,margin:"0 auto",paddingBottom:80,fontFamily:"'Outfit',sans-serif"}}>
+      <div className="app-wrapper" style={{minHeight:"100vh",background:G.bg,maxWidth:480,margin:"0 auto",paddingBottom:"max(80px, calc(80px + env(safe-area-inset-bottom)))",fontFamily:"'Outfit',sans-serif"}}>
 
         {/* TOP BAR */}
         <div style={{background:G.surf0,boxShadow:G.sh1,padding:"14px 18px",position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",gap:12}}>
@@ -2206,7 +2224,7 @@ function PStats({ comunidad, user, esAdmin }) {
 
       {/* TABLA PRINCIPAL */}
       <Card style={{padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto"}}>
+        <div className="table-scroll">
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:340}}>
             <thead style={{background:G.surf1}}>
               <tr>
@@ -2282,7 +2300,7 @@ function PStats({ comunidad, user, esAdmin }) {
             </div>
 
             {/* Stats detalladas */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+            <div className="grid-2" style={{marginBottom:14}}>
               {[
                 {l:"Partidos jugados",v:j.partidos||0,i:"🏟️"},
                 {l:"Puntos",v:calcPuntos(j.historial),i:"🏆",highlight:true},
@@ -2306,7 +2324,7 @@ function PStats({ comunidad, user, esAdmin }) {
             {esAdmin && (
               <>
                 <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8,marginTop:4}}>👑 ATRIBUTOS — Evolución último partido (Admin)</div>
-                <div style={{overflowX:"auto"}}>
+                <div className="table-scroll">
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <thead>
                       <tr style={{background:G.surf1}}>
