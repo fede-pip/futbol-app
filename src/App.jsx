@@ -226,51 +226,68 @@ function Msg({ children, ok, warn }) {
 function Divider() { return <div style={{height:1,background:"#EEF0F8",margin:"12px 0"}} />; }
 
 function Spinner({ size=110, msg="Cargando..." }) {
-  const r = size * 0.18;
-  const pad = 7;
-  const total = size + pad * 2;
-  // Perímetro del rectángulo redondeado
-  const w = total - 8, h = total - 8;
-  const perim = 2*(w - 2*r) + 2*(h - 2*r) + 2*Math.PI*r;
-  const snake = perim * 0.22; // largo de la víbora: 22% del perímetro
+  const pad = 5;           // espacio entre logo y víbora
+  const sw = 4;            // grosor del trazo
+  const total = size + (pad + sw) * 2;
+  // El border-radius del logo
+  const logoR = size * 0.18;
+  // El border-radius del rectángulo SVG = logoR + pad (misma distancia)
+  const rectR = logoR + pad;
+  // Coordenadas del rect dentro del SVG
+  const x0 = sw / 2, y0 = sw / 2;
+  const rw = total - sw, rh = total - sw;
+  // Perímetro real del rectángulo redondeado
+  const perim = 2 * (rw - 2*rectR) + 2 * (rh - 2*rectR) + 2 * Math.PI * rectR;
+  const snake = perim * 0.20;
 
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20,padding:40}}>
       <div style={{position:"relative",width:total,height:total}}>
-        {/* Track gris tenue */}
+
+        {/* Track gris fijo */}
         <svg width={total} height={total} viewBox={`0 0 ${total} ${total}`}
           style={{position:"absolute",top:0,left:0,pointerEvents:"none"}}>
-          <rect x="4" y="4" width={w} height={h} rx={r} ry={r}
-            fill="none" stroke="#DDE3F0" strokeWidth="3"/>
+          <rect x={x0} y={y0} width={rw} height={rh} rx={rectR} ry={rectR}
+            fill="none" stroke="#DDE3F0" strokeWidth={sw}/>
         </svg>
+
         {/* Víbora giratoria */}
         <svg width={total} height={total} viewBox={`0 0 ${total} ${total}`}
           style={{position:"absolute",top:0,left:0,pointerEvents:"none",
-            animation:"snakespin 1.4s linear infinite"}}>
+            animation:"snakespin 1.5s linear infinite",
+            transformOrigin:`${total/2}px ${total/2}px`}}>
           <defs>
-            <linearGradient id="snakegrad" gradientUnits="userSpaceOnUse"
-              x1="0%" y1="0%" x2="100%" y2="0%">
+            <linearGradient id="snakeg" gradientUnits="userSpaceOnUse"
+              x1={total/2} y1={y0} x2={total} y2={total/2}>
               <stop offset="0%" stopColor="#3D5AFE" stopOpacity="0"/>
-              <stop offset="60%" stopColor="#3D5AFE" stopOpacity="0.7"/>
               <stop offset="100%" stopColor="#3D5AFE" stopOpacity="1"/>
             </linearGradient>
           </defs>
-          {/* Víbora: dash que ocupa el 22% del perímetro, el resto transparente */}
-          <rect x="4" y="4" width={w} height={h} rx={r} ry={r}
+          <rect x={x0} y={y0} width={rw} height={rh} rx={rectR} ry={rectR}
             fill="none"
-            stroke="url(#snakegrad)"
-            strokeWidth="4"
-            strokeDasharray={`${snake} ${perim}`}
+            stroke="url(#snakeg)"
+            strokeWidth={sw}
+            strokeDasharray={`${snake} ${perim - snake}`}
             strokeLinecap="round"
             pathLength={perim}
           />
         </svg>
-        {/* Logo centrado */}
-        <div style={{position:"absolute",top:pad,left:pad,width:size,height:size,
-          borderRadius:r,overflow:"hidden",boxShadow:"0 6px 24px rgba(61,90,254,0.3)"}}>
+
+        {/* Logo */}
+        <div style={{
+          position:"absolute",
+          top: pad + sw,
+          left: pad + sw,
+          width: size,
+          height: size,
+          borderRadius: logoR,
+          overflow:"hidden",
+          boxShadow:"0 6px 24px rgba(61,90,254,0.3)"
+        }}>
           <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8"/>
         </div>
       </div>
+
       <div style={{textAlign:"center"}}>
         <p style={{color:G.t2,fontSize:15,fontWeight:700,margin:0}}>{msg}</p>
         <p style={{color:G.t3,fontSize:12,marginTop:4}}>App8 · Fútbol de los Lunes</p>
