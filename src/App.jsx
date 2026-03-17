@@ -1375,10 +1375,24 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
 
       {/* Info */}
       <Card accent={G.primary+"25"}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-          {[{i:"📆",v:partido.fecha},{i:"🕐",v:partido.hora},{i:"📍",v:partido.lugar},{i:"👥",v:partido.formato}].map((r,i)=>(
-            <div key={i} style={{background:G.surf1,borderRadius:G.r1,padding:"10px 12px",fontSize:14,fontWeight:600}}>{r.i} {r.v||"—"}</div>
-          ))}
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+          {/* Fecha y hora en la misma fila */}
+          <div style={{display:"flex",gap:8}}>
+            <div style={{flex:1,background:G.surf1,borderRadius:G.r1,padding:"10px 12px",fontSize:14,fontWeight:600}}>
+              📆 {partido.fecha ? new Date(partido.fecha+"T12:00:00").toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short",year:"numeric"}) : "—"}
+            </div>
+            <div style={{background:G.surf1,borderRadius:G.r1,padding:"10px 12px",fontSize:14,fontWeight:600,whiteSpace:"nowrap"}}>
+              🕐 {partido.hora||"—"}
+            </div>
+          </div>
+          {/* Lugar en fila completa */}
+          <div style={{background:G.surf1,borderRadius:G.r1,padding:"10px 12px",fontSize:13,fontWeight:600,lineHeight:1.4}}>
+            📍 {partido.lugar||"—"}
+          </div>
+          {/* Formato */}
+          <div style={{background:G.surf1,borderRadius:G.r1,padding:"10px 12px",fontSize:14,fontWeight:600,display:"inline-flex",alignSelf:"flex-start"}}>
+            👥 {partido.formato||"—"}
+          </div>
         </div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <Chip color={cupoLibre>0?G.secondary:G.danger}>{cupoLibre>0?`✅ ${cupoLibre} lugares libres`:"🚫 Completo"}</Chip>
