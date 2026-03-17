@@ -226,31 +226,48 @@ function Msg({ children, ok, warn }) {
 function Divider() { return <div style={{height:1,background:"#EEF0F8",margin:"12px 0"}} />; }
 
 function Spinner({ size=110, msg="Cargando..." }) {
-  const r = size * 0.18; // mismo border-radius que el logo
-  const pad = 6; // espacio entre logo y anillo
+  const r = size * 0.18;
+  const pad = 7;
   const total = size + pad * 2;
-  // Radio del anillo = mitad del total menos el padding del stroke
-  const ringR = (total / 2) - 4;
-  // Perímetro aproximado de rect redondeado para dasharray
-  const perim = 2 * ((size + pad*2 - 2*r) + (size + pad*2 - 2*r)) + 2 * Math.PI * r;
+  // Perímetro del rectángulo redondeado
+  const w = total - 8, h = total - 8;
+  const perim = 2*(w - 2*r) + 2*(h - 2*r) + 2*Math.PI*r;
+  const snake = perim * 0.22; // largo de la víbora: 22% del perímetro
 
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20,padding:40}}>
       <div style={{position:"relative",width:total,height:total}}>
-        {/* Anillo giratorio que sigue el borde redondeado del logo */}
+        {/* Track gris tenue */}
         <svg width={total} height={total} viewBox={`0 0 ${total} ${total}`}
-          style={{position:"absolute",top:0,left:0,animation:"ringspin 1.4s linear infinite"}}>
-          {/* Track gris */}
-          <rect x="2" y="2" width={total-4} height={total-4} rx={r+pad} ry={r+pad}
-            fill="none" stroke="#EEF0F8" strokeWidth="3.5"/>
-          {/* Arco azul animado */}
-          <rect x="2" y="2" width={total-4} height={total-4} rx={r+pad} ry={r+pad}
-            fill="none" stroke="#3D5AFE" strokeWidth="3.5"
-            strokeDasharray={`${perim*0.25} ${perim}`}
-            strokeLinecap="round"/>
+          style={{position:"absolute",top:0,left:0,pointerEvents:"none"}}>
+          <rect x="4" y="4" width={w} height={h} rx={r} ry={r}
+            fill="none" stroke="#DDE3F0" strokeWidth="3"/>
+        </svg>
+        {/* Víbora giratoria */}
+        <svg width={total} height={total} viewBox={`0 0 ${total} ${total}`}
+          style={{position:"absolute",top:0,left:0,pointerEvents:"none",
+            animation:"snakespin 1.4s linear infinite"}}>
+          <defs>
+            <linearGradient id="snakegrad" gradientUnits="userSpaceOnUse"
+              x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#3D5AFE" stopOpacity="0"/>
+              <stop offset="60%" stopColor="#3D5AFE" stopOpacity="0.7"/>
+              <stop offset="100%" stopColor="#3D5AFE" stopOpacity="1"/>
+            </linearGradient>
+          </defs>
+          {/* Víbora: dash que ocupa el 22% del perímetro, el resto transparente */}
+          <rect x="4" y="4" width={w} height={h} rx={r} ry={r}
+            fill="none"
+            stroke="url(#snakegrad)"
+            strokeWidth="4"
+            strokeDasharray={`${snake} ${perim}`}
+            strokeLinecap="round"
+            pathLength={perim}
+          />
         </svg>
         {/* Logo centrado */}
-        <div style={{position:"absolute",top:pad,left:pad,width:size,height:size,borderRadius:r,overflow:"hidden",boxShadow:"0 6px 24px rgba(61,90,254,0.3)"}}>
+        <div style={{position:"absolute",top:pad,left:pad,width:size,height:size,
+          borderRadius:r,overflow:"hidden",boxShadow:"0 6px 24px rgba(61,90,254,0.3)"}}>
           <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8"/>
         </div>
       </div>
@@ -259,7 +276,7 @@ function Spinner({ size=110, msg="Cargando..." }) {
         <p style={{color:G.t3,fontSize:12,marginTop:4}}>App8 · Fútbol de los Lunes</p>
       </div>
       <style>{`
-        @keyframes ringspin {
+        @keyframes snakespin {
           0%   { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
@@ -670,6 +687,7 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
   const [invitadosSueltos, setInvitadosSueltos] = useState([]);
   const [vincDni, setVincDni]   = useState({});
   const [msgVinc, setMsgVinc]   = useState("");
+  const [comLoading, setComLoading] = useState(true);
 
   const esAdmin=(comunidad.admins||[]).includes(user.dni);
   const esCreador=comunidad.creadorDni===user.dni;
@@ -758,9 +776,11 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
   }
 
   async function loadMiembros(){
+    setComLoading(true);
     const arr=[];
     for(const dni of comunidad.miembros||[]){const s=await getDoc(rUser(dni));if(s.exists())arr.push(s.data());}
     setMiembros(arr);
+    setComLoading(false);
   }
 
   async function invitar(){
@@ -816,6 +836,8 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
     await setDoc(rCom(comunidad.id),{miembros:(comunidad.miembros||[]).filter(d=>d!==dni),admins:(comunidad.admins||[]).filter(d=>d!==dni)},{merge:true});
     await loadComs();await loadMiembros();
   }
+
+  if(comLoading) return <div style={{padding:20}}><Spinner msg="Cargando grupo..." /></div>;
 
   return (
     <div style={{padding:20}}>
