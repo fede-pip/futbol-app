@@ -477,7 +477,7 @@ export default function App() {
       <div className="app-wrapper" style={{minHeight:"100vh",background:G.bg,maxWidth:480,margin:"0 auto",paddingBottom:"max(80px, calc(80px + env(safe-area-inset-bottom)))",fontFamily:"'Outfit',sans-serif"}}>
 
         {/* TOP BAR */}
-        <div style={{background:G.surf0,boxShadow:G.sh1,padding:"14px 18px",position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",gap:12}}>
+        <div className="top-bar" style={{background:G.surf0,boxShadow:G.sh1,paddingLeft:18,paddingRight:18,paddingBottom:14,position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",gap:12}}>
           <div onClick={()=>{setComActiva(null);setPantalla("home");}} style={{width:36,height:36,borderRadius:12,overflow:"hidden",cursor:"pointer",flexShrink:0,boxShadow:G.sh2}}><img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8" /></div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:800,fontSize:18,letterSpacing:-.5,color:G.t1}}>
@@ -510,7 +510,7 @@ export default function App() {
 
         {/* BOTTOM NAV */}
         {user && (
-          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:G.surf0,borderTop:"1px solid #EEF0F8",display:"flex",zIndex:100,boxShadow:"0 -4px 20px rgba(0,0,0,.06)"}}>
+          <div className="bottom-nav" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:G.surf0,borderTop:"1px solid #EEF0F8",display:"flex",zIndex:100,boxShadow:"0 -4px 20px rgba(0,0,0,.06)"}}>
             {tabs.map(t=>{
               const active = pantalla===t.id;
               return (
