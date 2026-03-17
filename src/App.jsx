@@ -60,10 +60,12 @@ function fmtNombre(nombre, modo="completo") {
   const partes = nombre.trim().split(" ").filter(Boolean);
   if(partes.length === 1) return partes[0];
   if(modo === "tabla") {
-    // Apellido + inicial del nombre: "Pipkin F."
-    const apellido = partes[partes.length-1];
+    // Inicial del primer nombre + apellido completo (todo menos la primera palabra)
+    // Ej: "Agustin Dal Maso" → "A. Dal Maso"
+    // Ej: "Federico Pipkin" → "F. Pipkin"
     const inicial = partes[0][0].toUpperCase();
-    return `${apellido} ${inicial}.`;
+    const apellido = partes.slice(1).join(" ");
+    return `${inicial}. ${apellido}`;
   }
   return nombre; // completo
 }
@@ -2182,19 +2184,37 @@ function PStats({ comunidad, user, esAdmin }) {
   useEffect(()=>{
     const load=async()=>{
       const arr=[];
-      // Miembros registrados
-      for(const dni of comunidad.miembros||[]){const s=await getDoc(rUser(dni));if(s.exists())arr.push({...s.data(),_tipo:"registrado"});}
+      const normalizar = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 
-      // Invitados del historial — agrupar por nombre exacto
+      // Miembros registrados — guardar sus nombres para filtrar invitados duplicados
+      const nombresMiembros = new Set();
+      for(const dni of comunidad.miembros||[]){
+        const s=await getDoc(rUser(dni));
+        if(s.exists()){
+          arr.push({...s.data(),_tipo:"registrado"});
+          const nom = normalizar(s.data().nombre||"");
+          nombresMiembros.add(nom);
+          const partes = nom.split(" ");
+          if(partes[0]) nombresMiembros.add(partes[0]);
+          if(partes[1]) nombresMiembros.add(partes[0]+" "+partes[1]);
+        }
+      }
+
+      // Invitados del historial — agrupar por nombre, excluir miembros actuales
       const histPart = comunidad.historialPartidos || [];
-      const invMap = {}; // nombre → {nombre, historial acumulado, goles, partidos}
+      const invMap = {};
       for(const p of histPart){
         const invs = p.invitados || {};
         for(const [id, data] of Object.entries(invs)){
           if(!id.startsWith("inv_")) continue;
           const nombre = data.nombre || id;
+          const nombreNorm = normalizar(nombre);
+          // Excluir si ya es miembro registrado
+          if(nombresMiembros.has(nombreNorm)) continue;
+          let excluir = false;
+          for(const nom of nombresMiembros){ if(nom.startsWith(nombreNorm)||nombreNorm.startsWith(nom)){ excluir=true; break; } }
+          if(excluir) continue;
           if(!invMap[nombre]) invMap[nombre]={nombre,_tipo:"invitado",partidos:0,goles:0,historial:[]};
-          // Acumular estadísticas desde eventos del partido
           const evs=(p.eventos||{})[id]||{};
           const enOscuro=(p.equipos?.oscuro||[]).includes(id);
           const enBlanco=(p.equipos?.blanco||[]).includes(id);
@@ -2208,10 +2228,9 @@ function PStats({ comunidad, user, esAdmin }) {
           else if((enOscuro&&golesO>golesB)||(enBlanco&&golesB>golesO)) res="ganado";
           else if(enOscuro||enBlanco) res="perdido";
           const mvpIds = p.mvps || (p.mvp ? [p.mvp] : []);
-          // Chequear por ID directo O por nombre del mvp (fallback para IDs duplicados limpios)
           const mvpPorNombre = mvpIds.some(mid => {
             const mvpData = (p.invitados||{})[mid];
-            return mvpData && (mvpData.nombre||"").toLowerCase().trim() === nombre.toLowerCase().trim();
+            return mvpData && normalizar(mvpData.nombre||"") === nombreNorm;
           });
           invMap[nombre].partidos++;
           invMap[nombre].goles+=(evs.goles||0);
