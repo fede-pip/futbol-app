@@ -1542,7 +1542,11 @@ function PVotar({ comunidad, partido, user }) {
 
   const [votLoading,setVotLoading]=useState(true);
 
-  useEffect(()=>{\n    if(!partido)return;\n    const unsub=onSnapshot(rVots(partido.id),s=>setVotosSnap(s.exists()?s.data():{}));\n    return unsub;\n  },[partido?.id]);
+  useEffect(()=>{
+    if(!partido)return;
+    const unsub=onSnapshot(rVots(partido.id),s=>setVotosSnap(s.exists()?s.data():{}));
+    return unsub;
+  },[partido?.id]);
 
   useEffect(()=>{
     const load=async()=>{
