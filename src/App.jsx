@@ -16,13 +16,13 @@ const db = getFirestore(fbApp);
 const SUPER_ADMIN = "35270164";
 
 const ATTRS = [
-  { key:"velocidad",   label:"Velocidad",   icon:"⚡" },
-  { key:"pases",       label:"Pases",        icon:"🎯" },
-  { key:"definicion",  label:"Definición",   icon:"🥅" },
-  { key:"amagues",     label:"Amagues",      icon:"🕺" },
-  { key:"defensa",     label:"Defensa",      icon:"🛡️" },
-  { key:"resistencia", label:"Resistencia",  icon:"💪" },
-  { key:"arquero",     label:"Arquero",      icon:"🧤" },
+  { key:"velocidad",   label:"Velocidad",   icon:"⚡", ej:"corrió" },
+  { key:"pases",       label:"Pases",       icon:"🎯", ej:"pasó la pelota" },
+  { key:"definicion",  label:"Definición",  icon:"🥅", ej:"definió" },
+  { key:"amagues",     label:"Amagues",     icon:"🕺", ej:"gambeteó" },
+  { key:"defensa",     label:"Defensa",     icon:"🛡️", ej:"defendió" },
+  { key:"resistencia", label:"Resistencia", icon:"💪", ej:"aguantó físicamente" },
+  { key:"arquero",     label:"Arquero",     icon:"🧤", ej:"atajó" },
 ];
 
 const FORMATOS = [
@@ -1070,14 +1070,40 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   const [nomInv,setNomInv]=useState(""); const [nivelInv,setNivelInv]=useState(5); const [msg,setMsg]=useState(""); const [invMsg,setInvMsg]=useState("");
   const [invitadosHistorial,setInvitadosHistorial]=useState([]);
 
-  // Cargar invitados previos del historial para el desplegable
+  // Cargar invitados previos del historial para el desplegable — excluir miembros actuales
   useEffect(()=>{
-    const hist = comunidad.historialPartidos || [];
-    const mapa = {};
-    hist.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{
-      if(id.startsWith("inv_")&&data.nombre&&!mapa[data.nombre]) mapa[data.nombre]=data;
-    }));
-    setInvitadosHistorial(Object.entries(mapa).map(([nombre,data])=>({nombre,...data})));
+    const load = async () => {
+      const hist = comunidad.historialPartidos || [];
+      const mapa = {};
+      hist.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{
+        if(id.startsWith("inv_")&&data.nombre&&!mapa[data.nombre]) mapa[data.nombre]=data;
+      }));
+      // Cargar nombres de miembros actuales para filtrarlos (nombre completo y parcial)
+      const nombresMiembros = new Set();
+      for(const dni of comunidad.miembros||[]){
+        const s = await getDoc(rUser(dni));
+        if(s.exists()){
+          const nom = s.data().nombre?.toLowerCase().trim() || "";
+          nombresMiembros.add(nom);
+          // También agregar primer nombre y primer apellido por separado
+          const partes = nom.split(" ");
+          if(partes[0]) nombresMiembros.add(partes[0]);
+          if(partes[1]) nombresMiembros.add(partes[0]+" "+partes[1]);
+        }
+      }
+      const lista = Object.entries(mapa)
+        .map(([nombre,data])=>({nombre,...data}))
+        .filter(inv=>{
+          const n = inv.nombre?.toLowerCase().trim() || "";
+          // Excluir si el nombre del invitado coincide exactamente con algún miembro
+          // o si algún miembro empieza con ese nombre
+          if(nombresMiembros.has(n)) return false;
+          for(const nom of nombresMiembros){ if(nom.startsWith(n)||n.startsWith(nom)) return false; }
+          return true;
+        });
+      setInvitadosHistorial(lista);
+    };
+    load();
   },[comunidad.id]);
   const [jugData,setJugData]=useState({});
 
@@ -1668,20 +1694,36 @@ function PVotar({ comunidad, partido, user }) {
               </div>
 
               <p style={{fontSize:11,color:G.t3,marginBottom:12,textAlign:"center",background:G.surf1,borderRadius:G.r1,padding:"8px 12px"}}>
-                👍 Mejor que siempre &nbsp;·&nbsp; ➡️ Como siempre &nbsp;·&nbsp; 👎 Menos que siempre
+                Votá cómo jugó hoy comparado con su nivel habitual
               </p>
               {ATTRS.map(a=>{
                 const voto=notas[compActual]?.[a.key]??null;
-                const opts=[{v:1,icon:"👍",color:G.secondary},{v:0,icon:"➡️",color:G.t3},{v:-1,icon:"👎",color:G.danger}];
+                const opts=[
+                  {v:1,  icon:"👍", color:G.secondary, label:"Mejor"},
+                  {v:0,  icon:"🟰", color:G.t3,        label:"Igual"},
+                  {v:-1, icon:"👎", color:G.danger,     label:"Peor"},
+                ];
                 return (
-                  <div key={a.key} style={{marginBottom:8,padding:"10px 14px",background:G.surf1,borderRadius:G.r2,display:"flex",alignItems:"center",gap:10}}>
-                    <span style={{fontSize:18}}>{a.icon}</span>
-                    <span style={{flex:1,fontWeight:700,fontSize:13}}>{a.label}</span>
+                  <div key={a.key} style={{marginBottom:8,padding:"10px 14px",background:G.surf1,borderRadius:G.r2}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <span style={{fontSize:18}}>{a.icon}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13}}>{a.label}</div>
+                        <div style={{fontSize:11,color:G.t3}}>
+                          {voto===null
+                            ? `¿${a.ej} más, igual o menos que siempre?`
+                            : voto===1  ? `👍 ${a.ej} más que siempre`
+                            : voto===-1 ? `👎 ${a.ej} menos que siempre`
+                            :             `🟰 ${a.ej} igual que siempre`}
+                        </div>
+                      </div>
+                    </div>
                     <div style={{display:"flex",gap:6}}>
                       {opts.map(o=>(
                         <button key={o.v} onClick={()=>setNotas(p=>({...p,[compActual]:{...p[compActual],[a.key]:o.v}}))}
-                          style={{width:42,height:42,borderRadius:G.r2,border:`2px solid ${voto===o.v?o.color:"#DDE3F0"}`,background:voto===o.v?o.color+"25":"transparent",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>
-                          {o.icon}
+                          style={{flex:1,padding:"8px 4px",borderRadius:G.r2,border:`2px solid ${voto===o.v?o.color:"#DDE3F0"}`,background:voto===o.v?o.color+"25":"transparent",cursor:"pointer",transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                          <span style={{fontSize:20}}>{o.icon}</span>
+                          <span style={{fontSize:10,fontWeight:700,color:voto===o.v?o.color:G.t3}}>{o.label}</span>
                         </button>
                       ))}
                     </div>
@@ -1788,7 +1830,7 @@ function PHistorial({ comunidad, esAdmin }) {
           <div onClick={()=>setExpandido(expandido===i?null:i)} style={{cursor:"pointer"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:15}}>{new Date(p.fecha).toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"})}</div>
+                <div style={{fontWeight:700,fontSize:15}}>{(()=>{const d=new Date(p.fecha);return isNaN(d)?p.fecha:d.toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"});})()}</div>
                 <div style={{color:G.t3,fontSize:12,marginTop:2}}>📍 {p.lugar||"—"} · {p.formato||"—"}</div>
                 {p.resultado && <div style={{marginTop:4,fontSize:13,fontWeight:600,color:G.primary}}>🏆 {p.resultado}</div>}
               </div>
