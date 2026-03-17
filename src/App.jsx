@@ -2135,7 +2135,49 @@ function PStats({ comunidad, user, esAdmin }) {
             </div>
 
             {/* Admin: atributos con evolución */}
-            {esAdmin && (\n              <>\n                <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8}}>👑 ATRIBUTOS — Evolución último partido (Admin)</div>\n                <div style={{overflowX:\"auto\"}}>\n                  <table style={{width:\"100%\",borderCollapse:\"collapse\",fontSize:12}}>\n                    <thead>\n                      <tr style={{background:G.surf1}}>\n                        <th style={{padding:\"6px 8px\",textAlign:\"left\",fontWeight:600,color:G.t3,fontSize:11}}>Atributo</th>\n                        <th style={{padding:\"6px 8px\",textAlign:\"center\",fontWeight:600,color:G.t3,fontSize:11}}>Anterior</th>\n                        <th style={{padding:\"6px 8px\",textAlign:\"center\",fontWeight:600,color:G.t3,fontSize:11}}>Actual</th>\n                        <th style={{padding:\"6px 8px\",textAlign:\"center\",fontWeight:600,color:G.t3,fontSize:11}}>Delta</th>\n                      </tr>\n                    </thead>\n                    <tbody>\n                      {ATTRS.map(a=>{\n                        const ant=parseFloat((j.atributosAnteriores||{})[a.key]||0);\n                        const act=parseFloat((j.atributos||{})[a.key]||0);\n                        const delta=+(act-ant).toFixed(2);\n                        const color=delta>0?G.secondary:delta<0?G.danger:G.t3;\n                        const enRango=Math.abs(delta)<=0.26;\n                        return (\n                          <tr key={a.key} style={{borderBottom:`1px solid ${G.surf2}`,background:(!enRango&&ant>0)?\"#FFF8E1\":\"transparent\"}}>\n                            <td style={{padding:\"7px 8px\",display:\"flex\",alignItems:\"center\",gap:6}}>\n                              <span>{a.icon}</span>\n                              <span style={{color:G.t2}}>{a.label}</span>\n                            </td>\n                            <td style={{padding:\"7px 8px\",textAlign:\"center\",color:G.t3}}>{ant>0?ant.toFixed(2):\"—\"}</td>\n                            <td style={{padding:\"7px 8px\",textAlign:\"center\",fontWeight:800,color:G.primary}}>{act.toFixed(2)}</td>\n                            <td style={{padding:\"7px 8px\",textAlign:\"center\",fontWeight:700,color}}>\n                              {ant>0?(delta>0?`▲ +${delta}`:delta<0?`▼ ${delta}`:`= 0`):\"—\"}\n                              {ant>0&&!enRango&&<span style={{marginLeft:4,fontSize:10,color:G.warn}}>⚠️</span>}\n                            </td>\n                          </tr>\n                        );\n                      })}\n                    </tbody>\n                  </table>\n                </div>\n                <div style={{display:\"flex\",justifyContent:\"space-between\",padding:\"8px 12px\",background:G.primary+\"12\",borderRadius:G.r1,marginTop:8}}>\n                  <span style={{fontWeight:700,fontSize:12}}>Promedio general</span>\n                  <span style={{fontWeight:900,color:G.primary}}>{calcProm(j.atributos||{}).toFixed(2)}</span>\n                </div>\n              </>\n            )}
+            {esAdmin && (
+              <>
+                <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8,marginTop:4}}>👑 ATRIBUTOS — Evolución último partido (Admin)</div>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead>
+                      <tr style={{background:G.surf1}}>
+                        <th style={{padding:"6px 8px",textAlign:"left",fontWeight:600,color:G.t3,fontSize:11}}>Atributo</th>
+                        <th style={{padding:"6px 8px",textAlign:"center",fontWeight:600,color:G.t3,fontSize:11}}>Anterior</th>
+                        <th style={{padding:"6px 8px",textAlign:"center",fontWeight:600,color:G.primary,fontSize:11}}>Actual</th>
+                        <th style={{padding:"6px 8px",textAlign:"center",fontWeight:600,color:G.t3,fontSize:11}}>Delta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ATTRS.map(a=>{
+                        const ant=parseFloat((j.atributosAnteriores||{})[a.key]||0);
+                        const act=parseFloat((j.atributos||{})[a.key]||0);
+                        const dlt=+(act-ant).toFixed(2);
+                        const dcol=dlt>0?G.secondary:dlt<0?G.danger:G.t3;
+                        const enRango=Math.abs(dlt)<=0.26;
+                        return (
+                          <tr key={a.key} style={{borderBottom:`1px solid ${G.surf2}`,background:(!enRango&&ant>0)?"#FFF8E1":"transparent"}}>
+                            <td style={{padding:"7px 8px"}}>
+                              <span>{a.icon}</span> <span style={{color:G.t2}}>{a.label}</span>
+                            </td>
+                            <td style={{padding:"7px 8px",textAlign:"center",color:G.t3}}>{ant>0?ant.toFixed(2):"—"}</td>
+                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:800,color:G.primary}}>{act.toFixed(2)}</td>
+                            <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:dcol}}>
+                              {ant>0?(dlt>0?`▲ +${dlt}`:dlt<0?`▼ ${dlt}`:"= 0"):"—"}
+                              {ant>0&&!enRango&&<span style={{marginLeft:4,fontSize:10,color:G.warn}}>⚠️</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:G.primary+"12",borderRadius:G.r1,marginTop:8}}>
+                  <span style={{fontWeight:700,fontSize:12}}>Promedio general</span>
+                  <span style={{fontWeight:900,color:G.primary}}>{calcProm(j.atributos||{}).toFixed(2)}</span>
+                </div>
+              </>
+            )}
           </Card>
         );
       })()}
