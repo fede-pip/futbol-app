@@ -1068,6 +1068,17 @@ function CalendarLinks({ partido, comunidad }) {
 function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   const [fecha,setFecha]=useState(""); const [hora,setHora]=useState(""); const [lugar,setLugar]=useState(""); const [formato,setFormato]=useState("");
   const [nomInv,setNomInv]=useState(""); const [nivelInv,setNivelInv]=useState(5); const [msg,setMsg]=useState(""); const [invMsg,setInvMsg]=useState("");
+  const [invitadosHistorial,setInvitadosHistorial]=useState([]);
+
+  // Cargar invitados previos del historial para el desplegable
+  useEffect(()=>{
+    const hist = comunidad.historialPartidos || [];
+    const mapa = {};
+    hist.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{
+      if(id.startsWith("inv_")&&data.nombre&&!mapa[data.nombre]) mapa[data.nombre]=data;
+    }));
+    setInvitadosHistorial(Object.entries(mapa).map(([nombre,data])=>({nombre,...data})));
+  },[comunidad.id]);
   const [jugData,setJugData]=useState({});
 
   const esAdmin=(comunidad.admins||[]).includes(user.dni);
@@ -1283,6 +1294,34 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
         <>
           <Card>
             <h3 style={{fontWeight:700,marginBottom:12}}>👤 Agregar invitado</h3>
+
+            {/* Desplegable de invitados previos */}
+            {invitadosHistorial.length > 0 && (
+              <div style={{marginBottom:10}}>
+                <label style={{fontSize:12,color:G.t3,fontWeight:600,display:"block",marginBottom:6}}>Invitado que ya vino antes</label>
+                <select
+                  onChange={e=>{
+                    const sel = invitadosHistorial.find(x=>x.nombre===e.target.value);
+                    if(sel){
+                      setNomInv(sel.nombre);
+                      // Pre-cargar nivel si tiene atributos guardados
+                      const prom = sel.atributos ? calcProm(sel.atributos) : 5;
+                      setNivelInv(prom||5);
+                    } else {
+                      setNomInv("");
+                    }
+                  }}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:G.r1,border:"1.5px solid #DDE3F0",background:G.surf0,fontSize:14,fontFamily:"'Outfit',sans-serif",color:G.t1,marginBottom:6}}
+                >
+                  <option value="">— Elegir invitado anterior —</option>
+                  {invitadosHistorial.map(inv=>(
+                    <option key={inv.nombre} value={inv.nombre}>{inv.nombre}</option>
+                  ))}
+                </select>
+                <div style={{fontSize:11,color:G.t3,textAlign:"center",marginBottom:8}}>— o escribí un nombre nuevo —</div>
+              </div>
+            )}
+
             <Inp value={nomInv} onChange={e=>setNomInv(e.target.value)} placeholder='"Amigo de Juan"' onKeyDown={e=>e.key==="Enter"&&agregarInvitado()} />
             <div style={{marginBottom:12}}>
               <label style={{fontSize:12,color:G.t3,fontWeight:600,display:"block",marginBottom:6}}>Nivel del jugador (para balanceo de equipos)</label>
@@ -1829,7 +1868,43 @@ function PStats({ comunidad, user, esAdmin }) {
   useEffect(()=>{
     const load=async()=>{
       const arr=[];
-      for(const dni of comunidad.miembros||[]){const s=await getDoc(rUser(dni));if(s.exists())arr.push(s.data());}
+      // Miembros registrados
+      for(const dni of comunidad.miembros||[]){const s=await getDoc(rUser(dni));if(s.exists())arr.push({...s.data(),_tipo:"registrado"});}
+
+      // Invitados del historial — agrupar por nombre exacto
+      const histPart = comunidad.historialPartidos || [];
+      const invMap = {}; // nombre → {nombre, historial acumulado, goles, partidos}
+      for(const p of histPart){
+        const invs = p.invitados || {};
+        for(const [id, data] of Object.entries(invs)){
+          if(!id.startsWith("inv_")) continue;
+          const nombre = data.nombre || id;
+          if(!invMap[nombre]) invMap[nombre]={nombre,_tipo:"invitado",partidos:0,goles:0,historial:[]};
+          // Acumular estadísticas desde eventos del partido
+          const evs=(p.eventos||{})[id]||{};
+          const enOscuro=(p.equipos?.oscuro||[]).includes(id);
+          const enBlanco=(p.equipos?.blanco||[]).includes(id);
+          let golesO=0,golesB=0;
+          if(p.equipos){
+            golesO=(p.equipos.oscuro||[]).reduce((s,x)=>s+((p.eventos||{})[x]?.goles||0),0);
+            golesB=(p.equipos.blanco||[]).reduce((s,x)=>s+((p.eventos||{})[x]?.goles||0),0);
+          }
+          let res="jugado";
+          if(golesO===golesB) res="empatado";
+          else if((enOscuro&&golesO>golesB)||(enBlanco&&golesB>golesO)) res="ganado";
+          else if(enOscuro||enBlanco) res="perdido";
+          invMap[nombre].partidos++;
+          invMap[nombre].goles+=(evs.goles||0);
+          invMap[nombre].historial.push({
+            fecha:p.fecha||"",
+            mvp:p.mvp===id,
+            resultado:res,
+            eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0},
+          });
+        }
+      }
+      for(const inv of Object.values(invMap)) arr.push(inv);
+
       arr.sort((a,b)=>calcPuntos(b.historial)-calcPuntos(a.historial));
       setJugadores(arr);setLoading(false);
     };
@@ -1883,8 +1958,9 @@ function PStats({ comunidad, user, esAdmin }) {
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <Av nom={j.nombre} foto={j.foto} size={28} />
                         <div>
-                          <div style={{fontWeight:700,fontSize:13,lineHeight:1.2}}>{j.nombre.split(" ")[0]}</div>
+                          <div style={{fontWeight:700,fontSize:13,lineHeight:1.2}}>{j.nombre?.split(" ")[0]}</div>
                           {j.apodo && <div style={{color:G.primary,fontSize:10}}>"{j.apodo}"</div>}
+                          {j._tipo==="invitado" && <div style={{color:G.warn,fontSize:10,fontWeight:600}}>invitado</div>}
                         </div>
                       </div>
                     </td>
