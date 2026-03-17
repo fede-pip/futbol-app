@@ -53,6 +53,20 @@ function calcPuntos(historial) {
     return s;
   },0);
 }
+
+// Formatea nombre: "Apellido, N." para tabla, nombre completo para resto
+function fmtNombre(nombre, modo="completo") {
+  if(!nombre) return "—";
+  const partes = nombre.trim().split(" ").filter(Boolean);
+  if(partes.length === 1) return partes[0];
+  if(modo === "tabla") {
+    // Apellido + inicial del nombre: "Pipkin F."
+    const apellido = partes[partes.length-1];
+    const inicial = partes[0][0].toUpperCase();
+    return `${apellido} ${inicial}.`;
+  }
+  return nombre; // completo
+}
 function balancear(lista) {
   const n = lista.length;
   const mitad = Math.floor(n/2);
@@ -1486,7 +1500,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
                   {cena.map(id=>{
                     const j=jugData[id];
                     if(!j) return <Chip key={id} color={G.warn}>{id}</Chip>;
-                    return <Chip key={id} color={G.warn}>{j.nombre?.split(" ")[0]}</Chip>;
+                    return <Chip key={id} color={G.warn}>{fmtNombre(j.nombre,"tabla")}</Chip>;
                   })}
                 </div>
               </div>
@@ -2079,7 +2093,7 @@ function PHistorial({ comunidad, esAdmin }) {
               {p.mvp && (()=>{
                 const ids=p.mvps||[p.mvp];
                 return ids.map(id=>{
-                  const nombre=(jugData[id]?.nombre||p.invitados?.[id]?.nombre||"MVP")?.split(" ")[0];
+                  const nombre=fmtNombre(jugData[id]?.nombre||p.invitados?.[id]?.nombre||"MVP","tabla");
                   return <Chip key={id} color={G.gold}>🥇 {nombre}</Chip>;
                 });
               })()}
@@ -2284,7 +2298,7 @@ function PStats({ comunidad, user, esAdmin }) {
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <Av nom={j.nombre} foto={j.foto} size={28} />
                         <div>
-                          <div style={{fontWeight:700,fontSize:13,lineHeight:1.2}}>{j.nombre?.split(" ")[0]}</div>
+                          <div style={{fontWeight:700,fontSize:13,lineHeight:1.2}}>{fmtNombre(j.nombre,"tabla")}</div>
                           {j.apodo && <div style={{color:G.primary,fontSize:10}}>"{j.apodo}"</div>}
                           {j._tipo==="invitado" && <div style={{color:G.warn,fontSize:10,fontWeight:600}}>invitado</div>}
                         </div>
