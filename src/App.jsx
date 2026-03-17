@@ -262,7 +262,6 @@ function Spinner({ size=80, msg="Cargando..." }) {
     </div>
   );
 }
-}
 
 function Toggle({ checked, onChange }) {
   return (
