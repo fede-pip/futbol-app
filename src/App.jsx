@@ -228,34 +228,16 @@ function Divider() { return <div style={{height:1,background:"#EEF0F8",margin:"1
 function Spinner({ size=110, msg="Cargando..." }) {
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20,padding:40}}>
-      <div style={{position:"relative",width:size,height:size}}>
-        {/* Logo App8 como fondo */}
-        <div style={{width:size,height:size,borderRadius:size*0.18,overflow:"hidden",boxShadow:"0 8px 32px rgba(61,90,254,0.35)"}}>
+      <div style={{position:"relative",width:size+16,height:size+16}}>
+        {/* Anillo giratorio */}
+        <svg width={size+16} height={size+16} viewBox="0 0 126 126" style={{position:"absolute",top:0,left:0,animation:"ringspin 1.4s linear infinite"}}>
+          <circle cx="63" cy="63" r="58" fill="none" stroke="#EEF0F8" strokeWidth="4"/>
+          <circle cx="63" cy="63" r="58" fill="none" stroke="#3D5AFE" strokeWidth="4"
+            strokeDasharray="80 284" strokeLinecap="round"/>
+        </svg>
+        {/* Logo centrado */}
+        <div style={{position:"absolute",top:8,left:8,width:size,height:size,borderRadius:size*0.18,overflow:"hidden",boxShadow:"0 6px 24px rgba(61,90,254,0.3)"}}>
           <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8"/>
-        </div>
-        {/* Pelota giratoria encima abajo-derecha */}
-        <div style={{position:"absolute",bottom:-10,right:-10,animation:"ballspin 1.1s linear infinite",filter:"drop-shadow(0 3px 6px rgba(0,0,0,0.5))"}}>
-          <svg width={size*0.42} height={size*0.42} viewBox="0 0 100 100">
-            <defs>
-              <radialGradient id="sg" cx="35%" cy="30%" r="65%">
-                <stop offset="0%" stopColor="#ffffff"/>
-                <stop offset="50%" stopColor="#e0e0e0"/>
-                <stop offset="100%" stopColor="#999999"/>
-              </radialGradient>
-              <clipPath id="bc"><circle cx="50" cy="50" r="44"/></clipPath>
-            </defs>
-            <circle cx="50" cy="50" r="44" fill="url(#sg)" stroke="#bbb" strokeWidth="1.5"/>
-            <g clipPath="url(#bc)" fill="#111">
-              <polygon points="50,8 62,18 57,33 43,33 38,18"/>
-              <polygon points="62,18 78,16 84,32 72,42 57,33"/>
-              <polygon points="38,18 22,16 16,32 28,42 43,33"/>
-              <polygon points="57,33 72,42 68,59 50,64 32,59 28,42 43,33"/>
-              <polygon points="84,32 96,44 90,62 74,64 68,59 72,42"/>
-              <polygon points="16,32 4,44 10,62 26,64 32,59 28,42"/>
-              <polygon points="50,64 68,59 74,64 66,80 50,86 34,80 26,64 32,59"/>
-            </g>
-            <ellipse cx="36" cy="34" rx="10" ry="7" fill="white" opacity="0.4" transform="rotate(-30 36 34)"/>
-          </svg>
         </div>
       </div>
       <div style={{textAlign:"center"}}>
@@ -263,13 +245,9 @@ function Spinner({ size=110, msg="Cargando..." }) {
         <p style={{color:G.t3,fontSize:12,marginTop:4}}>App8 · Fútbol de los Lunes</p>
       </div>
       <style>{`
-        @keyframes ballspin {
+        @keyframes ringspin {
           0%   { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
-        }
-        @keyframes bounce {
-          0%,100% { transform: translateY(0); }
-          50%      { transform: translateY(-14px); }
         }
       `}</style>
     </div>
@@ -446,9 +424,9 @@ function AuthScreen({ onLogin }) {
   return (
     <div style={{padding:20}}>
       <div style={{textAlign:"center",padding:"32px 0 28px"}}>
-        <div style={{width:80,height:80,borderRadius:24,overflow:"hidden",margin:"0 auto 16px",boxShadow:G.sh3}}><img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8" /></div>
-        <h1 style={{fontSize:28,fontWeight:900,letterSpacing:-1,color:G.t1}}>App<span style={{color:G.primary}}>8</span></h1>
-        <p style={{color:G.t3,fontSize:14,marginTop:4}}>Tu red de fútbol</p>
+        <div style={{width:140,height:140,borderRadius:36,overflow:"hidden",margin:"0 auto 20px",boxShadow:"0 12px 40px rgba(61,90,254,0.35)"}}>
+          <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8" />
+        </div>
       </div>
       <div style={{display:"flex",gap:6,marginBottom:20,background:G.surf1,borderRadius:G.r3,padding:4}}>
         {["login","register"].map(t=>(
