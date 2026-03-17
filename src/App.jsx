@@ -2193,11 +2193,17 @@ function PStats({ comunidad, user, esAdmin }) {
           if(golesO===golesB) res="empatado";
           else if((enOscuro&&golesO>golesB)||(enBlanco&&golesB>golesO)) res="ganado";
           else if(enOscuro||enBlanco) res="perdido";
+          const mvpIds = p.mvps || (p.mvp ? [p.mvp] : []);
+          // Chequear por ID directo O por nombre del mvp (fallback para IDs duplicados limpios)
+          const mvpPorNombre = mvpIds.some(mid => {
+            const mvpData = (p.invitados||{})[mid];
+            return mvpData && (mvpData.nombre||"").toLowerCase().trim() === nombre.toLowerCase().trim();
+          });
           invMap[nombre].partidos++;
           invMap[nombre].goles+=(evs.goles||0);
           invMap[nombre].historial.push({
             fecha:p.fecha||"",
-            mvp:p.mvp===id,
+            mvp: mvpIds.includes(id) || mvpPorNombre,
             resultado:res,
             eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0},
           });
