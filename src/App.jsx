@@ -54,12 +54,79 @@ function calcPuntos(historial) {
   },0);
 }
 function balancear(lista) {
-  const s = [...lista].sort((a,b)=>calcProm(b.atributos)-calcProm(a.atributos));
-  const o=[],b=[];
-  s.forEach((j,i)=>(i%2===0?o:b).push(j));
-  // Mezclar orden de display para no revelar ranking por puntaje
+  const n = lista.length;
+  const mitad = Math.floor(n/2);
   const shuffle = arr => [...arr].sort(()=>Math.random()-.5);
-  return {oscuro:shuffle(o), blanco:shuffle(b)};
+
+  if(n <= 2) {
+    const s=[...lista].sort((a,b)=>calcProm(b.atributos)-calcProm(a.atributos));
+    return {oscuro:shuffle([s[0]]), blanco:shuffle(s.slice(1))};
+  }
+
+  // Para grupos pequeños (≤14): buscar la combinación óptima por fuerza bruta parcial
+  // Para grupos grandes: usar algoritmo greedy mejorado
+  const prom = j => calcProm(j.atributos||{});
+  const sumEquipo = eq => eq.reduce((s,j)=>s+prom(j),0);
+
+  let mejorO=[], mejorB=[], mejorDiff=Infinity;
+
+  if(n <= 12) {
+    // Greedy con múltiples iteraciones aleatorias — encuentra combinación muy cercana al óptimo
+    const intentos = 200;
+    for(let t=0; t<intentos; t++){
+      const shuffled = [...lista].sort(()=>Math.random()-.5);
+      const o=shuffled.slice(0,mitad), b=shuffled.slice(mitad);
+      const diff=Math.abs(sumEquipo(o)-sumEquipo(b));
+      if(diff<mejorDiff){
+        mejorDiff=diff;
+        mejorO=[...o];
+        mejorB=[...b];
+      }
+    }
+    // Refinamiento: intentar swaps para mejorar
+    let mejorado=true;
+    while(mejorado){
+      mejorado=false;
+      for(let i=0;i<mejorO.length;i++){
+        for(let j=0;j<mejorB.length;j++){
+          // Probar swap
+          const newO=[...mejorO]; const newB=[...mejorB];
+          [newO[i],newB[j]]=[newB[j],newO[i]];
+          const diff=Math.abs(sumEquipo(newO)-sumEquipo(newB));
+          if(diff<mejorDiff-0.001){
+            mejorDiff=diff;
+            mejorO=newO; mejorB=newB;
+            mejorado=true;
+          }
+        }
+      }
+    }
+  } else {
+    // Greedy para grupos grandes: ordenar y distribuir en serpenteo con swaps
+    const s=[...lista].sort((a,b)=>prom(b.atributos)-prom(a.atributos));
+    s.forEach((j,i)=>(i%2===0?mejorO:mejorB).push(j));
+    // Refinamiento con swaps
+    let mejorado=true;
+    mejorDiff=Math.abs(sumEquipo(mejorO)-sumEquipo(mejorB));
+    while(mejorado){
+      mejorado=false;
+      for(let i=0;i<mejorO.length;i++){
+        for(let j=0;j<mejorB.length;j++){
+          const newO=[...mejorO]; const newB=[...mejorB];
+          [newO[i],newB[j]]=[newB[j],newO[i]];
+          const diff=Math.abs(sumEquipo(newO)-sumEquipo(newB));
+          if(diff<mejorDiff-0.001){
+            mejorDiff=diff;
+            mejorO=newO; mejorB=newB;
+            mejorado=true;
+          }
+        }
+      }
+    }
+  }
+
+  // Mezclar display para no revelar ranking
+  return {oscuro:shuffle(mejorO), blanco:shuffle(mejorB)};
 }
 function asignarVotaciones(inscriptos) {
   const jugadores = inscriptos.filter(id=>!id.startsWith("inv_"));
@@ -226,19 +293,16 @@ function Msg({ children, ok, warn }) {
 function Divider() { return <div style={{height:1,background:"#EEF0F8",margin:"12px 0"}} />; }
 
 function Spinner({ size=110, msg="Cargando..." }) {
-  const pad = 5;           // espacio entre logo y víbora
-  const sw = 4;            // grosor del trazo
-  const total = size + (pad + sw) * 2;
-  // El border-radius del logo
-  const logoR = size * 0.18;
-  // El border-radius del rectángulo SVG = logoR + pad (misma distancia)
+  const pad = 6;
+  const sw = 4;
+  const logoR = Math.round(size * 0.18);
   const rectR = logoR + pad;
-  // Coordenadas del rect dentro del SVG
-  const x0 = sw / 2, y0 = sw / 2;
-  const rw = total - sw, rh = total - sw;
-  // Perímetro real del rectángulo redondeado
-  const perim = 2 * (rw - 2*rectR) + 2 * (rh - 2*rectR) + 2 * Math.PI * rectR;
-  const snake = perim * 0.20;
+  const total = size + (pad + sw) * 2;
+  const x0 = sw, y0 = sw;
+  const rw = total - sw*2, rh = total - sw*2;
+  // Perímetro exacto del rectángulo redondeado
+  const perim = Math.round(2*(rw - 2*rectR) + 2*(rh - 2*rectR) + 2*Math.PI*rectR);
+  const snakeLen = Math.round(perim * 0.22);
 
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20,padding:40}}>
@@ -251,24 +315,41 @@ function Spinner({ size=110, msg="Cargando..." }) {
             fill="none" stroke="#DDE3F0" strokeWidth={sw}/>
         </svg>
 
-        {/* Víbora giratoria */}
+        {/* Víbora: dashoffset animado recorre el path */}
         <svg width={total} height={total} viewBox={`0 0 ${total} ${total}`}
-          style={{position:"absolute",top:0,left:0,pointerEvents:"none",
-            animation:"snakespin 1.5s linear infinite",
-            transformOrigin:`${total/2}px ${total/2}px`}}>
+          style={{position:"absolute",top:0,left:0,pointerEvents:"none"}}>
           <defs>
-            <linearGradient id="snakeg" gradientUnits="userSpaceOnUse"
-              x1={total/2} y1={y0} x2={total} y2={total/2}>
-              <stop offset="0%" stopColor="#3D5AFE" stopOpacity="0"/>
-              <stop offset="100%" stopColor="#3D5AFE" stopOpacity="1"/>
-            </linearGradient>
+            <style>{`
+              @keyframes snakeoffset {
+                0%   { stroke-dashoffset: ${perim}; }
+                100% { stroke-dashoffset: 0; }
+              }
+              @keyframes snakehead {
+                0%   { stroke-dashoffset: ${perim + snakeLen}; }
+                100% { stroke-dashoffset: ${snakeLen}; }
+              }
+            `}</style>
           </defs>
+          {/* Cola — trazo que desaparece */}
           <rect x={x0} y={y0} width={rw} height={rh} rx={rectR} ry={rectR}
             fill="none"
-            stroke="url(#snakeg)"
+            stroke="#3D5AFE"
+            strokeOpacity="0.25"
             strokeWidth={sw}
-            strokeDasharray={`${snake} ${perim - snake}`}
+            strokeDasharray={`${snakeLen} ${perim - snakeLen}`}
             strokeLinecap="round"
+            style={{animation:`snakeoffset 1.5s linear infinite`}}
+            pathLength={perim}
+          />
+          {/* Cabeza — trazo brillante adelante */}
+          <rect x={x0} y={y0} width={rw} height={rh} rx={rectR} ry={rectR}
+            fill="none"
+            stroke="#3D5AFE"
+            strokeOpacity="1"
+            strokeWidth={sw + 1}
+            strokeDasharray={`${Math.round(snakeLen*0.25)} ${perim - Math.round(snakeLen*0.25)}`}
+            strokeLinecap="round"
+            style={{animation:`snakehead 1.5s linear infinite`}}
             pathLength={perim}
           />
         </svg>
@@ -292,12 +373,6 @@ function Spinner({ size=110, msg="Cargando..." }) {
         <p style={{color:G.t2,fontSize:15,fontWeight:700,margin:0}}>{msg}</p>
         <p style={{color:G.t3,fontSize:12,marginTop:4}}>App8 · Fútbol de los Lunes</p>
       </div>
-      <style>{`
-        @keyframes snakespin {
-          0%   { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -1658,7 +1733,31 @@ function PVotar({ comunidad, partido, user }) {
 
     const notasAc=partido.notasAtributos||{};
     const mvpC=partido.mvpConteo||{};
-    const mvpId=Object.keys(mvpC).length?Object.keys(mvpC).reduce((a,b)=>mvpC[a]>mvpC[b]?a:b):null;
+
+    // Calcular MVP con desempate por goles, y MVP compartido si siguen iguales
+    let mvpId=null;
+    let mvpIds=[]; // puede ser más de uno si hay empate total
+    if(Object.keys(mvpC).length){
+      const maxVotos=Math.max(...Object.values(mvpC));
+      const empatados=Object.keys(mvpC).filter(id=>mvpC[id]===maxVotos);
+      if(empatados.length===1){
+        mvpId=empatados[0];
+        mvpIds=[mvpId];
+      } else {
+        // Desempate por goles en el partido
+        const golesPartido=(id)=>((partido.eventos||{})[id]?.goles||0);
+        const maxGoles=Math.max(...empatados.map(golesPartido));
+        const finalistas=empatados.filter(id=>golesPartido(id)===maxGoles);
+        if(finalistas.length===1){
+          mvpId=finalistas[0];
+          mvpIds=[mvpId];
+        } else {
+          // Empate total — MVP compartido
+          mvpIds=finalistas;
+          mvpId=finalistas[0]; // guardamos el primero como referencia principal
+        }
+      }
+    }
 
     // Calcular resultado global
     let resultado="";
@@ -1697,7 +1796,7 @@ function PVotar({ comunidad, partido, user }) {
       });
       const evs=(partido.eventos||{})[id]||{};
       const resJug=getResJug(id);
-      const nuevaEntrada={fecha:new Date().toLocaleDateString("es-AR"),mvp:id===mvpId,resultado:resJug,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}};
+      const nuevaEntrada={fecha:new Date().toLocaleDateString("es-AR"),mvp:mvpIds.includes(id),resultado:resJug,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}};
       await setDoc(rUser(id),{
         atributos:nuevos,
         atributosAnteriores:attrsAnt,
@@ -1713,7 +1812,7 @@ function PVotar({ comunidad, partido, user }) {
     // Evitar duplicados: no agregar si ya existe una entrada con este partidoId
     const yaExiste=histExistente.some(h=>h.partidoId===partido.id);
     if(!yaExiste){
-      const nuevaEntradaHist={partidoId:partido.id,fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,jugadores,invitados:partido.invitados||{},resultado};
+      const nuevaEntradaHist={partidoId:partido.id,fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,mvps:mvpIds,jugadores,invitados:partido.invitados||{},resultado};
       await setDoc(rCom(comunidad.id),{historialPartidos:[...histExistente,nuevaEntradaHist],partidoActivo:null},{merge:true});
     } else {
       await setDoc(rCom(comunidad.id),{partidoActivo:null},{merge:true});
@@ -1927,7 +2026,13 @@ function PHistorial({ comunidad, esAdmin }) {
                 <div style={{color:G.t3,fontSize:12,marginTop:2}}>📍 {p.lugar||"—"} · {p.formato||"—"}</div>
                 {p.resultado && <div style={{marginTop:4,fontSize:13,fontWeight:600,color:G.primary}}>🏆 {p.resultado}</div>}
               </div>
-              {p.mvp && <Chip color={G.gold}>🥇 {(jugData[p.mvp]?.nombre || p.invitados?.[p.mvp]?.nombre || "MVP")?.split(" ")[0]}</Chip>}
+              {p.mvp && (()=>{
+                const ids=p.mvps||[p.mvp];
+                return ids.map(id=>{
+                  const nombre=(jugData[id]?.nombre||p.invitados?.[id]?.nombre||"MVP")?.split(" ")[0];
+                  return <Chip key={id} color={G.gold}>🥇 {nombre}</Chip>;
+                });
+              })()}
               <span style={{color:G.t3,fontSize:18}}>{expandido===i?"∧":"∨"}</span>
             </div>
           </div>
@@ -1975,14 +2080,24 @@ function PHistorial({ comunidad, esAdmin }) {
               )}
 
               {p.mvp && (() => {
-                const mvpData = jugData[p.mvp];
-                const mvpNombre = mvpData?.nombre || p.invitados?.[p.mvp]?.nombre || p.mvp;
+                const ids = p.mvps||[p.mvp];
+                const isShared = ids.length > 1;
                 return (
-                  <div style={{padding:"10px 14px",background:G.gold+"15",borderRadius:G.r2,display:"flex",alignItems:"center",gap:8}}>
-                    <Av nom={mvpNombre} foto={mvpData?.foto} size={32} />
-                    <div>
-                      <div style={{fontSize:11,color:G.t3,fontWeight:600}}>🥇 MVP del partido</div>
-                      <div style={{fontWeight:700,fontSize:14}}>{mvpNombre}</div>
+                  <div style={{padding:"10px 14px",background:G.gold+"15",borderRadius:G.r2}}>
+                    <div style={{fontSize:11,color:G.t3,fontWeight:600,marginBottom:8}}>
+                      🥇 {isShared?"MVPs compartidos (empate)":"MVP del partido"}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                      {ids.map(id=>{
+                        const d=jugData[id];
+                        const nom=d?.nombre||p.invitados?.[id]?.nombre||id;
+                        return (
+                          <div key={id} style={{display:"flex",alignItems:"center",gap:8}}>
+                            <Av nom={nom} foto={d?.foto} size={32}/>
+                            <span style={{fontWeight:700,fontSize:14}}>{nom}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
