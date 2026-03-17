@@ -223,13 +223,45 @@ function Msg({ children, ok, warn }) {
 
 function Divider() { return <div style={{height:1,background:"#EEF0F8",margin:"12px 0"}} />; }
 
-function Spinner({ size=40 }) {
+function Spinner({ size=80, msg="Cargando..." }) {
   return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"70vh",gap:16}}>
-      <div style={{width:size,height:size,border:`3px solid ${G.surf2}`,borderTopColor:G.primary,borderRadius:"50%",animation:"spin .7s linear infinite"}} />
-      <p style={{color:G.t3,fontSize:14,fontWeight:500}}>Cargando App8...</p>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20,padding:40}}>
+      {/* Pelota animada SVG */}
+      <div style={{animation:"bounce 1s ease-in-out infinite"}}>
+        <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          {/* Sombra */}
+          <ellipse cx="50" cy="95" rx="20" ry="5" fill="#00000015" style={{animation:"shadow .8s ease-in-out infinite"}} />
+          {/* Pelota */}
+          <circle cx="50" cy="50" r="42" fill="white" stroke="#e0e0e0" strokeWidth="2"/>
+          {/* Pentagono central */}
+          <polygon points="50,22 64,33 59,50 41,50 36,33" fill="#222"/>
+          {/* Pentagonos laterales */}
+          <polygon points="50,22 36,33 28,20 38,10 55,12" fill="#222"/>
+          <polygon points="50,22 64,33 72,20 62,10 45,12" fill="#222"/>
+          <polygon points="41,50 36,33 20,36 18,52 30,60" fill="#222"/>
+          <polygon points="59,50 64,33 80,36 82,52 70,60" fill="#222"/>
+          <polygon points="41,50 30,60 35,75 50,78 65,75 70,60 59,50" fill="#222"/>
+          {/* Brillo */}
+          <ellipse cx="38" cy="33" rx="8" ry="5" fill="white" opacity="0.3" transform="rotate(-30 38 33)"/>
+        </svg>
+      </div>
+      <div style={{textAlign:"center"}}>
+        <p style={{color:G.t2,fontSize:15,fontWeight:700,margin:0}}>{msg}</p>
+        <p style={{color:G.t3,fontSize:12,marginTop:4}}>App8 · Fútbol de los Lunes</p>
+      </div>
+      <style>{`
+        @keyframes bounce {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-18px); }
+        }
+        @keyframes shadow {
+          0%,100% { transform: scaleX(1); opacity:.3; }
+          50% { transform: scaleX(.6); opacity:.1; }
+        }
+      `}</style>
     </div>
   );
+}
 }
 
 function Toggle({ checked, onChange }) {
@@ -289,7 +321,7 @@ export default function App() {
     if(s.exists()){ const u={...user,...s.data()}; setUser(u); localStorage.setItem("app8_v4_session",JSON.stringify(u)); }
   }
 
-  if(loading) return <><style>{globalCSS}</style><div style={{background:G.bg,minHeight:"100vh"}}><Spinner /></div></>;
+  if(loading) return <><style>{globalCSS}</style><div style={{background:G.bg,minHeight:"100vh"}}><Spinner msg="Entrando al vestuario..." /></div></>;
 
   const esAdminCom = comActiva && (comActiva.admins||[]).includes(user?.dni);
 
@@ -1115,15 +1147,18 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   const yoAnotado=inscripos.includes(user.dni);
 
   useEffect(()=>{if(partido){setFecha(partido.fecha||"");setHora(partido.hora||"");setLugar(partido.lugar||"");setFormato(partido.formato||"");}},[partido?.id]);
+  const [jugLoading,setJugLoading]=useState(false);
   useEffect(()=>{
     const load=async()=>{
       if(!partido)return;
+      setJugLoading(true);
       const obj={};
       for(const id of inscripos){
         if(id.startsWith("inv_")){obj[id]=partido.invitados?.[id];continue;}
         const s=await getDoc(rUser(id));if(s.exists())obj[id]=s.data();
       }
       setJugData(obj);
+      setJugLoading(false);
     };
     if(partido)load();
   },[JSON.stringify(inscripos)]);
@@ -1295,7 +1330,12 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
       {/* Lista */}
       <Card>
         <h3 style={{fontWeight:700,marginBottom:14}}>👥 Inscriptos ({inscripos.length}/{cupo})</h3>
-        {inscripos.length===0
+        {jugLoading
+          ? <div style={{padding:"20px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+              <div style={{animation:"bounce 1s ease-in-out infinite"}}>⚽</div>
+              <p style={{color:G.t3,fontSize:13}}>Cargando inscriptos...</p>
+            </div>
+          : inscripos.length===0
           ? <p style={{color:G.t3,textAlign:"center",padding:16}}>Nadie anotado aún</p>
           : inscripos.map((id,idx)=>{
               const j=jugData[id];if(!j)return null;
@@ -1501,15 +1541,14 @@ function PVotar({ comunidad, partido, user }) {
   const [votosSnap,setVotosSnap]=useState({}); const [jugData,setJugData]=useState({});
   const [msg,setMsg]=useState(""); const [enviado,setEnviado]=useState(false);
 
-  useEffect(()=>{
-    if(!partido)return;
-    const unsub=onSnapshot(rVots(partido.id),s=>setVotosSnap(s.exists()?s.data():{}));
-    return unsub;
-  },[partido?.id]);
+  const [votLoading,setVotLoading]=useState(true);
+
+  useEffect(()=>{\n    if(!partido)return;\n    const unsub=onSnapshot(rVots(partido.id),s=>setVotosSnap(s.exists()?s.data():{}));\n    return unsub;\n  },[partido?.id]);
 
   useEffect(()=>{
     const load=async()=>{
       if(!partido)return;
+      setVotLoading(true);
       const obj={};
       for(const id of partido.inscriptos||[]){
         if(id.startsWith("inv_")){obj[id]=partido.invitados?.[id]||{nombre:"Invitado"};continue;}
@@ -1522,6 +1561,7 @@ function PVotar({ comunidad, partido, user }) {
       const init={};
       misAsig.forEach(id=>{init[id]={};ATTRS.forEach(a=>{init[id][a.key]=null;});});
       setNotas(init);
+      setVotLoading(false);
     };
     load();
   },[partido?.id]);
@@ -1534,6 +1574,7 @@ function PVotar({ comunidad, partido, user }) {
   const tiempoVencido=horas!==null&&horas<=0;
   const esAdmin=(comunidad.admins||[]).includes(user.dni);
 
+  if(votLoading) return <div style={{padding:20}}><Spinner msg="Preparando las votaciones..." /></div>;
   if(!partido?.finalizado) return (
     <div style={{padding:20}}>
       <Card style={{textAlign:"center",padding:32,background:G.surf1}}>
@@ -1788,13 +1829,13 @@ function PVotar({ comunidad, partido, user }) {
 function PHistorial({ comunidad, esAdmin }) {
   const [historial,setHistorial]=useState([]); const [jugData,setJugData]=useState({});
   const [expandido,setExpandido]=useState(null); const [editando,setEditando]=useState(null);
-  const [resultado,setResultado]=useState("");
+  const [resultado,setResultado]=useState(""); const [loading,setLoading]=useState(true);
 
   useEffect(()=>{
     const load=async()=>{
-      const s=await getDoc(rCom(comunidad.id));if(!s.exists())return;
+      setLoading(true);
+      const s=await getDoc(rCom(comunidad.id));if(!s.exists()){setLoading(false);return;}
       const h=[...(s.data().historialPartidos||[])].reverse();
-      setHistorial(h);
       // Recopilar todos los DNIs: jugadores + mvp de cada partido
       const dnis=new Set();
       h.forEach(p=>{
@@ -1805,10 +1846,15 @@ function PHistorial({ comunidad, esAdmin }) {
       for(const d of dnis){const s2=await getDoc(rUser(d));if(s2.exists())obj[d]=s2.data();}
       // También agregar invitados de cada partido al jugData
       h.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{obj[id]=data;}));
+      // Actualizar todo junto para evitar renders intermedios sin jugData
+      setHistorial(h);
       setJugData(obj);
+      setLoading(false);
     };
     load();
   },[comunidad.id]);
+
+  if(loading) return <div style={{padding:20}}><Spinner msg="Cargando historial de partidos..." /></div>;
 
   async function guardarResultado(idx){
     const comSnap=await getDoc(rCom(comunidad.id));
@@ -1947,13 +1993,33 @@ function PStats({ comunidad, user, esAdmin }) {
       }
       for(const inv of Object.values(invMap)) arr.push(inv);
 
-      arr.sort((a,b)=>calcPuntos(b.historial)-calcPuntos(a.historial));
+      arr.sort((a,b)=>{
+        // 1. Puntos
+        const pts = calcPuntos(b.historial) - calcPuntos(a.historial);
+        if(pts!==0) return pts;
+        // 2. MVPs
+        const mvpA=(a.historial||[]).filter(h=>h.mvp).length;
+        const mvpB=(b.historial||[]).filter(h=>h.mvp).length;
+        if(mvpB!==mvpA) return mvpB-mvpA;
+        // 3. Goles por partido (⚽/PJ)
+        const pjA=a.partidos||0; const pjB=b.partidos||0;
+        const golA=(a.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0);
+        const golB=(b.historial||[]).reduce((s,h)=>s+(h.eventos?.goles||0),0);
+        const gpjA=pjA>0?golA/pjA:0; const gpjB=pjB>0?golB/pjB:0;
+        if(gpjB!==gpjA) return gpjB-gpjA;
+        // 4. Goles totales
+        if(golB!==golA) return golB-golA;
+        // 5. Partidos ganados
+        const ganA=(a.historial||[]).filter(h=>h.resultado==="ganado").length;
+        const ganB=(b.historial||[]).filter(h=>h.resultado==="ganado").length;
+        return ganB-ganA;
+      });
       setJugadores(arr);setLoading(false);
     };
     load();
   },[comunidad.id]);
 
-  if(loading) return <div style={{padding:20}}><Spinner /></div>;
+  if(loading) return <div style={{padding:20}}><Spinner msg="Calculando estadísticas..." /></div>;
 
   const thStyle={padding:"10px 8px",fontWeight:700,fontSize:11,color:G.t3,textAlign:"center",borderBottom:`2px solid ${G.surf2}`,whiteSpace:"nowrap"};
   const tdStyle={padding:"10px 8px",fontSize:13,textAlign:"center",borderBottom:`1px solid ${G.surf2}`};
@@ -2107,7 +2173,7 @@ function PSuperAdmin() {
     setEditando(null);setMsg("✓ Guardado");setTimeout(()=>setMsg(""),2000);
   }
 
-  if(loading) return <div style={{padding:20}}><Spinner /></div>;
+  if(loading) return <div style={{padding:20}}><Spinner msg="Cargando panel de administración..." /></div>;
 
   return (
     <div style={{padding:20}}>
