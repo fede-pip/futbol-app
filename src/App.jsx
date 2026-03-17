@@ -255,9 +255,9 @@ async function subirFotoCloudinary(file, onProgress) {
 function FotoUpload({ value, onChange, label="Foto", size=72 }) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value||"");
-  const inputRef = React.useRef();
+  const inputRef = useRef();
 
-  React.useEffect(()=>{ setPreview(value||""); },[value]);
+  useEffect(()=>{ setPreview(value||""); },[value]);
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -2278,10 +2278,20 @@ function PStats({ comunidad, user, esAdmin }) {
           let excluir = false;
           for(const nom of nombresMiembros){ if(nom.startsWith(nombreNorm)||nombreNorm.startsWith(nom)){ excluir=true; break; } }
           if(excluir) continue;
-          if(!invMap[nombre]) invMap[nombre]={nombre,_tipo:"invitado",partidos:0,goles:0,historial:[]};
+          if(!invMap[nombre]) invMap[nombre]={nombre,_tipo:"invitado",partidos:0,goles:0,historial:[],_partidos:new Set()};
+          // Evitar contar el mismo partido múltiples veces (por IDs duplicados del mismo invitado)
+          const partidoKey = p.partidoId || p.fecha || String(Object.keys(p.invitados||{}).length);
+          if(invMap[nombre]._partidos.has(partidoKey)) continue;
+          invMap[nombre]._partidos.add(partidoKey);
           const evs=(p.eventos||{})[id]||{};
-          const enOscuro=(p.equipos?.oscuro||[]).includes(id);
-          const enBlanco=(p.equipos?.blanco||[]).includes(id);
+          // Buscar si está en equipos por ID directo O por cualquier inv_ con el mismo nombre
+          const todosInvIds = Object.entries(p.invitados||{})
+            .filter(([iid, idata]) => normalizar(idata.nombre||"") === nombreNorm)
+            .map(([iid]) => iid);
+          const enOscuro = todosInvIds.some(iid => (p.equipos?.oscuro||[]).includes(iid));
+          const enBlanco = todosInvIds.some(iid => (p.equipos?.blanco||[]).includes(iid));
+          // Goles: sumar de todos los IDs que correspondan al mismo invitado
+          const golesInv = todosInvIds.reduce((s,iid)=>s+((p.eventos||{})[iid]?.goles||0),0);
           let golesO=0,golesB=0;
           if(p.equipos){
             golesO=(p.equipos.oscuro||[]).reduce((s,x)=>s+((p.eventos||{})[x]?.goles||0),0);
@@ -2297,12 +2307,12 @@ function PStats({ comunidad, user, esAdmin }) {
             return mvpData && normalizar(mvpData.nombre||"") === nombreNorm;
           });
           invMap[nombre].partidos++;
-          invMap[nombre].goles+=(evs.goles||0);
+          invMap[nombre].goles+=golesInv;
           invMap[nombre].historial.push({
             fecha:p.fecha||"",
             mvp: mvpIds.includes(id) || mvpPorNombre,
             resultado:res,
-            eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0},
+            eventos:{goles:golesInv,amarillas:evs.amarillas||0},
           });
         }
       }
