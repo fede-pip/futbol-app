@@ -226,17 +226,31 @@ function Msg({ children, ok, warn }) {
 function Divider() { return <div style={{height:1,background:"#EEF0F8",margin:"12px 0"}} />; }
 
 function Spinner({ size=110, msg="Cargando..." }) {
+  const r = size * 0.18; // mismo border-radius que el logo
+  const pad = 6; // espacio entre logo y anillo
+  const total = size + pad * 2;
+  // Radio del anillo = mitad del total menos el padding del stroke
+  const ringR = (total / 2) - 4;
+  // Perímetro aproximado de rect redondeado para dasharray
+  const perim = 2 * ((size + pad*2 - 2*r) + (size + pad*2 - 2*r)) + 2 * Math.PI * r;
+
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20,padding:40}}>
-      <div style={{position:"relative",width:size+16,height:size+16}}>
-        {/* Anillo giratorio */}
-        <svg width={size+16} height={size+16} viewBox="0 0 126 126" style={{position:"absolute",top:0,left:0,animation:"ringspin 1.4s linear infinite"}}>
-          <circle cx="63" cy="63" r="58" fill="none" stroke="#EEF0F8" strokeWidth="4"/>
-          <circle cx="63" cy="63" r="58" fill="none" stroke="#3D5AFE" strokeWidth="4"
-            strokeDasharray="80 284" strokeLinecap="round"/>
+      <div style={{position:"relative",width:total,height:total}}>
+        {/* Anillo giratorio que sigue el borde redondeado del logo */}
+        <svg width={total} height={total} viewBox={`0 0 ${total} ${total}`}
+          style={{position:"absolute",top:0,left:0,animation:"ringspin 1.4s linear infinite"}}>
+          {/* Track gris */}
+          <rect x="2" y="2" width={total-4} height={total-4} rx={r+pad} ry={r+pad}
+            fill="none" stroke="#EEF0F8" strokeWidth="3.5"/>
+          {/* Arco azul animado */}
+          <rect x="2" y="2" width={total-4} height={total-4} rx={r+pad} ry={r+pad}
+            fill="none" stroke="#3D5AFE" strokeWidth="3.5"
+            strokeDasharray={`${perim*0.25} ${perim}`}
+            strokeLinecap="round"/>
         </svg>
         {/* Logo centrado */}
-        <div style={{position:"absolute",top:8,left:8,width:size,height:size,borderRadius:size*0.18,overflow:"hidden",boxShadow:"0 6px 24px rgba(61,90,254,0.3)"}}>
+        <div style={{position:"absolute",top:pad,left:pad,width:size,height:size,borderRadius:r,overflow:"hidden",boxShadow:"0 6px 24px rgba(61,90,254,0.3)"}}>
           <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8"/>
         </div>
       </div>
@@ -2120,25 +2134,8 @@ function PStats({ comunidad, user, esAdmin }) {
               ))}
             </div>
 
-            {/* Admin: atributos */}
-            {esAdmin && (
-              <>
-                <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8}}>👑 PUNTAJES (Admin)</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  {ATTRS.map(a=>(
-                    <div key={a.key} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",background:G.surf1,borderRadius:G.r1}}>
-                      <span>{a.icon}</span>
-                      <span style={{flex:1,fontSize:11,color:G.t2}}>{a.label}</span>
-                      <span style={{fontWeight:800,color:G.primary,fontSize:13}}>{((j.atributos||{})[a.key]||0).toFixed(1)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:G.primary+"12",borderRadius:G.r1,marginTop:8}}>
-                  <span style={{fontWeight:700,fontSize:12}}>Promedio general</span>
-                  <span style={{fontWeight:900,color:G.primary}}>{calcProm(j.atributos||{}).toFixed(2)}</span>
-                </div>
-              </>
-            )}
+            {/* Admin: atributos con evolución */}
+            {esAdmin && (\n              <>\n                <div style={{fontSize:11,color:G.warn,fontWeight:700,marginBottom:8}}>👑 ATRIBUTOS — Evolución último partido (Admin)</div>\n                <div style={{overflowX:\"auto\"}}>\n                  <table style={{width:\"100%\",borderCollapse:\"collapse\",fontSize:12}}>\n                    <thead>\n                      <tr style={{background:G.surf1}}>\n                        <th style={{padding:\"6px 8px\",textAlign:\"left\",fontWeight:600,color:G.t3,fontSize:11}}>Atributo</th>\n                        <th style={{padding:\"6px 8px\",textAlign:\"center\",fontWeight:600,color:G.t3,fontSize:11}}>Anterior</th>\n                        <th style={{padding:\"6px 8px\",textAlign:\"center\",fontWeight:600,color:G.t3,fontSize:11}}>Actual</th>\n                        <th style={{padding:\"6px 8px\",textAlign:\"center\",fontWeight:600,color:G.t3,fontSize:11}}>Delta</th>\n                      </tr>\n                    </thead>\n                    <tbody>\n                      {ATTRS.map(a=>{\n                        const ant=parseFloat((j.atributosAnteriores||{})[a.key]||0);\n                        const act=parseFloat((j.atributos||{})[a.key]||0);\n                        const delta=+(act-ant).toFixed(2);\n                        const color=delta>0?G.secondary:delta<0?G.danger:G.t3;\n                        const enRango=Math.abs(delta)<=0.26;\n                        return (\n                          <tr key={a.key} style={{borderBottom:`1px solid ${G.surf2}`,background:(!enRango&&ant>0)?\"#FFF8E1\":\"transparent\"}}>\n                            <td style={{padding:\"7px 8px\",display:\"flex\",alignItems:\"center\",gap:6}}>\n                              <span>{a.icon}</span>\n                              <span style={{color:G.t2}}>{a.label}</span>\n                            </td>\n                            <td style={{padding:\"7px 8px\",textAlign:\"center\",color:G.t3}}>{ant>0?ant.toFixed(2):\"—\"}</td>\n                            <td style={{padding:\"7px 8px\",textAlign:\"center\",fontWeight:800,color:G.primary}}>{act.toFixed(2)}</td>\n                            <td style={{padding:\"7px 8px\",textAlign:\"center\",fontWeight:700,color}}>\n                              {ant>0?(delta>0?`▲ +${delta}`:delta<0?`▼ ${delta}`:`= 0`):\"—\"}\n                              {ant>0&&!enRango&&<span style={{marginLeft:4,fontSize:10,color:G.warn}}>⚠️</span>}\n                            </td>\n                          </tr>\n                        );\n                      })}\n                    </tbody>\n                  </table>\n                </div>\n                <div style={{display:\"flex\",justifyContent:\"space-between\",padding:\"8px 12px\",background:G.primary+\"12\",borderRadius:G.r1,marginTop:8}}>\n                  <span style={{fontWeight:700,fontSize:12}}>Promedio general</span>\n                  <span style={{fontWeight:900,color:G.primary}}>{calcProm(j.atributos||{}).toFixed(2)}</span>\n                </div>\n              </>\n            )}
           </Card>
         );
       })()}
