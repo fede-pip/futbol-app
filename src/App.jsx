@@ -1498,29 +1498,16 @@ function PVotar({ comunidad, partido, user }) {
 
   async function cerrarVotacion(){
     if(!confirm("¿Cerrar la votación y guardar resultados?"))return;
+
+    // Guard: verificar que el partido sigue activo antes de proceder
+    const partSnap = await getDoc(rPart(partido.id));
+    if(!partSnap.exists()){setMsg("❌ El partido ya fue cerrado");return;}
+
     const notasAc=partido.notasAtributos||{};
     const mvpC=partido.mvpConteo||{};
     const mvpId=Object.keys(mvpC).length?Object.keys(mvpC).reduce((a,b)=>mvpC[a]>mvpC[b]?a:b):null;
-    for(const id of jugadores){
-      const s=await getDoc(rUser(id));if(!s.exists())continue;
-      const j=s.data();
-      const attrsAnt={...j.atributos||{}};
-      const nuevos={...j.atributos||{}};
-      ATTRS.forEach(a=>{
-        const n=notasAc[id]?.[a.key];
-        if(n&&n.cant>0){
-          // prom es entre -1 y 1 (promedio de votos -1/0/+1)
-          const prom=n.suma/n.cant;
-          const actual=nuevos[a.key]||5;
-          // delta máximo ±0.25, escalado por el promedio de votos
-          const delta = Math.min(0.25, Math.max(-0.25, prom * 0.25));
-          nuevos[a.key]=Math.min(10,Math.max(1,+(actual+delta).toFixed(2)));
-        }
-      });
-      const evs=(partido.eventos||{})[id]||{};
-      await setDoc(rUser(id),{atributos:nuevos,atributosAnteriores:attrsAnt,goles:j.goles+(evs.goles||0),partidos:(j.partidos||0)+1,historial:[...(j.historial||[]),{fecha:new Date().toLocaleDateString("es-AR"),mvp:id===mvpId,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}}]},{merge:true});
-    }
-    // Resultado automático desde goles por equipo
+
+    // Calcular resultado global
     let resultado="";
     let golesO=0, golesB=0;
     if(partido.equipos){
@@ -1530,7 +1517,6 @@ function PVotar({ comunidad, partido, user }) {
       else if(golesB>golesO) resultado=`Blanco gano ${golesB}-${golesO}`;
       else resultado=`Empate ${golesO}-${golesB}`;
     }
-    // Guardar resultado individual por jugador (ganado/empatado/perdido)
     const getResJug=(id)=>{
       if(!partido.equipos) return "jugado";
       const enOscuro=(partido.equipos.oscuro||[]).includes(id);
@@ -1540,17 +1526,46 @@ function PVotar({ comunidad, partido, user }) {
       if((enOscuro&&golesO>golesB)||(enBlanco&&golesB>golesO)) return "ganado";
       return "perdido";
     };
-    // Actualizar historial de cada jugador con resultado individual
+
+    // Loop único: atributos + historial + resultado en una sola escritura por jugador
     for(const id of jugadores){
       const s=await getDoc(rUser(id));if(!s.exists())continue;
       const j=s.data();
+      const attrsAnt={...j.atributos||{}};
+      const nuevos={...j.atributos||{}};
+      ATTRS.forEach(a=>{
+        const n=notasAc[id]?.[a.key];
+        if(n&&n.cant>0){
+          const prom=n.suma/n.cant;
+          const actual=nuevos[a.key]||5;
+          const delta=Math.min(0.25,Math.max(-0.25,prom*0.25));
+          nuevos[a.key]=Math.min(10,Math.max(1,+(actual+delta).toFixed(2)));
+        }
+      });
       const evs=(partido.eventos||{})[id]||{};
       const resJug=getResJug(id);
-      await setDoc(rUser(id),{historial:[...(j.historial||[]).slice(0,-1),{...(j.historial||[]).slice(-1)[0]||{},resultado:resJug}]},{merge:true});
+      const nuevaEntrada={fecha:new Date().toLocaleDateString("es-AR"),mvp:id===mvpId,resultado:resJug,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}};
+      await setDoc(rUser(id),{
+        atributos:nuevos,
+        atributosAnteriores:attrsAnt,
+        goles:(j.goles||0)+(evs.goles||0),
+        partidos:(j.partidos||0)+1,
+        historial:[...(j.historial||[]),nuevaEntrada],
+      },{merge:true});
     }
+
+    // Guardar en historial de la comunidad — leer fresh y deduplicar por partidoId
     const comSnap=await getDoc(rCom(comunidad.id));
-    const hist=[...(comSnap.data()?.historialPartidos||[]),{fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,jugadores,invitados:partido.invitados||{},resultado}];
-    await setDoc(rCom(comunidad.id),{historialPartidos:hist,partidoActivo:null},{merge:true});
+    const histExistente=comSnap.data()?.historialPartidos||[];
+    // Evitar duplicados: no agregar si ya existe una entrada con este partidoId
+    const yaExiste=histExistente.some(h=>h.partidoId===partido.id);
+    if(!yaExiste){
+      const nuevaEntradaHist={partidoId:partido.id,fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,jugadores,invitados:partido.invitados||{},resultado};
+      await setDoc(rCom(comunidad.id),{historialPartidos:[...histExistente,nuevaEntradaHist],partidoActivo:null},{merge:true});
+    } else {
+      await setDoc(rCom(comunidad.id),{partidoActivo:null},{merge:true});
+    }
+
     await deleteDoc(rPart(partido.id));
     setMsg("✓ ¡Resultados guardados!");
   }
@@ -1699,8 +1714,16 @@ function PHistorial({ comunidad, esAdmin }) {
       const s=await getDoc(rCom(comunidad.id));if(!s.exists())return;
       const h=[...(s.data().historialPartidos||[])].reverse();
       setHistorial(h);
-      const dnis=new Set();h.forEach(p=>(p.jugadores||[]).forEach(d=>dnis.add(d)));
-      const obj={};for(const d of dnis){const s2=await getDoc(rUser(d));if(s2.exists())obj[d]=s2.data();}
+      // Recopilar todos los DNIs: jugadores + mvp de cada partido
+      const dnis=new Set();
+      h.forEach(p=>{
+        (p.jugadores||[]).forEach(d=>dnis.add(d));
+        if(p.mvp&&!p.mvp.startsWith("inv_")) dnis.add(p.mvp);
+      });
+      const obj={};
+      for(const d of dnis){const s2=await getDoc(rUser(d));if(s2.exists())obj[d]=s2.data();}
+      // También agregar invitados de cada partido al jugData
+      h.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{obj[id]=data;}));
       setJugData(obj);
     };
     load();
@@ -1730,7 +1753,7 @@ function PHistorial({ comunidad, esAdmin }) {
                 <div style={{color:G.t3,fontSize:12,marginTop:2}}>📍 {p.lugar||"—"} · {p.formato||"—"}</div>
                 {p.resultado && <div style={{marginTop:4,fontSize:13,fontWeight:600,color:G.primary}}>🏆 {p.resultado}</div>}
               </div>
-              {p.mvp && jugData[p.mvp] && <Chip color={G.gold}>🥇 {jugData[p.mvp].nombre?.split(" ")[0]}</Chip>}
+              {p.mvp && <Chip color={G.gold}>🥇 {(jugData[p.mvp]?.nombre || p.invitados?.[p.mvp]?.nombre || "MVP")?.split(" ")[0]}</Chip>}
               <span style={{color:G.t3,fontSize:18}}>{expandido===i?"∧":"∨"}</span>
             </div>
           </div>
@@ -1777,12 +1800,19 @@ function PHistorial({ comunidad, esAdmin }) {
                 </div>
               )}
 
-              {p.mvp && jugData[p.mvp] && (
-                <div style={{padding:"10px 14px",background:G.gold+"15",borderRadius:G.r2,display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:18}}>🥇</span>
-                  <span style={{fontWeight:700,fontSize:13}}>MVP: {jugData[p.mvp].nombre}</span>
-                </div>
-              )}
+              {p.mvp && (() => {
+                const mvpData = jugData[p.mvp];
+                const mvpNombre = mvpData?.nombre || p.invitados?.[p.mvp]?.nombre || p.mvp;
+                return (
+                  <div style={{padding:"10px 14px",background:G.gold+"15",borderRadius:G.r2,display:"flex",alignItems:"center",gap:8}}>
+                    <Av nom={mvpNombre} foto={mvpData?.foto} size={32} />
+                    <div>
+                      <div style={{fontSize:11,color:G.t3,fontWeight:600}}>🥇 MVP del partido</div>
+                      <div style={{fontWeight:700,fontSize:14}}>{mvpNombre}</div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </Card>
