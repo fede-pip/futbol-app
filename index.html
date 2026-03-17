@@ -2,16 +2,42 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>App8 v4</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>App8</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/icons/icon-192x192.png" type="image/png" />
+
+    <!-- iOS / Apple -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="App8" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Theme color Android -->
+    <meta name="theme-color" content="#3D5AFE" />
+    <meta name="description" content="App8 — Tu red de fútbol. Organizá partidos, votá el MVP y seguí las estadísticas." />
+    <meta name="mobile-web-app-capable" content="yes" />
+
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #0a0f1a; }
+      body { background: #f6f8fc; }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(r => console.log('SW ok:', r.scope))
+            .catch(e => console.log('SW error:', e));
+        });
+      }
+    </script>
   </body>
 </html>
