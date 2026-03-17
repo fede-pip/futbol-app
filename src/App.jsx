@@ -703,7 +703,7 @@ function PHome({ user, coms, setComActiva, loadComs }) {
         return (
           <Card key={c.id} onClick={()=>setComActiva(c)} style={{cursor:"pointer",padding:0,overflow:"hidden"}}
             accent={G.primary+"20"}>
-            {c.foto && <img src={fixImgUrl(c.foto)} style={{width:"100%",height:120,objectFit:"cover"}} onError={e=>e.target.style.display="none"} />}
+            {c.foto && <img src={fixImgUrl(c.foto)} style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"} />}
             {!c.foto && <div style={{height:80,background:`linear-gradient(135deg,${G.primary}22,${G.secondary}22)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🏘️</div>}
             <div style={{padding:"14px 16px"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
