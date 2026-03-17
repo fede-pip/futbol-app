@@ -229,13 +229,77 @@ const globalCSS = `
 // Convierte links de Google Drive a URL directa de imagen
 function fixImgUrl(url) {
   if (!url) return "";
-  // https://drive.google.com/file/d/FILE_ID/view...
   const m = url.match(/\/file\/d\/([^/]+)/);
   if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
-  // https://drive.google.com/open?id=FILE_ID
   const m2 = url.match(/[?&]id=([^&]+)/);
   if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
   return url;
+}
+
+const CLOUDINARY_CLOUD = "dln7wkdgn";
+const CLOUDINARY_PRESET = "app8_fotos";
+
+async function subirFotoCloudinary(file, onProgress) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_PRESET);
+  formData.append("folder", "app8");
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+    method: "POST", body: formData
+  });
+  if (!res.ok) throw new Error("Error al subir imagen");
+  const data = await res.json();
+  return data.secure_url;
+}
+
+function FotoUpload({ value, onChange, label="Foto", size=72 }) {
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(value||"");
+  const inputRef = React.useRef();
+
+  React.useEffect(()=>{ setPreview(value||""); },[value]);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("La foto debe ser menor a 5MB"); return; }
+    setUploading(true);
+    try {
+      const url = await subirFotoCloudinary(file);
+      setPreview(url);
+      onChange(url);
+    } catch(err) {
+      alert("No se pudo subir la foto. Intentá de nuevo.");
+    } finally { setUploading(false); }
+  }
+
+  return (
+    <div style={{marginBottom:12}}>
+      {label && <div style={{fontSize:12,color:G.t3,fontWeight:600,marginBottom:8}}>{label}</div>}
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        {/* Preview */}
+        <div style={{width:size,height:size,borderRadius:size*0.22,overflow:"hidden",background:G.surf1,
+          border:`2px dashed ${G.surf2}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {preview
+            ? <img src={fixImgUrl(preview)} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="foto"/>
+            : <span style={{fontSize:24}}>📷</span>}
+        </div>
+        {/* Botones */}
+        <div style={{flex:1}}>
+          <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
+          <Btn onClick={()=>inputRef.current?.click()} disabled={uploading} full>
+            {uploading ? "⏳ Subiendo..." : preview ? "📷 Cambiar foto" : "📷 Subir foto"}
+          </Btn>
+          {preview && !uploading && (
+            <Btn v="ghost" onClick={()=>{setPreview("");onChange("");}} full style={{marginTop:6}}>
+              ✕ Quitar foto
+            </Btn>
+          )}
+          <div style={{fontSize:11,color:G.t3,marginTop:4}}>JPG, PNG — máx 5MB</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Av({ nom, foto, size=40 }) {
@@ -666,7 +730,7 @@ function PHome({ user, coms, setComActiva, loadComs }) {
         : <Card accent={G.primary+"30"}>
             <h3 style={{fontWeight:700,marginBottom:14,color:G.primary}}>🏘️ Nueva comunidad</h3>
             <Inp label="Nombre" value={nomCom} onChange={e=>setNomCom(e.target.value)} placeholder='Ej: Fútbol de los Lunes' onKeyDown={e=>e.key==="Enter"&&crear()} />
-            <Inp label="URL de foto de portada (opcional)" value={fotoCom} onChange={e=>setFotoCom(e.target.value)} placeholder="https://..." />
+            <FotoUpload label="Foto de portada (opcional)" value={fotoCom} onChange={setFotoCom} size={80}/>
             <div style={{display:"flex",gap:8,marginTop:4}}>
               <Btn onClick={crear} full>Crear</Btn>
               <Btn v="ghost" onClick={()=>setShowNew(false)} full>Cancelar</Btn>
@@ -728,7 +792,7 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
         </div>
         <Inp label="Nombre" value={nom} onChange={e=>setNom(e.target.value)} />
         <Inp label="Apodo (opcional)" value={apodo} onChange={e=>setApodo(e.target.value)} placeholder='"El Flaco"' />
-        <Inp label="URL de foto" value={foto} onChange={e=>setFoto(e.target.value)} placeholder="https://..." />
+        <FotoUpload label="Tu foto de perfil" value={foto} onChange={setFoto} size={80}/>
         <p style={{fontSize:11,color:G.t3,marginBottom:12}}>Pegá el link de una imagen de internet (compartida públicamente)</p>
         <Btn onClick={guardar} full>Guardar perfil</Btn>
         <Msg ok={!!msg}>{msg}</Msg>
@@ -1007,7 +1071,7 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
             <>
               <h3 style={{fontWeight:700,marginBottom:14}}>⚙️ Editar grupo</h3>
               <Inp label="Nombre" value={nomEdit} onChange={e=>setNomEdit(e.target.value)} />
-              <Inp label="URL foto de portada" value={fotoEdit} onChange={e=>setFotoEdit(e.target.value)} placeholder="https://..." />
+              <FotoUpload label="Foto de portada" value={fotoEdit} onChange={setFotoEdit} size={80}/>
               <Inp label="💰 Precio por persona ($)" type="number" value={precio} onChange={e=>setPrecio(e.target.value)} />
               <Inp label="🏆 Pozo acumulado ($)" type="number" value={pozo} onChange={e=>setPozo(e.target.value)} />
               <div style={{display:"flex",gap:8}}>
