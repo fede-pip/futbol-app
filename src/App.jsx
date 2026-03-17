@@ -805,16 +805,36 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
   useEffect(()=>{loadMiembros(); if(esAdmin) cargarInvitadosSueltos();},[comunidad.id]);
 
   async function cargarInvitadosSueltos(){
-    // Recopilar todos los inv_ únicos del historialPartidos de la comunidad
+    const normalizar = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    // Recopilar todos los inv_ únicos del historialPartidos — deduplicar por ID
     const hist = comunidad.historialPartidos || [];
     const mapaInv = {};
     for(const p of hist){
-      const invs = p.invitados || {};
-      for(const [id, data] of Object.entries(invs)){
+      for(const [id, data] of Object.entries(p.invitados||{})){
         if(id.startsWith("inv_") && !mapaInv[id]) mapaInv[id] = data;
       }
     }
-    setInvitadosSueltos(Object.entries(mapaInv).map(([id,data])=>({id,...data})));
+    // Cargar nombres de miembros para excluirlos (con normalización de tildes)
+    const nombresMiembros = new Set();
+    for(const dni of comunidad.miembros||[]){
+      const s = await getDoc(rUser(dni));
+      if(s.exists()){
+        const nom = normalizar(s.data().nombre||"");
+        nombresMiembros.add(nom);
+        const partes = nom.split(" ");
+        if(partes[0]) nombresMiembros.add(partes[0]);
+        if(partes[1]) nombresMiembros.add(partes[0]+" "+partes[1]);
+      }
+    }
+    const lista = Object.entries(mapaInv)
+      .map(([id,data])=>({id,...data}))
+      .filter(inv=>{
+        const n = normalizar(inv.nombre||"");
+        if(nombresMiembros.has(n)) return false;
+        for(const nom of nombresMiembros){ if(nom.startsWith(n)||n.startsWith(nom)) return false; }
+        return true;
+      });
+    setInvitadosSueltos(lista);
   }
 
   async function vincularInvitado(invId){
@@ -1242,18 +1262,18 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   useEffect(()=>{
     const load = async () => {
       const hist = comunidad.historialPartidos || [];
+      const normalizar = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
       const mapa = {};
       hist.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{
         if(id.startsWith("inv_")&&data.nombre&&!mapa[data.nombre]) mapa[data.nombre]=data;
       }));
-      // Cargar nombres de miembros actuales para filtrarlos (nombre completo y parcial)
+      // Cargar nombres de miembros actuales para filtrarlos (con normalización de tildes)
       const nombresMiembros = new Set();
       for(const dni of comunidad.miembros||[]){
         const s = await getDoc(rUser(dni));
         if(s.exists()){
-          const nom = s.data().nombre?.toLowerCase().trim() || "";
+          const nom = normalizar(s.data().nombre||"");
           nombresMiembros.add(nom);
-          // También agregar primer nombre y primer apellido por separado
           const partes = nom.split(" ");
           if(partes[0]) nombresMiembros.add(partes[0]);
           if(partes[1]) nombresMiembros.add(partes[0]+" "+partes[1]);
@@ -1262,9 +1282,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
       const lista = Object.entries(mapa)
         .map(([nombre,data])=>({nombre,...data}))
         .filter(inv=>{
-          const n = inv.nombre?.toLowerCase().trim() || "";
-          // Excluir si el nombre del invitado coincide exactamente con algún miembro
-          // o si algún miembro empieza con ese nombre
+          const n = normalizar(inv.nombre||"");
           if(nombresMiembros.has(n)) return false;
           for(const nom of nombresMiembros){ if(nom.startsWith(n)||n.startsWith(nom)) return false; }
           return true;
