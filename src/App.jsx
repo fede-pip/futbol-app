@@ -2192,7 +2192,15 @@ function PHistorial({ comunidad, esAdmin }) {
                       <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:eq.c}}>{eq.label}</div>
                       {eq.ids.map(id=>{
                         const j=jugData[id]||p.invitados?.[id];if(!j)return null;
-                        const evs=(p.eventos||{})[id]||{};
+                        // Buscar eventos: primero por id directo, luego por inv_ con mismo nombre (invitados migrados)
+                        let evs=(p.eventos||{})[id]||{};
+                        if(!evs.goles && !evs.amarillas) {
+                          const nombreJ=(j.nombre||"").toLowerCase().trim();
+                          const invMatch=Object.entries(p.invitados||{}).find(([iid,idata])=>
+                            iid.startsWith("inv_") && (idata.nombre||"").toLowerCase().trim()===nombreJ
+                          );
+                          if(invMatch) evs=(p.eventos||{})[invMatch[0]]||{};
+                        }
                         return (
                           <div key={id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                             <Av nom={j.nombre} foto={j.foto} size={24} />
