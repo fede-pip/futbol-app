@@ -925,6 +925,7 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
           ✅ Cuenta de Google vinculada — {ud.googleEmail}
         </div>
       )}
+      <Card>
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
           <Av nom={nom||user.nombre} foto={foto} size={60} />
           <div>
