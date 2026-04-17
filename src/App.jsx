@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 const LOGO_IMG = "data:image/jpeg;base64,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";
 
 
@@ -15,6 +16,8 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const googleProvider = new GoogleAuthProvider();
 const SUPER_ADMIN = "35270164";
 
 const ATTRS = [
@@ -52,6 +55,18 @@ function calcPuntos(historial) {
     if(h.resultado==="empatado") return s+1;
     return s;
   },0);
+}
+
+function calcRacha(historial) {
+  const hist = (historial||[]).filter(h => ["ganado","empatado","perdido"].includes(h.resultado));
+  if (hist.length === 0) return { tipo: null, n: 0 };
+  const ultimo = hist[hist.length - 1].resultado;
+  let n = 0;
+  for (let i = hist.length - 1; i >= 0; i--) {
+    if (hist[i].resultado === ultimo) n++;
+    else break;
+  }
+  return { tipo: ultimo, n };
 }
 
 // Formatea nombre: "Apellido, N." para tabla, nombre completo para resto
@@ -610,10 +625,17 @@ export default function App() {
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 function AuthScreen({ onLogin }) {
-  const [tab,  setTab]  = useState("login");
-  const [dni,  setDni]  = useState(""); const [nom,setNom]=useState("");
-  const [p1,   setP1]   = useState(""); const [p2, setP2] =useState("");
-  const [msg,  setMsg]  = useState(""); const [load,setLoad]=useState(false);
+  const [tab,   setTab]  = useState("login");
+  const [dni,   setDni]  = useState(""); const [nom,setNom]=useState("");
+  const [p1,    setP1]   = useState(""); const [p2, setP2] =useState("");
+  const [msg,   setMsg]  = useState(""); const [load,setLoad]=useState(false);
+  // Google link flow — after Google sign-in, ask for DNI to link/create
+  const [googleUser, setGoogleUser] = useState(null); // {uid, email, displayName, photoURL}
+  const [linkDni,    setLinkDni]   = useState("");
+  const [linkNom,    setLinkNom]   = useState("");
+  const [linkP1,     setLinkP1]    = useState("");
+  const [linkP2,     setLinkP2]    = useState("");
+  const [linkMsg,    setLinkMsg]   = useState("");
 
   async function doLogin() {
     if(!dni||!p1){setMsg("Completá todos los campos");return;}
@@ -642,6 +664,78 @@ function AuthScreen({ onLogin }) {
     setLoad(false);onLogin(n);
   }
 
+  async function doGoogleLogin() {
+    setLoad(true); setMsg("");
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const gu = result.user;
+      // Buscar si este Google UID ya está vinculado a algún usuario
+      const mapSnap = await getDoc(doc(db, "app8_uid_map", gu.uid));
+      if (mapSnap.exists()) {
+        // Ya vinculado — cargar usuario y entrar
+        const { dni: dniVinc } = mapSnap.data();
+        const userSnap = await getDoc(rUser(dniVinc));
+        if (userSnap.exists()) { setLoad(false); onLogin({...userSnap.data()}); return; }
+      }
+      // No vinculado — pedir DNI para vincular o crear cuenta
+      setLoad(false);
+      setGoogleUser({ uid: gu.uid, email: gu.email, displayName: gu.displayName, photoURL: gu.photoURL });
+      setLinkNom(gu.displayName||"");
+    } catch(e) {
+      setLoad(false);
+      setMsg("Error con Google. Intentá de nuevo.");
+    }
+  }
+
+  async function doLinkDni() {
+    if(!linkDni){setLinkMsg("Ingresá tu DNI");return;}
+    setLoad(true);
+    const snap = await getDoc(rUser(linkDni.trim()));
+    if (snap.exists()) {
+      // Usuario existente — vincular Google UID
+      await setDoc(doc(db,"app8_uid_map",googleUser.uid),{dni:linkDni.trim()},{merge:true});
+      await setDoc(rUser(linkDni.trim()),{googleUid:googleUser.uid,googleEmail:googleUser.email},{merge:true});
+      setLoad(false);
+      onLogin({...snap.data(), googleUid:googleUser.uid});
+    } else {
+      // Usuario nuevo — necesita contraseña y nombre
+      if(!linkNom||!linkP1||!linkP2){setLinkMsg("Completá todos los campos");setLoad(false);return;}
+      if(linkP1!==linkP2){setLinkMsg("Las contraseñas no coinciden");setLoad(false);return;}
+      const n={nombre:linkNom.trim(),dni:linkDni.trim(),apodo:"",foto:googleUser.photoURL||"",
+        passHash:hashPwd(linkP1),googleUid:googleUser.uid,googleEmail:googleUser.email,
+        atributos:{},atributosAnteriores:{},goles:0,partidos:0,historial:[],creadoEn:Date.now()};
+      await setDoc(rUser(linkDni.trim()),n);
+      await setDoc(doc(db,"app8_uid_map",googleUser.uid),{dni:linkDni.trim()});
+      setLoad(false);
+      onLogin(n);
+    }
+  }
+
+  // Flujo de vinculación con Google
+  if (googleUser) {
+    return (
+      <div style={{padding:20}}>
+        <div style={{textAlign:"center",padding:"24px 0 20px"}}>
+          <div style={{width:100,height:100,borderRadius:24,overflow:"hidden",margin:"0 auto 16px",boxShadow:"0 8px 24px rgba(61,90,254,0.3)"}}>
+            <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8"/>
+          </div>
+          <div style={{fontSize:13,color:G.t3}}>Conectado como <b>{googleUser.email}</b></div>
+        </div>
+        <Card>
+          <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>Vinculá tu cuenta</div>
+          <div style={{fontSize:13,color:G.t2,marginBottom:16}}>Ingresá tu DNI para vincular tu cuenta de Google. Si ya tenés cuenta en App8, se vinculará automáticamente.</div>
+          <Inp label="Tu DNI" value={linkDni} onChange={e=>setLinkDni(e.target.value)} placeholder="38123456"/>
+          <Inp label="Tu nombre completo" value={linkNom} onChange={e=>setLinkNom(e.target.value)} placeholder="Juan Pérez"/>
+          <Inp label="Contraseña" type="password" value={linkP1} onChange={e=>setLinkP1(e.target.value)} placeholder="••••••"/>
+          <Inp label="Repetir contraseña" type="password" value={linkP2} onChange={e=>setLinkP2(e.target.value)} placeholder="••••••"/>
+          <Btn onClick={doLinkDni} disabled={load} full style={{marginTop:4}}>{load?"Cargando...":"Continuar →"}</Btn>
+          <Msg ok={false}>{linkMsg}</Msg>
+          <button onClick={()=>setGoogleUser(null)} style={{width:"100%",marginTop:8,background:"none",border:"none",color:G.t3,fontSize:13,cursor:"pointer"}}>← Volver</button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div style={{padding:20}}>
       <div style={{textAlign:"center",padding:"32px 0 28px"}}>
@@ -649,7 +743,20 @@ function AuthScreen({ onLogin }) {
           <img src={LOGO_IMG} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="App8" />
         </div>
       </div>
-      <div style={{display:"flex",gap:6,marginBottom:20,background:G.surf1,borderRadius:G.r3,padding:4}}>
+
+      {/* Botón Google */}
+      <button onClick={doGoogleLogin} disabled={load} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"13px 16px",background:"#fff",border:"1.5px solid #DDE3F0",borderRadius:G.r2,cursor:"pointer",fontWeight:700,fontSize:15,color:"#333",marginBottom:16,boxShadow:G.sh1}}>
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        Ingresar con Google
+      </button>
+
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+        <div style={{flex:1,height:1,background:G.surf2}}/>
+        <span style={{fontSize:12,color:G.t3}}>o con DNI</span>
+        <div style={{flex:1,height:1,background:G.surf2}}/>
+      </div>
+
+      <div style={{display:"flex",gap:6,marginBottom:16,background:G.surf1,borderRadius:G.r3,padding:4}}>
         {["login","register"].map(t=>(
           <button key={t} onClick={()=>{setTab(t);setMsg("");}} style={{flex:1,padding:"10px",borderRadius:G.r2,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,background:tab===t?G.surf0:"transparent",color:tab===t?G.primary:G.t3,boxShadow:tab===t?G.sh1:"none",transition:"all .2s"}}>
             {t==="login"?"Ingresar":"Registrarme"}
@@ -765,6 +872,24 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
     setP0("");setP1("");setP2("");setMsgP("Contraseña cambiada");setTimeout(()=>setMsgP(""),2500);
   }
 
+  const [googleMsg, setGoogleMsg] = useState("");
+  const [googleLoad, setGoogleLoad] = useState(false);
+
+  async function vincularGoogle() {
+    setGoogleLoad(true); setGoogleMsg("");
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const gu = result.user;
+      await setDoc(doc(db,"app8_uid_map",gu.uid),{dni:user.dni});
+      await setDoc(rUser(user.dni),{googleUid:gu.uid,googleEmail:gu.email},{merge:true});
+      await reloadUser();
+      setGoogleMsg("✅ Cuenta de Google vinculada correctamente");
+    } catch(e) {
+      setGoogleMsg("Error al vincular. Intentá de nuevo.");
+    }
+    setGoogleLoad(false);
+  }
+
   const attrs=ud.atributos||{};
   const attrsAnt=ud.atributosAnteriores||{};
   // Solo mostrar tendencia si ya hubo al menos un partido (historial tiene entradas)
@@ -781,7 +906,25 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
   return (
     <div style={{padding:20}}>
       <STitle>Mi perfil</STitle>
-      <Card>
+
+      {/* Banner vinculación Google */}
+      {!ud.googleUid && (
+        <div style={{background:"#E8F0FE",border:"1px solid #3D5AFE40",borderRadius:G.r2,padding:"12px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:13,color:"#1a1a2e"}}>🔗 Vinculá tu cuenta de Google</div>
+            <div style={{fontSize:12,color:G.t2,marginTop:2}}>Próximamente será el método principal de ingreso</div>
+          </div>
+          <button onClick={vincularGoogle} disabled={googleLoad} style={{background:"#3D5AFE",color:"#fff",border:"none",borderRadius:G.r1,padding:"8px 14px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>
+            {googleLoad?"...":"Vincular Google"}
+          </button>
+          {googleMsg && <div style={{width:"100%",fontSize:12,fontWeight:600,color:googleMsg.startsWith("✅")?G.secondary:G.danger}}>{googleMsg}</div>}
+        </div>
+      )}
+      {ud.googleUid && (
+        <div style={{background:"#E8F5E9",border:"1px solid #00C2A840",borderRadius:G.r2,padding:"10px 14px",marginBottom:16,fontSize:13,color:G.secondary,fontWeight:600}}>
+          ✅ Cuenta de Google vinculada — {ud.googleEmail}
+        </div>
+      )}
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
           <Av nom={nom||user.nombre} foto={foto} size={60} />
           <div>
@@ -1730,6 +1873,31 @@ function PEquipos({ comunidad, partido, user }) {
     setPublicado(true);setMsg("✓ Equipos publicados");setTimeout(()=>setMsg(""),2000);
   }
 
+  function compartirEquipos(){
+    const nombreJug = id => jugData[id]?.nombre || (id.startsWith("inv_") ? "Invitado" : "?");
+    const listaO = eqO.map((id,i) => `${i+1}. ${nombreJug(id)}`).join("\n");
+    const listaB = eqB.map((id,i) => `${i+1}. ${nombreJug(id)}`).join("\n");
+    const texto = [
+      `⚽ *${comunidad?.nombre||"Fútbol"}* — Equipos`,
+      ``,
+      `🖤 *Oscuro*`,
+      listaO,
+      ``,
+      `🤍 *Blanco*`,
+      listaB,
+      ``,
+      `_App8 · ${window.location.origin}_`,
+    ].join("\n");
+    if(navigator.clipboard){
+      navigator.clipboard.writeText(texto).then(()=>{
+        alert("¡Copiado! Pegá el mensaje en WhatsApp.");
+        window.open("https://wa.me/","_blank");
+      });
+    } else {
+      window.open("https://wa.me/?text="+encodeURIComponent(texto),"_blank");
+    }
+  }
+
   const sumaEq=ids=>ids.map(id=>calcProm((jugData[id]||{}).atributos||{})).reduce((s,v)=>s+v,0);
 
   const EqCol=({ids,nom,color})=>{
@@ -1774,6 +1942,7 @@ function PEquipos({ comunidad, partido, user }) {
           {(publicado||esAdmin) && <div style={{display:"flex",gap:10,marginBottom:14}}><EqCol ids={eqO} nom="o" color="#555" /><EqCol ids={eqB} nom="b" color="#888" /></div>}
           {!publicado && esAdmin && <><Btn v="ghost" onClick={generar} full style={{marginBottom:8}}>🔄 Re-generar</Btn><Btn v="secondary" onClick={publicar} full>✅ Publicar equipos</Btn></>}
           {publicado && esAdmin && <Btn v="ghost" onClick={()=>{setPublicado(false);setGenerado(false);}} full>🔄 Re-hacer equipos</Btn>}
+          {(publicado||esAdmin) && <button onClick={compartirEquipos} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:"#25D36620",border:"1.5px solid #25D36640",borderRadius:G.r2,cursor:"pointer",color:"#128C7E",fontWeight:700,fontSize:14,width:"100%",justifyContent:"center",marginTop:8}}>💬 Compartir equipos por WhatsApp</button>}
           {!publicado && !esAdmin && <Card style={{textAlign:"center",color:G.t3,padding:24}}>⏳ El admin está preparando los equipos...</Card>}
           <Msg ok={msg?.startsWith("✓")}>{msg}</Msg>
         </>
@@ -2377,6 +2546,7 @@ function PStats({ comunidad, user, esAdmin }) {
                 <th style={thStyle}>⚽</th>
                 <th style={thStyle}>⚽/PJ</th>
                 <th style={thStyle}>🥇</th>
+                <th style={thStyle}>Racha</th>
               </tr>
             </thead>
             <tbody>
@@ -2389,6 +2559,8 @@ function PStats({ comunidad, user, esAdmin }) {
                 const perdidos=(j.historial||[]).filter(h=>h.resultado==="perdido").length;
                 const pts=calcPuntos(j.historial);
                 const golPJ=partidos>0?(goles/partidos).toFixed(1):"—";
+                const racha=calcRacha(j.historial);
+                const rachaIcon=racha.tipo==="ganado"?"🔥":racha.tipo==="perdido"?"❄️":racha.tipo==="empatado"?"➡️":null;
                 return (
                   <tr key={j.dni} onClick={()=>setExpandido(expandido===j.dni?null:j.dni)}
                     style={{cursor:"pointer",background:expandido===j.dni?G.primary+"08":"transparent",transition:"background .15s"}}>
@@ -2413,6 +2585,11 @@ function PStats({ comunidad, user, esAdmin }) {
                     <td style={{...tdStyle,color:goles>0?G.secondary:G.t3}}>{goles||"—"}</td>
                     <td style={{...tdStyle,color:G.t2}}>{golPJ}</td>
                     <td style={{...tdStyle,color:mvps>0?G.gold:G.t3}}>{mvps||"—"}</td>
+                    <td style={{...tdStyle,fontSize:12}}>
+                      {rachaIcon && racha.n>=2
+                        ? <span title={`${racha.n} ${racha.tipo}s seguidos`}>{rachaIcon}{racha.n}</span>
+                        : <span style={{color:G.t3}}>—</span>}
+                    </td>
                   </tr>
                 );
               })}
