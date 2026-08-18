@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Debug OneSignal</title>
+<style>
+  body { font-family: monospace; max-width: 700px; margin: 20px auto; padding: 20px; background: #f6f8fc; }
+  button { background: #3D5AFE; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; margin: 4px; }
+  button.go { background: #00C2A8; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  pre { background: #f0f0f0; padding: 12px; border-radius: 8px; font-size: 11px; overflow: auto; white-space: pre-wrap; max-height: 400px; }
+  input { padding: 8px 12px; border-radius: 8px; border: 1.5px solid #ddd; font-size: 14px; width: 200px; }
+</style>
+</head>
+<body>
+<h2>🔍 Debug OneSignal — App8</h2>
+
+<div class="card">
+  <b>Paso 1:</b> Ver tu OneSignal ID actual
+  <br><button onclick="verId()" style="margin-top:8px">Ver mi OneSignal ID</button>
+</div>
+
+<div class="card">
+  <b>Paso 2:</b> Guardar en Firebase
+  <br>DNI: <input id="dni" value="35270164" placeholder="Tu DNI"/>
+  <br><button class="go" onclick="guardarId()" style="margin-top:8px">Guardar ID en Firebase</button>
+</div>
+
+<div class="card">
+  <b>Paso 3:</b> Probar envío directo
+  <br><button onclick="enviarTest()" style="margin-top:8px">Enviar notificación de prueba a mi ID</button>
+</div>
+
+<pre id="log">Esperando...</pre>
+
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const cfg = {
+  apiKey: "AIzaSyBkdakeLAzmp7zGz99nPswuqjtELSAOe8s",
+  authDomain: "futbol-app-5818a.firebaseapp.com",
+  projectId: "futbol-app-5818a",
+  storageBucket: "futbol-app-5818a.firebasestorage.app",
+  messagingSenderId: "861046895576",
+  appId: "1:861046895576:web:1e64b31f951194fbfaf8ad"
+};
+initializeApp(cfg);
+const db = getFirestore();
+
+const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
+const ONESIGNAL_API_KEY = "os_v2_app_h62vb5b6wjaanpj5o7zjkhmu7ypfkfyuklgufe5hokgnntrpxqdowon7zzdsapfj3vocmnpml2eq2gszyx66zkd2ftpqgo5u4rwu66y";
+
+const log = m => document.getElementById("log").textContent += m + "\n";
+let myId = null;
+
+// Init OneSignal
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+window.OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({ appId: ONESIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true });
+  log("OneSignal inicializado ✅");
+  window._OS = OneSignal;
+});
+
+window.verId = async function() {
+  document.getElementById("log").textContent = "";
+  log("Buscando OneSignal ID...");
+
+  const OS = window._OS || window.OneSignal;
+  if (!OS) { log("❌ OneSignal no está listo, esperá 2 segundos y reintentá"); return; }
+
+  // Intentar todos los métodos posibles v16
+  log("Método 1 - PushSubscription.id: " + (OS.User?.PushSubscription?.id || "null"));
+  log("Método 2 - getNotificationPermission: " + (await OS.Notifications?.permission || "null"));
+
+  try {
+    const sub = OS.User?.PushSubscription;
+    log("PushSubscription objeto: " + JSON.stringify({
+      id: sub?.id,
+      token: sub?.token,
+      optedIn: sub?.optedIn,
+    }));
+    myId = sub?.id || null;
+  } catch(e) { log("Error: " + e.message); }
+
+  // También verificar en Firebase qué hay guardado
+  const dni = document.getElementById("dni").value;
+  const snap = await getDoc(doc(db, "app8_users", dni));
+  if (snap.exists()) {
+    log("\nEn Firebase guardado: " + (snap.data().oneSignalId || "NADA"));
+  }
+
+  log("\nTu OneSignal ID actual: " + (myId || "NO ENCONTRADO"));
+};
+
+window.guardarId = async function() {
+  const OS = window._OS || window.OneSignal;
+  const id = OS?.User?.PushSubscription?.id;
+  if (!id) { log("❌ Sin ID — ejecutá Paso 1 primero"); return; }
+
+  const dni = document.getElementById("dni").value;
+  await setDoc(doc(db, "app8_users", dni), { oneSignalId: id }, { merge: true });
+  log("✅ Guardado en Firebase: " + id);
+  myId = id;
+};
+
+window.enviarTest = async function() {
+  const id = myId || window._OS?.User?.PushSubscription?.id;
+  if (!id) { log("❌ Ejecutá los pasos 1 y 2 primero"); return; }
+
+  log("\nEnviando a: " + id);
+  const resp = await fetch("https://onesignal.com/api/v1/notifications", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Key ${ONESIGNAL_API_KEY}`
+    },
+    body: JSON.stringify({
+      app_id: ONESIGNAL_APP_ID,
+      include_subscription_ids: [id], // v16 usa subscription_ids no player_ids
+      headings: { en: "🔔 Test App8", es: "🔔 Test App8" },
+      contents: { en: "Si ves esto, las notificaciones funcionan!", es: "Si ves esto, las notificaciones funcionan!" },
+    })
+  });
+  const data = await resp.json();
+  log("Respuesta OneSignal: " + JSON.stringify(data, null, 2));
+};
+</script>
+</body>
+</html>
