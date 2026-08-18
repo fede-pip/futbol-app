@@ -309,7 +309,11 @@ async function initOneSignal() {
 async function getOneSignalId() {
   try {
     if (!window.OneSignal) return null;
-    return await window.OneSignal.getUserId();
+    // SDK v16 — obtener subscription ID
+    const id = window.OneSignal.User?.PushSubscription?.id ||
+                await window.OneSignal.User?.PushSubscription?.optIn?.().then(()=>window.OneSignal.User?.PushSubscription?.id) ||
+                null;
+    return id || null;
   } catch(e) { return null; }
 }
 
@@ -672,14 +676,20 @@ export default function App() {
   function login(u) {
     setUser(u);
     localStorage.setItem("app8_v4_session",JSON.stringify(u));
-    // Inicializar OneSignal y guardar el player ID del usuario
     initOneSignal();
-    setTimeout(async()=>{
-      const osId = await getOneSignalId();
-      if(osId && osId !== u.oneSignalId){
+    // Reintentar hasta 5 veces con 2s de espera entre intentos
+    let intentos = 0;
+    const guardarId = async () => {
+      intentos++;
+      const osId = window.OneSignal?.User?.PushSubscription?.id;
+      if (osId && osId !== u.oneSignalId) {
         await setDoc(rUser(u.dni),{oneSignalId:osId},{merge:true});
+        console.log("OneSignal ID guardado:", osId);
+      } else if (intentos < 5) {
+        setTimeout(guardarId, 2000);
       }
-    }, 3000);
+    };
+    setTimeout(guardarId, 2000);
   }
   function logout()  { setUser(null); localStorage.removeItem("app8_v4_session"); setPantalla("home"); setComActiva(null); }
   async function reloadUser() {
