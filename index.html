@@ -4,24 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>App8</title>
-
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
-
-    <!-- Favicon -->
     <link rel="icon" href="/icons/icon-192x192.png" type="image/png" />
-
-    <!-- iOS / Apple -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="App8" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-
-    <!-- Theme color Android -->
     <meta name="theme-color" content="#3D5AFE" />
-    <meta name="description" content="App8 — Tu red de fútbol. Organizá partidos, votá el MVP y seguí las estadísticas." />
+    <meta name="description" content="App8 — Tu red de fútbol." />
     <meta name="mobile-web-app-capable" content="yes" />
-
+    <!-- OneSignal SDK -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "3fb550f4-3eb2-4006-bd3d-77f2951d94fe",
+          notifyButton: { enable: false },
+          allowLocalhostAsSecureOrigin: true,
+        });
+      });
+    </script>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { background: #f6f8fc; }
