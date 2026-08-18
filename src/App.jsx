@@ -244,7 +244,7 @@ const G = {
   sh2:      "0 4px 12px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.06)",
   sh3:      "0 8px 24px rgba(0,0,0,.12)",
   // Radii
-  r1:8, r2:14, r3:20, r4:28,
+  r1:10, r2:16, r3:22, r4:32,
 };
 
 const globalCSS = `
@@ -291,6 +291,97 @@ function fixImgUrl(url) {
 }
 
 const CLOUDINARY_CLOUD = "dln7wkdgn";
+const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
+const ONESIGNAL_API_KEY = "os_v2_app_h62vb5b6wjaanpj5o7zjkhmu7ypfkfyuklgufe5hokgnntrpxqdowon7zzdsapfj3vocmnpml2eq2gszyx66zkd2ftpqgo5u4rwu66y";
+
+// Inicializar OneSignal y pedir permiso de notificaciones
+async function initOneSignal() {
+  if (typeof window === "undefined") return;
+  try {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({ appId: ONESIGNAL_APP_ID, notifyButton: { enable: false } });
+    });
+  } catch(e) { console.log("OneSignal init error:", e); }
+}
+
+// Obtener el Player ID del usuario actual
+async function getOneSignalId() {
+  try {
+    if (!window.OneSignal) return null;
+    return await window.OneSignal.getUserId();
+  } catch(e) { return null; }
+}
+
+// Configuración default de notificaciones
+const NOTIF_DEFAULT = {
+  partido_nuevo:  { activa:true, titulo:"⚽ ¡Partido confirmado! — {comunidad}", cuerpo:"{fecha} a las {hora} en {lugar}. ¡Anotate!", dest:"todos" },
+  inscripcion:    { activa:true, titulo:"✅ {nombre} se anotó", cuerpo:"Quedan {restantes} lugar{es} libres. Partido: {lugar}", dest:"todos" },
+  pocos_lugares:  { activa:true, titulo:"⚠️ ¡Quedan solo {restantes} lugar{es}!", cuerpo:"{nombre} se anotó. ¡Anotate antes que se llene!", dest:"no_anotados" },
+  equipos:        { activa:true, titulo:"⚖️ ¡Equipos publicados!", cuerpo:"Ya podés ver en qué equipo jugás. ¡A prepararse! 💪", dest:"inscriptos" },
+  votaciones:     { activa:true, titulo:"🗳️ ¡Votaciones abiertas!", cuerpo:"Votá el MVP y los atributos. Resultado: Oscuro {golesO} - {golesB} Blanco", dest:"inscriptos" },
+  resultado:      { activa:true, titulo:"📊 Resultados del partido", cuerpo:"{resultado} · ¡Mirá las stats actualizadas!", dest:"jugadores" },
+  mvp:            { activa:true, titulo:"🥇 ¡Sos el MVP del partido!", cuerpo:"Tus compañeros te eligieron como el mejor jugador. ¡Felicitaciones!", dest:"mvp" },
+};
+
+const DEST_LABELS = {
+  todos:"Todos los miembros", inscriptos:"Inscriptos al partido",
+  no_anotados:"Miembros NO anotados", jugadores:"Jugadores del partido",
+  mvp:"Solo el MVP", admins:"Solo admins"
+};
+
+function reemplazarVars(texto, vars) {
+  let t = texto||"";
+  Object.entries(vars).forEach(([k,v])=>{ t=t.replace(new RegExp(`{${k}}`,"g"),v||""); });
+  // {es} para plural de "lugar"
+  t = t.replace(/{es}/g, (vars.restantes===1||vars.restantes==="1")?"":"es");
+  return t;
+}
+
+// Enviar notificación usando config de la comunidad
+async function dispararNotif(tipo, comunidadData, vars={}, playerIdsOverride=null) {
+  const cfg = { ...(NOTIF_DEFAULT[tipo]||{}), ...(comunidadData?.notifConfig?.[tipo]||{}) };
+  if (!cfg.activa) return;
+  const titulo = reemplazarVars(cfg.titulo, vars);
+  const cuerpo = reemplazarVars(cfg.cuerpo, vars);
+  const ids = playerIdsOverride || [];
+  if (ids.length === 0) return;
+  await sendNotif(ids, titulo, cuerpo, {tipo});
+}
+
+// Enviar notificación custom (creada por admin)
+async function dispararNotifCustom(notif, playerIds) {
+  if (!notif.activa) return;
+  await sendNotif(playerIds, notif.titulo||"", notif.cuerpo||"", {tipo:"custom"});
+}
+
+async function sendNotif(playerIds, title, body, data={}) {
+  if (!playerIds || playerIds.length === 0) return;
+  const validIds = playerIds.filter(Boolean);
+  if (validIds.length === 0) return;
+  try {
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization":`Key ${ONESIGNAL_API_KEY}` },
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        include_player_ids: validIds,
+        headings: { en:title, es:title },
+        contents: { en:body, es:body },
+        data, url: window.location.origin,
+      })
+    });
+  } catch(e) { console.log("Error enviando notif:", e); }
+}
+
+// Obtener playerIds de todos los miembros de una comunidad
+async function getPlayerIds(dnis) {
+  const ids = [];
+  const snaps = await Promise.all(dnis.map(dni => getDoc(rUser(dni))));
+  snaps.forEach(s => { if(s.exists() && s.data().oneSignalId) ids.push(s.data().oneSignalId); });
+  return ids;
+}
+
 const CLOUDINARY_PRESET = "app8_fotos";
 
 async function subirFotoCloudinary(file, onProgress) {
@@ -374,8 +465,8 @@ function Btn({ children, onClick, v="primary", disabled, sm, full, style:ex={} }
     secondary:{ bg:G.secondary,  color:"#fff",   shadow:G.sh2 },
     danger:  { bg:G.danger,      color:"#fff",   shadow:G.sh1 },
     warn:    { bg:G.warn,        color:"#fff",   shadow:G.sh1 },
-    ghost:   { bg:"transparent", color:G.t2,     shadow:"none", border:`1.5px solid #DDE3F0` },
-    soft:    { bg:G.surf2,       color:G.primary,shadow:"none" },
+    ghost:   { bg:G.surf1,       color:G.t2,     shadow:"none", border:"none" },
+    soft:    { bg:G.primary+"15",color:G.primary,shadow:"none" },
     text:    { bg:"transparent", color:G.primary,shadow:"none" },
   };
   const s = styles[v]||styles.primary;
@@ -409,8 +500,8 @@ function Card({ children, style:ex={}, accent, onClick, className="" }) {
   return (
     <div className={className} onClick={onClick} style={{
       background:G.surf0, borderRadius:G.r3, boxShadow:G.sh1,
-      border:`1px solid ${accent||"#EEF0F8"}`,
-      padding:18, marginBottom:14,
+      border:`0.5px solid ${accent||"#E8EEFF"}`,
+      padding:22, marginBottom:14,
       cursor:onClick?"pointer":"default",
       transition:"box-shadow .2s,transform .15s",
       ...ex
@@ -578,7 +669,18 @@ export default function App() {
     if(comActiva){ const u=all.find(c=>c.id===comActiva.id); if(u) setComActiva(u); }
   }
 
-  function login(u) { setUser(u); localStorage.setItem("app8_v4_session",JSON.stringify(u)); }
+  function login(u) {
+    setUser(u);
+    localStorage.setItem("app8_v4_session",JSON.stringify(u));
+    // Inicializar OneSignal y guardar el player ID del usuario
+    initOneSignal();
+    setTimeout(async()=>{
+      const osId = await getOneSignalId();
+      if(osId && osId !== u.oneSignalId){
+        await setDoc(rUser(u.dni),{oneSignalId:osId},{merge:true});
+      }
+    }, 3000);
+  }
   function logout()  { setUser(null); localStorage.removeItem("app8_v4_session"); setPantalla("home"); setComActiva(null); }
   async function reloadUser() {
     if(!user) return;
@@ -1044,6 +1146,186 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
 }
 
 // ── COMUNIDAD ─────────────────────────────────────────────────────────────────
+// ── PANEL DE NOTIFICACIONES ───────────────────────────────────────────────────
+function PanelNotificaciones({ comunidad }) {
+  const [abierto, setAbierto] = useState(false);
+  const [config, setConfig] = useState(null);
+  const [editando, setEditando] = useState(null); // id de notif editando
+  const [form, setForm] = useState({});
+  const [msg, setMsg] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  // Para notif custom
+  const [nuevaTitulo, setNuevaTitulo] = useState("");
+  const [nuevaCuerpo, setNuevaCuerpo] = useState("");
+  const [nuevaDest, setNuevaDest] = useState("todos");
+  const [mostrarNueva, setMostrarNueva] = useState(false);
+
+  useEffect(()=>{
+    if(!abierto) return;
+    const cfg = {};
+    Object.entries(NOTIF_DEFAULT).forEach(([k,v])=>{
+      cfg[k] = { ...v, ...(comunidad.notifConfig?.[k]||{}) };
+    });
+    // Agregar notifs custom
+    if(comunidad.notifConfig){
+      Object.entries(comunidad.notifConfig).forEach(([k,v])=>{
+        if(!NOTIF_DEFAULT[k]) cfg[k] = v;
+      });
+    }
+    setConfig(cfg);
+  },[abierto, comunidad.notifConfig]);
+
+  async function guardarConfig(nuevaCfg) {
+    await setDoc(rCom(comunidad.id),{notifConfig:nuevaCfg},{merge:true});
+    setConfig(nuevaCfg);
+  }
+
+  async function toggleActiva(id) {
+    const nueva = {...config, [id]:{...config[id], activa:!config[id].activa}};
+    await guardarConfig(nueva);
+  }
+
+  function iniciarEdicion(id) {
+    setEditando(id);
+    setForm({...config[id]});
+  }
+
+  async function guardarEdicion() {
+    const nueva = {...config, [editando]:{...form}};
+    await guardarConfig(nueva);
+    setEditando(null);
+    setMsg("✓ Guardado");
+    setTimeout(()=>setMsg(""),2000);
+  }
+
+  async function crearCustom() {
+    if(!nuevaTitulo.trim()||!nuevaCuerpo.trim()){setMsg("Completá título y cuerpo");return;}
+    const id = `custom_${Date.now()}`;
+    const nueva = {...config, [id]:{activa:true,titulo:nuevaTitulo,cuerpo:nuevaCuerpo,dest:nuevaDest,esCustom:true}};
+    await guardarConfig(nueva);
+    setNuevaTitulo("");setNuevaCuerpo("");setNuevaDest("todos");setMostrarNueva(false);
+    setMsg("✓ Notificación creada");setTimeout(()=>setMsg(""),2000);
+  }
+
+  async function eliminarCustom(id) {
+    if(!confirm("¿Eliminar esta notificación?")) return;
+    const nueva = {...config};
+    delete nueva[id];
+    await guardarConfig(nueva);
+  }
+
+  async function enviarManual(id) {
+    setEnviando(id);
+    const notif = config[id];
+    const playerIds = await getPlayerIds(comunidad.miembros||[]);
+    await sendNotif(playerIds, notif.titulo, notif.cuerpo, {tipo:id});
+    setEnviando(null);
+    setMsg("✓ Enviada");
+    setTimeout(()=>setMsg(""),2000);
+  }
+
+  const NOTIF_LABELS = {
+    partido_nuevo:"⚽ Partido nuevo", inscripcion:"✅ Inscripción",
+    pocos_lugares:"⚠️ Pocos lugares", equipos:"⚖️ Equipos publicados",
+    votaciones:"🗳️ Votaciones abiertas", resultado:"📊 Resultado",
+    mvp:"🥇 MVP elegido"
+  };
+
+  return (
+    <Card>
+      <div onClick={()=>setAbierto(a=>!a)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
+        <div style={{fontWeight:700,fontSize:15}}>🔔 Notificaciones</div>
+        <span style={{color:G.t3,fontSize:18}}>{abierto?"∧":"∨"}</span>
+      </div>
+
+      {abierto && config && (
+        <div style={{marginTop:14}}>
+          {Object.entries(config).map(([id,notif])=>(
+            <div key={id} style={{marginBottom:10,background:G.surf1,borderRadius:G.r2,padding:12}}>
+              {editando===id ? (
+                <>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>
+                    ✏️ Editando: {NOTIF_LABELS[id]||id}
+                  </div>
+                  <Inp label="Título" value={form.titulo} onChange={e=>setForm(f=>({...f,titulo:e.target.value}))}/>
+                  <Inp label="Cuerpo" value={form.cuerpo} onChange={e=>setForm(f=>({...f,cuerpo:e.target.value}))}/>
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:12,fontWeight:600,color:G.t3,marginBottom:5}}>Destinatarios</div>
+                    <select value={form.dest||"todos"} onChange={e=>setForm(f=>({...f,dest:e.target.value}))}
+                      style={{width:"100%",padding:"10px 14px",borderRadius:G.r2,border:"1.5px solid #DDE3F0",background:G.surf0,fontSize:14,color:G.t1}}>
+                      {Object.entries(DEST_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                  {!notif.esCustom && (
+                    <div style={{fontSize:11,color:G.t3,marginBottom:10,background:G.surf0,borderRadius:G.r1,padding:"6px 10px"}}>
+                      Variables: {id==="partido_nuevo"?"{comunidad} {fecha} {hora} {lugar}":
+                        id==="inscripcion"||id==="pocos_lugares"?"{nombre} {restantes}":
+                        id==="votaciones"?"{golesO} {golesB}":
+                        id==="resultado"?"{resultado}":"—"}
+                    </div>
+                  )}
+                  <div style={{display:"flex",gap:8}}>
+                    <Btn onClick={guardarEdicion} full>💾 Guardar</Btn>
+                    <Btn v="ghost" onClick={()=>setEditando(null)} full>Cancelar</Btn>
+                  </div>
+                </>
+              ):(
+                <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                      <span style={{fontWeight:700,fontSize:13,color:G.t1}}>{NOTIF_LABELS[id]||id}</span>
+                      <span style={{fontSize:10,background:G.surf2,color:G.t3,borderRadius:99,padding:"2px 7px"}}>{DEST_LABELS[notif.dest]||notif.dest}</span>
+                    </div>
+                    <div style={{fontSize:12,color:G.t2,marginBottom:2}}>{notif.titulo}</div>
+                    <div style={{fontSize:11,color:G.t3}}>{notif.cuerpo}</div>
+                    <div style={{display:"flex",gap:6,marginTop:8}}>
+                      <button onClick={()=>iniciarEdicion(id)} style={{background:"none",border:"none",color:G.primary,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>✏️ Editar</button>
+                      <button onClick={()=>enviarManual(id)} disabled={!!enviando} style={{background:"none",border:"none",color:G.secondary,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>
+                        {enviando===id?"⏳ Enviando...":"📤 Enviar ahora"}
+                      </button>
+                      {notif.esCustom && (
+                        <button onClick={()=>eliminarCustom(id)} style={{background:"none",border:"none",color:G.danger,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>🗑️ Eliminar</button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Toggle activa/inactiva */}
+                  <div onClick={()=>toggleActiva(id)} style={{width:40,height:22,borderRadius:99,background:notif.activa?G.primary:G.surf2,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0,marginTop:2}}>
+                    <div style={{position:"absolute",width:16,height:16,borderRadius:"50%",background:"#fff",top:3,left:notif.activa?21:3,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Crear nueva notificación custom */}
+          {mostrarNueva ? (
+            <div style={{background:G.surf1,borderRadius:G.r2,padding:12,marginTop:6}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>✨ Nueva notificación</div>
+              <Inp label="Título" value={nuevaTitulo} onChange={e=>setNuevaTitulo(e.target.value)} placeholder="Ej: 🍕 Quedarse a comer"/>
+              <Inp label="Cuerpo" value={nuevaCuerpo} onChange={e=>setNuevaCuerpo(e.target.value)} placeholder="Ej: ¿Te quedás a comer después del partido?"/>
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:600,color:G.t3,marginBottom:5}}>Destinatarios</div>
+                <select value={nuevaDest} onChange={e=>setNuevaDest(e.target.value)}
+                  style={{width:"100%",padding:"10px 14px",borderRadius:G.r2,border:"1.5px solid #DDE3F0",background:G.surf0,fontSize:14,color:G.t1}}>
+                  {Object.entries(DEST_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <Btn onClick={crearCustom} full>✨ Crear</Btn>
+                <Btn v="ghost" onClick={()=>setMostrarNueva(false)} full>Cancelar</Btn>
+              </div>
+            </div>
+          ):(
+            <Btn v="soft" onClick={()=>setMostrarNueva(true)} full style={{marginTop:6}}>+ Crear notificación personalizada</Btn>
+          )}
+
+          {msg && <div style={{marginTop:10,fontSize:13,fontWeight:700,color:G.secondary,textAlign:"center"}}>{msg}</div>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function PComunidad({ comunidad, user, loadComs, setPantalla }) {
   const [miembros, setMiembros] = useState([]);
   const [dniInv,   setDniInv]   = useState("");
@@ -1374,6 +1656,10 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
       )}
 
       <Divider />
+      {/* Panel de notificaciones — solo admin */}
+      {esAdmin && <PanelNotificaciones comunidad={comunidad} />}
+
+      <Divider />
       {/* Salir del grupo */}
       {!esCreador && (
         <Btn v="ghost" onClick={salirDelGrupo} full style={{marginBottom:10}}>Salir del grupo</Btn>
@@ -1588,11 +1874,28 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
     await setDoc(rPart(pid),{comunidadId:comunidad.id,fecha,hora,lugar,formato,inscriptos:[],invitados:{},eventos:{},finalizado:false,equipos:null,notasAtributos:{},mvpConteo:{},votacionesAsignadas:{},creadoEn:Date.now()});
     await setDoc(rCom(comunidad.id),{partidoActivo:pid},{merge:true});
     await loadComs();setMsg("✓ Partido creado!");setTimeout(()=>setMsg(""),2000);
+    // Notificar a todos los miembros
+    const playerIds = await getPlayerIds(comunidad.miembros||[]);
+    const fechaFmt = fecha ? new Date(fecha+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"}) : fecha;
+    await dispararNotif("partido_nuevo", comunidad, {comunidad:comunidad.nombre,fecha:fechaFmt,hora,lugar,formato}, playerIds);
   }
 
   async function anotarme(){
     if(cupoLibre<=0){setMsg("Partido completo");return;}
-    await setDoc(rPart(partido.id),{inscriptos:[...inscripos,user.dni]},{merge:true});
+    const nuevosInscriptos=[...inscripos,user.dni];
+    await setDoc(rPart(partido.id),{inscriptos:nuevosInscriptos},{merge:true});
+    // Notificar a todos los miembros
+    const playerIds = await getPlayerIds(comunidad.miembros||[]);
+    const restantes = cupoLibre - 1;
+    const nombreCorto = user.nombre?.split(" ")[0]||"Alguien";
+    if(restantes <= 3 && restantes > 0){
+      // Alerta de pocos lugares — notificar solo a los NO anotados
+      const noAnotados = (comunidad.miembros||[]).filter(d=>!nuevosInscriptos.includes(d)&&d!==user.dni);
+      const idsNoAnotados = await getPlayerIds(noAnotados);
+      await dispararNotif("pocos_lugares", comunidad, {nombre:nombreCorto,restantes:String(restantes)}, idsNoAnotados);
+    } else {
+      await dispararNotif("inscripcion", comunidad, {nombre:nombreCorto,restantes:String(restantes),lugar:partido.lugar||""}, playerIds);
+    }
   }
   async function desanotarme(){ await setDoc(rPart(partido.id),{inscriptos:inscripos.filter(d=>d!==user.dni)},{merge:true}); }
   async function borrarInscripto(id){ await setDoc(rPart(partido.id),{inscriptos:inscripos.filter(d=>d!==id)},{merge:true}); }
@@ -1644,6 +1947,10 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
       votacionesAsignadas:asig,
       marcador:{oscuro:golesOscuro,blanco:golesBlanco}
     },{merge:true});
+    // Notificar votaciones abiertas a todos los inscriptos registrados
+    const dniInscriptos = inscripos.filter(id=>!id.startsWith("inv_"));
+    const playerIds = await getPlayerIds(dniInscriptos);
+    await dispararNotif("votaciones", comunidad, {golesO:String(golesOscuro),golesB:String(golesBlanco)}, playerIds);
     setPantalla("votar");
   }
   async function borrarPartido(){
@@ -1981,6 +2288,10 @@ function PEquipos({ comunidad, partido, user }) {
   async function publicar(){
     await setDoc(rPart(partido.id),{equipos:{oscuro:eqO,blanco:eqB,publicado:true}},{merge:true});
     setPublicado(true);setMsg("✓ Equipos publicados");setTimeout(()=>setMsg(""),2000);
+    // Notificar a todos los inscriptos registrados
+    const dniInscriptos = inscripos.filter(id=>!id.startsWith("inv_"));
+    const playerIds = await getPlayerIds(dniInscriptos);
+    await dispararNotif("equipos", comunidad, {}, playerIds);
   }
 
   function compartirEquipos(){
@@ -2229,6 +2540,19 @@ function PVotar({ comunidad, partido, user }) {
 
     await deleteDoc(rPart(partido.id));
     setMsg("✓ ¡Resultados guardados!");
+
+    // Notificar resultado y MVP a todos los jugadores
+    const dniJugadores = jugadores.filter(id=>!id.startsWith("inv_"));
+    const allPlayerIds = await getPlayerIds(dniJugadores);
+    if(allPlayerIds.length > 0){
+      // Notif resultado general
+      await dispararNotif("resultado", comunidad, {resultado:resultado||"Partido finalizado"}, allPlayerIds);
+      // Notif especial al MVP
+      if(mvpId && !mvpId.startsWith("inv_")){
+        const mvpPlayerIds = await getPlayerIds([mvpId]);
+        await dispararNotif("mvp", comunidad, {}, mvpPlayerIds);
+      }
+    }
   }
 
   const puedeVotar=asignados.length>0&&!yoVote&&!tiempoVencido&&jugadores.includes(user.dni);
