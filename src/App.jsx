@@ -18,6 +18,45 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const googleProvider = new GoogleAuthProvider();
+
+// ── Caché local para datos de jugadores ──────────────────────────────────────
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const userCache = {}; // en memoria para la sesión actual
+
+async function getDocCached(ref) {
+  const key = ref.path;
+  const now = Date.now();
+  // 1. Revisar caché en memoria (más rápido)
+  if (userCache[key] && now - userCache[key].ts < CACHE_TTL) {
+    return userCache[key].snap;
+  }
+  // 2. Revisar localStorage
+  try {
+    const stored = localStorage.getItem("app8_cache_" + key);
+    if (stored) {
+      const { data, ts } = JSON.parse(stored);
+      if (now - ts < CACHE_TTL) {
+        // Crear objeto fake con interfaz de DocumentSnapshot
+        const fakesnap = { exists: () => true, data: () => data, id: ref.id };
+        userCache[key] = { snap: fakesnap, ts };
+        return fakesnap;
+      }
+    }
+  } catch(e) {}
+  // 3. Ir a Firestore
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    userCache[key] = { snap, ts: now };
+    try { localStorage.setItem("app8_cache_" + key, JSON.stringify({ data: snap.data(), ts: now })); } catch(e) {}
+  }
+  return snap;
+}
+
+function invalidateUserCache(dni) {
+  const key = `app8_users/${dni}`;
+  delete userCache[key];
+  try { localStorage.removeItem("app8_cache_" + key); } catch(e) {}
+}
 const SUPER_ADMIN = "35270164";
 
 const ATTRS = [
@@ -860,6 +899,7 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
 
   async function guardar(){
     await setDoc(rUser(user.dni),{nombre:nom.trim(),apodo:apodo.trim(),foto:foto.trim()},{merge:true});
+    invalidateUserCache(user.dni);
     await reloadUser();setMsg("Perfil actualizado");setTimeout(()=>setMsg(""),2500);
   }
   async function cambiarPass(){
@@ -1038,10 +1078,10 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
         if(id.startsWith("inv_") && !mapaInv[id]) mapaInv[id] = data;
       }
     }
-    // Cargar nombres de miembros para excluirlos (con normalización de tildes)
+    // Cargar nombres de miembros para excluirlos — paralelo
     const nombresMiembros = new Set();
-    for(const dni of comunidad.miembros||[]){
-      const s = await getDoc(rUser(dni));
+    const mSnapsInv = await Promise.all((comunidad.miembros||[]).map(d=>getDocCached(rUser(d))));
+    for(const s of mSnapsInv){
       if(s.exists()){
         const nom = normalizar(s.data().nombre||"");
         nombresMiembros.add(nom);
@@ -1131,9 +1171,9 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
 
   async function loadMiembros(){
     setComLoading(true);
-    const arr=[];
-    for(const dni of comunidad.miembros||[]){const s=await getDoc(rUser(dni));if(s.exists())arr.push(s.data());}
-    setMiembros(arr);
+    const dnis = comunidad.miembros||[];
+    const snaps = await Promise.all(dnis.map(dni=>getDocCached(rUser(dni))));
+    setMiembros(snaps.filter(s=>s.exists()).map(s=>s.data()));
     setComLoading(false);
   }
 
@@ -1481,6 +1521,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   const [fecha,setFecha]=useState(""); const [hora,setHora]=useState(""); const [lugar,setLugar]=useState(""); const [formato,setFormato]=useState("");
   const [nomInv,setNomInv]=useState(""); const [nivelInv,setNivelInv]=useState(5); const [msg,setMsg]=useState(""); const [invMsg,setInvMsg]=useState("");
   const [invitadosHistorial,setInvitadosHistorial]=useState([]);
+  const [marcO,setMarcO]=useState(0); const [marcB,setMarcB]=useState(0); const [marcadorConfirmado,setMarcadorConfirmado]=useState(false);
 
   // Cargar invitados previos del historial para el desplegable — excluir miembros actuales
   useEffect(()=>{
@@ -1493,8 +1534,8 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
       }));
       // Cargar nombres de miembros actuales para filtrarlos (con normalización de tildes)
       const nombresMiembros = new Set();
-      for(const dni of comunidad.miembros||[]){
-        const s = await getDoc(rUser(dni));
+      const mSnaps = await Promise.all((comunidad.miembros||[]).map(dni=>getDocCached(rUser(dni))));
+      for(const s of mSnaps){
         if(s.exists()){
           const nom = normalizar(s.data().nombre||"");
           nombresMiembros.add(nom);
@@ -1531,10 +1572,10 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
       if(!partido)return;
       setJugLoading(true);
       const obj={};
-      for(const id of inscripos){
-        if(id.startsWith("inv_")){obj[id]=partido.invitados?.[id];continue;}
-        const s=await getDoc(rUser(id));if(s.exists())obj[id]=s.data();
-      }
+      const regIdsEq = inscripos.filter(id=>!id.startsWith("inv_"));
+      inscripos.filter(id=>id.startsWith("inv_")).forEach(id=>{obj[id]=partido.invitados?.[id];});
+      const eqSnaps = await Promise.all(regIdsEq.map(id=>getDocCached(rUser(id))));
+      eqSnaps.forEach(s=>{if(s.exists())obj[s.id]=s.data();});
       setJugData(obj);
       setJugLoading(false);
     };
@@ -1557,8 +1598,26 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   async function borrarInscripto(id){ await setDoc(rPart(partido.id),{inscriptos:inscripos.filter(d=>d!==id)},{merge:true}); }
   async function agregarInvitado(){
     if(!nomInv.trim()){setInvMsg("Poné un nombre");return;}
-    const id=`inv_${uid()}`;
-    // Construir atributos con el nivel elegido para el balanceo
+    const normalizar = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const nomBuscado = normalizar(nomInv.trim());
+    // Buscar si ya existe un inv_ con ese nombre en el historial de la comunidad
+    const hist = comunidad.historialPartidos || [];
+    let idExistente = null;
+    for(const p of hist){
+      for(const [id, data] of Object.entries(p.invitados||{})){
+        if(id.startsWith("inv_") && normalizar(data.nombre||"") === nomBuscado){
+          idExistente = id; break;
+        }
+      }
+      if(idExistente) break;
+    }
+    // También buscar en el partido actual
+    for(const [id, data] of Object.entries(partido.invitados||{})){
+      if(id.startsWith("inv_") && normalizar(data.nombre||"") === nomBuscado){
+        idExistente = id; break;
+      }
+    }
+    const id = idExistente || `inv_${uid()}`;
     const nivel=Number(nivelInv)||5;
     const atributos=Object.fromEntries(ATTRS.map(a=>[a.key,nivel]));
     await setDoc(rPart(partido.id),{invitados:{...(partido.invitados||{}),[id]:{nombre:nomInv.trim(),esInvitado:true,atributos}},inscriptos:[...inscripos,id]},{merge:true});
@@ -1570,10 +1629,21 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
     evs[id][key]=Math.max(0,(evs[id][key]||0)+delta);
     await setDoc(rPart(partido.id),{eventos:evs},{merge:true});
   }
-  async function finalizarPartido(){
+  async function finalizarPartido(golesOscuro=0, golesBlanco=0){
     if(inscripos.length<2){setMsg("Mínimo 2 jugadores");return;}
+    if(!marcadorConfirmado){setMsg("Primero confirmá el marcador del partido");return;}
+    // Guardar goles del marcador en eventos si no hay goles individuales asignados aún
+    const evs={...(partido.eventos||{})};
+    const totalGolesInd=(partido.equipos?.oscuro||[]).reduce((s,id)=>s+(evs[id]?.goles||0),0) +
+      (partido.equipos?.blanco||[]).reduce((s,id)=>s+(evs[id]?.goles||0),0);
+    // Guardar marcador como metadata del partido
     const asig=asignarVotaciones(inscripos);
-    await setDoc(rPart(partido.id),{finalizado:true,fechaFin:new Date().toISOString(),votacionesAsignadas:asig},{merge:true});
+    await setDoc(rPart(partido.id),{
+      finalizado:true,
+      fechaFin:new Date().toISOString(),
+      votacionesAsignadas:asig,
+      marcador:{oscuro:golesOscuro,blanco:golesBlanco}
+    },{merge:true});
     setPantalla("votar");
   }
   async function borrarPartido(){
@@ -1747,11 +1817,10 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
         }
       </Card>
 
-      {/* Admin tools */}
-      {esAdmin && (
-        <>
-          <Card>
-            <h3 style={{fontWeight:700,marginBottom:12}}>👤 Agregar invitado</h3>
+      {/* Agregar invitado — disponible para todos */}
+      {!partido?.finalizado && (
+        <Card>
+          <h3 style={{fontWeight:700,marginBottom:12}}>👤 Agregar invitado</h3>
 
             {/* Desplegable de invitados previos */}
             {invitadosHistorial.length > 0 && (
@@ -1797,24 +1866,61 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
             <Btn v="soft" onClick={agregarInvitado} full>+ Agregar invitado</Btn>
             <Msg ok={invMsg?.startsWith("✓")}>{invMsg}</Msg>
           </Card>
+      )}
 
+      {/* Admin tools */}
+      {esAdmin && (
+        <>
           {inscripos.length>0 && (
             <Card>
-              <h3 style={{fontWeight:700,marginBottom:4}}>⚽ Goles y sanciones</h3>
-              <p style={{color:G.t3,fontSize:12,marginBottom:14}}>Solo se guardan goles y amarillas en el historial</p>
-              {inscripos.map(id=>{
-                const j=jugData[id];if(!j)return null;
-                const evs=(partido.eventos||{})[id]||{};
-                return (
-                  <div key={id} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #EEF0F8"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                      <Av nom={j.nombre} foto={j.foto} size={30} />
-                      <span style={{fontWeight:700,fontSize:13}}>{j.nombre}</span>
+              <h3 style={{fontWeight:700,marginBottom:4}}>⚽ Resultado y goles</h3>
+
+              {/* Paso 1 — Marcador */}
+              {!marcadorConfirmado ? (
+                <>
+                  <p style={{color:G.t3,fontSize:12,marginBottom:14}}>Primero ingresá el resultado del partido</p>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:16,marginBottom:16}}>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:12,color:G.t3,fontWeight:600,marginBottom:6}}>🖤 Oscuro</div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <button onClick={()=>setMarcO(Math.max(0,marcO-1))} style={{width:36,height:36,borderRadius:"50%",border:"none",background:G.surf1,fontSize:18,cursor:"pointer",fontWeight:700}}>−</button>
+                        <span style={{fontSize:36,fontWeight:900,minWidth:40,textAlign:"center"}}>{marcO}</span>
+                        <button onClick={()=>setMarcO(marcO+1)} style={{width:36,height:36,borderRadius:"50%",border:"none",background:G.primary,color:"#fff",fontSize:18,cursor:"pointer",fontWeight:700}}>+</button>
+                      </div>
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      {[{key:"goles",label:"⚽ Goles"},{key:"amarillas",label:"🟨 Amarillas"}].map(ev=>(
-                        <div key={ev.key} style={{background:G.surf1,borderRadius:G.r1,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                          <span style={{fontSize:13,fontWeight:600,color:G.t2}}>{ev.label}</span>
+                    <span style={{fontSize:28,fontWeight:900,color:G.t3}}>vs</span>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:12,color:G.t3,fontWeight:600,marginBottom:6}}>🤍 Blanco</div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <button onClick={()=>setMarcB(Math.max(0,marcB-1))} style={{width:36,height:36,borderRadius:"50%",border:"none",background:G.surf1,fontSize:18,cursor:"pointer",fontWeight:700}}>−</button>
+                        <span style={{fontSize:36,fontWeight:900,minWidth:40,textAlign:"center"}}>{marcB}</span>
+                        <button onClick={()=>setMarcB(marcB+1)} style={{width:36,height:36,borderRadius:"50%",border:"none",background:G.surf1,fontSize:18,cursor:"pointer",fontWeight:700}}>+</button>
+                      </div>
+                    </div>
+                  </div>
+                  <Btn onClick={()=>setMarcadorConfirmado(true)} full>Confirmar resultado → Asignar goles</Btn>
+                </>
+              ) : (
+                <>
+                  {/* Marcador confirmado — mostrar y permitir editar */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:G.surf1,borderRadius:G.r2,padding:"10px 14px",marginBottom:14}}>
+                    <div style={{fontWeight:700,fontSize:15}}>🖤 Oscuro {marcO} — {marcB} Blanco 🤍</div>
+                    <button onClick={()=>setMarcadorConfirmado(false)} style={{background:"none",border:"none",color:G.primary,fontSize:12,fontWeight:700,cursor:"pointer"}}>✏️ Editar</button>
+                  </div>
+                  <p style={{color:G.t3,fontSize:12,marginBottom:14}}>Ahora asigná los goles individuales (deben sumar {marcO+marcB} en total)</p>
+                  {inscripos.map(id=>{
+                    const j=jugData[id];if(!j)return null;
+                    const evs=(partido.eventos||{})[id]||{};
+                    return (
+                      <div key={id} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #EEF0F8"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                          <Av nom={j.nombre} foto={j.foto} size={30}/>
+                          <span style={{fontWeight:700,fontSize:13}}>{j.nombre}</span>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                          {[{key:"goles",label:"⚽ Goles"},{key:"amarillas",label:"🟨 Amarillas"}].map(ev=>(
+                            <div key={ev.key} style={{background:G.surf1,borderRadius:G.r1,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                              <span style={{fontSize:13,fontWeight:600,color:G.t2}}>{ev.label}</span>
                           <NumPad value={evs[ev.key]||0} onChange={v=>actualizarEvento(id,ev.key,v-(evs[ev.key]||0))} />
                         </div>
                       ))}
@@ -1822,10 +1928,12 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
                   </div>
                 );
               })}
+                </>
+              )}
             </Card>
           )}
 
-          <Btn v="danger" onClick={finalizarPartido} full>🏁 Finalizar partido y abrir votaciones</Btn>
+          <Btn v="danger" onClick={()=>finalizarPartido(marcO,marcB)} full>🏁 Finalizar partido y abrir votaciones</Btn>
           <Btn v="ghost"  onClick={borrarPartido}    full style={{marginTop:8}}>🗑️ Borrar partido</Btn>
         </>
       )}
@@ -1851,10 +1959,11 @@ function PEquipos({ comunidad, partido, user }) {
     const load=async()=>{
       if(!partido)return;
       const obj={};
-      for(const id of inscripos){
-        if(id.startsWith("inv_")){obj[id]={...partido.invitados?.[id]};continue;}
-        const s=await getDoc(rUser(id));if(s.exists())obj[id]=s.data();
-      }
+      const regIds = inscripos.filter(id=>!id.startsWith("inv_"));
+      const invIds2 = inscripos.filter(id=>id.startsWith("inv_"));
+      invIds2.forEach(id=>{obj[id]={...partido.invitados?.[id]};});
+      const regSnaps = await Promise.all(regIds.map(id=>getDocCached(rUser(id))));
+      regSnaps.forEach(s=>{if(s.exists())obj[s.id]=s.data();});
       setJugData(obj);
     };
     if(partido)load();
@@ -1972,10 +2081,10 @@ function PVotar({ comunidad, partido, user }) {
       if(!partido)return;
       setVotLoading(true);
       const obj={};
-      for(const id of partido.inscriptos||[]){
-        if(id.startsWith("inv_")){obj[id]=partido.invitados?.[id]||{nombre:"Invitado"};continue;}
-        const s=await getDoc(rUser(id));if(s.exists())obj[id]=s.data();
-      }
+      const inscriptosVot = partido.inscriptos||[];
+      inscriptosVot.filter(id=>id.startsWith("inv_")).forEach(id=>{obj[id]=partido.invitados?.[id]||{nombre:"Invitado"};});
+      const votSnaps2 = await Promise.all(inscriptosVot.filter(id=>!id.startsWith("inv_")).map(id=>getDocCached(rUser(id))));
+      votSnaps2.forEach(s=>{if(s.exists())obj[s.id]=s.data();});
       setJugData(obj);
       // Auto-login: el jugador ya está logueado
       const misAsig=(partido.votacionesAsignadas||{})[user.dni]||[];
@@ -2289,7 +2398,8 @@ function PHistorial({ comunidad, esAdmin }) {
         if(p.mvp&&!p.mvp.startsWith("inv_")) dnis.add(p.mvp);
       });
       const obj={};
-      for(const d of dnis){const s2=await getDoc(rUser(d));if(s2.exists())obj[d]=s2.data();}
+      const dniSnaps = await Promise.all([...dnis].map(d=>getDocCached(rUser(d))));
+      dniSnaps.forEach(s2=>{if(s2.exists())obj[s2.id]=s2.data();});
       // También agregar invitados de cada partido al jugData
       h.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{obj[id]=data;}));
       // Actualizar todo junto para evitar renders intermedios sin jugData
@@ -2428,10 +2538,10 @@ function PStats({ comunidad, user, esAdmin }) {
       const arr=[];
       const normalizar = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 
-      // Miembros registrados — guardar sus nombres para filtrar invitados duplicados
+      // Miembros registrados — paralelo
       const nombresMiembros = new Set();
-      for(const dni of comunidad.miembros||[]){
-        const s=await getDoc(rUser(dni));
+      const statsSnaps2 = await Promise.all((comunidad.miembros||[]).map(dni=>getDocCached(rUser(dni))));
+      for(const s of statsSnaps2){
         if(s.exists()){
           arr.push({...s.data(),_tipo:"registrado"});
           const nom = normalizar(s.data().nombre||"");
