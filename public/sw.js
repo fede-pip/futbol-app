@@ -1,23 +1,21 @@
 // Service Worker — App8
-// Estrategia: network-first siempre, sin cachear assets con hash
-// Esto evita que nuevos deploys rompan la PWA instalada
+// Importa OneSignal primero para que maneje las notificaciones push
+importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
-const CACHE_NAME = 'app8-shell-v1';
-const SHELL = ['/', '/index.html', '/manifest.json'];
+const CACHE_NAME = 'app8-shell-v2';
 
 self.addEventListener('install', event => {
-  self.skipWaiting(); // activar inmediatamente
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(SHELL))
-      .catch(() => {}) // nunca fallar en install
+      .then(cache => cache.addAll(['/', '/index.html', '/manifest.json']))
+      .catch(() => {})
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     Promise.all([
-      // Limpiar caches viejos
       caches.keys().then(keys =>
         Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
       ),
@@ -27,39 +25,17 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  const req = event.request;
-  const url = new URL(req.url);
-
-  // Solo manejar GET del mismo origen
-  if (req.method !== 'GET' || url.hostname !== self.location.hostname) return;
-
-  // Para assets con hash en el nombre (JS/CSS de Vite) — network-first, sin cachear
-  // Esto evita que un deploy nuevo quede bloqueado por caché viejo
-  if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(
-      fetch(req).catch(() => caches.match(req))
-    );
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.hostname !== self.location.hostname) return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
     return;
   }
-
-  // Para navegación (HTML) — siempre ir a la red, fallback a index.html
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req).catch(() => caches.match('/index.html'))
-    );
-    return;
-  }
-
-  // Para íconos y manifest — cache-first (no cambian con los deploys)
   if (url.pathname.startsWith('/icons/') || url.pathname === '/manifest.json') {
-    event.respondWith(
-      caches.match(req).then(cached => cached || fetch(req))
-    );
+    event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
     return;
   }
-
-  // Todo lo demás — network-first
-  event.respondWith(
-    fetch(req).catch(() => caches.match(req))
-  );
+  // Assets con hash de Vite — nunca cachear
+  if (url.pathname.startsWith('/assets/')) return;
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
