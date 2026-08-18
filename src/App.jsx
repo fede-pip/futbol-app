@@ -364,16 +364,11 @@ async function sendNotif(playerIds, title, body, data={}) {
   const validIds = playerIds.filter(Boolean);
   if (validIds.length === 0) return;
   try {
-    await fetch("https://onesignal.com/api/v1/notifications", {
+    // Usar proxy Vercel para evitar CORS
+    await fetch("/api/notify", {
       method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization":`Key ${ONESIGNAL_API_KEY}` },
-      body: JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        include_player_ids: validIds,
-        headings: { en:title, es:title },
-        contents: { en:body, es:body },
-        data, url: window.location.origin,
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerIds: validIds, title, message: body, data })
     });
   } catch(e) { console.log("Error enviando notif:", e); }
 }
