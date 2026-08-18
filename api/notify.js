@@ -5,8 +5,12 @@ export default async function handler(req) {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const ONESIGNAL_API_KEY = "os_v2_app_h62vb5b6wjaanpj5o7zjkhmu7ypfkfyuklgufe5hokgnntrpxqdowon7zzdsapfj3vocmnpml2eq2gszyx66zkd2ftpqgo5u4rwu66y";
+  const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
   const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
+
+  if (!ONESIGNAL_API_KEY) {
+    return new Response(JSON.stringify({ error: 'Missing API key' }), { status: 500 });
+  }
 
   try {
     const body = await req.json();
