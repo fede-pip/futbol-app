@@ -2385,24 +2385,26 @@ function PHistorial({ comunidad, esAdmin }) {
   const [historial,setHistorial]=useState([]); const [jugData,setJugData]=useState({});
   const [expandido,setExpandido]=useState(null); const [editando,setEditando]=useState(null);
   const [resultado,setResultado]=useState(""); const [loading,setLoading]=useState(true);
+  const [editEvs,setEditEvs]=useState({}); // {id: {goles, amarillas}}
+  const [guardandoEvs,setGuardandoEvs]=useState(false);
 
   useEffect(()=>{
     const load=async()=>{
       setLoading(true);
       const s=await getDoc(rCom(comunidad.id));if(!s.exists()){setLoading(false);return;}
       const h=[...(s.data().historialPartidos||[])].reverse();
-      // Recopilar todos los DNIs: jugadores + mvp de cada partido
       const dnis=new Set();
       h.forEach(p=>{
         (p.jugadores||[]).forEach(d=>dnis.add(d));
         if(p.mvp&&!p.mvp.startsWith("inv_")) dnis.add(p.mvp);
+        // También cargar DNIs de equipos
+        (p.equipos?.oscuro||[]).forEach(d=>{ if(!d.startsWith("inv_")) dnis.add(d); });
+        (p.equipos?.blanco||[]).forEach(d=>{ if(!d.startsWith("inv_")) dnis.add(d); });
       });
       const obj={};
       const dniSnaps = await Promise.all([...dnis].map(d=>getDocCached(rUser(d))));
       dniSnaps.forEach(s2=>{if(s2.exists())obj[s2.id]=s2.data();});
-      // También agregar invitados de cada partido al jugData
       h.forEach(p=>Object.entries(p.invitados||{}).forEach(([id,data])=>{obj[id]=data;}));
-      // Actualizar todo junto para evitar renders intermedios sin jugData
       setHistorial(h);
       setJugData(obj);
       setLoading(false);
@@ -2415,11 +2417,101 @@ function PHistorial({ comunidad, esAdmin }) {
   async function guardarResultado(idx){
     const comSnap=await getDoc(rCom(comunidad.id));
     const hist=[...(comSnap.data()?.historialPartidos||[])];
-    // idx es índice en historial invertido
     const realIdx=hist.length-1-idx;
     hist[realIdx]={...hist[realIdx],resultado};
     await setDoc(rCom(comunidad.id),{historialPartidos:hist},{merge:true});
     setHistorial(prev=>prev.map((p,i)=>i===idx?{...p,resultado}:p));
+    setEditando(null);
+  }
+
+  function iniciarEditEvs(p){
+    // Cargar eventos actuales de todos los jugadores del partido
+    const todos=[...(p.equipos?.oscuro||[]),...(p.equipos?.blanco||[])];
+    const evsCopy={};
+    todos.forEach(id=>{
+      let evs=(p.eventos||{})[id]||{};
+      if(!evs.goles&&!evs.amarillas){
+        const j=jugData[id]||p.invitados?.[id];
+        const nombreJ=(j?.nombre||"").toLowerCase().trim();
+        const invMatch=Object.entries(p.invitados||{}).find(([iid,idata])=>
+          iid.startsWith("inv_")&&(idata.nombre||"").toLowerCase().trim()===nombreJ
+        );
+        if(invMatch) evs=(p.eventos||{})[invMatch[0]]||{};
+      }
+      evsCopy[id]={goles:evs.goles||0,amarillas:evs.amarillas||0};
+    });
+    setEditEvs(evsCopy);
+  }
+
+  async function guardarEventos(idx, p){
+    setGuardandoEvs(true);
+    const comSnap=await getDoc(rCom(comunidad.id));
+    const hist=[...(comSnap.data()?.historialPartidos||[])];
+    const realIdx=hist.length-1-idx;
+
+    // Construir nuevos eventos
+    const nuevosEvs={...(hist[realIdx].eventos||{})};
+    Object.entries(editEvs).forEach(([id,ev])=>{
+      nuevosEvs[id]={...nuevosEvs[id],goles:ev.goles,amarillas:ev.amarillas};
+    });
+
+    // Recalcular resultado desde goles totales
+    const oscuro=hist[realIdx].equipos?.oscuro||[];
+    const blanco=hist[realIdx].equipos?.blanco||[];
+    const golesO=oscuro.reduce((s,id)=>s+(nuevosEvs[id]?.goles||0),0);
+    const golesB=blanco.reduce((s,id)=>s+(nuevosEvs[id]?.goles||0),0);
+    let nuevoRes=hist[realIdx].resultado;
+    if(golesO>golesB) nuevoRes=`Oscuro gano ${golesO}-${golesB}`;
+    else if(golesB>golesO) nuevoRes=`Blanco gano ${golesB}-${golesO}`;
+    else nuevoRes=`Empate ${golesO}-${golesB}`;
+
+    hist[realIdx]={...hist[realIdx],eventos:nuevosEvs,resultado:nuevoRes};
+    await setDoc(rCom(comunidad.id),{historialPartidos:hist},{merge:true});
+
+    // ── Recalcular stats personales de todos los jugadores afectados ──
+    const todos=[...oscuro,...blanco];
+    for(const id of todos){
+      if(id.startsWith("inv_")) continue; // invitados no tienen perfil
+      const userSnap=await getDoc(rUser(id));
+      if(!userSnap.exists()) continue;
+      const userData=userSnap.data();
+      const userHist=[...(userData.historial||[])];
+      const fechaPartido=hist[realIdx].fecha?new Date(hist[realIdx].fecha).toLocaleDateString("es-AR"):"";
+
+      // Buscar la entrada correspondiente en el historial personal
+      const enOscuro=oscuro.includes(id);
+      const enBlanco=blanco.includes(id);
+      let resPersonal="jugado";
+      if(golesO===golesB) resPersonal="empatado";
+      else if((enOscuro&&golesO>golesB)||(enBlanco&&golesB>golesO)) resPersonal="ganado";
+      else resPersonal="perdido";
+
+      // Encontrar la entrada por fecha
+      let entradaIdx=userHist.findIndex(h=>h.fecha===fechaPartido);
+      if(entradaIdx===-1){
+        // Buscar por resultado similar si no hay match de fecha
+        entradaIdx=userHist.findIndex(h=>h.fecha===fechaPartido||
+          (h.resultado&&h.resultado===resPersonal&&!userHist.some((h2,i2)=>i2!==userHist.indexOf(h)&&h2.fecha===fechaPartido)));
+      }
+
+      if(entradaIdx>=0){
+        userHist[entradaIdx]={
+          ...userHist[entradaIdx],
+          resultado:resPersonal,
+          eventos:{goles:nuevosEvs[id]?.goles||0,amarillas:nuevosEvs[id]?.amarillas||0}
+        };
+      }
+
+      // Recalcular totales
+      const totalGoles=userHist.reduce((s,h)=>s+(h.eventos?.goles||0),0);
+      await setDoc(rUser(id),{historial:userHist,goles:totalGoles},{merge:true});
+      invalidateUserCache(id);
+    }
+
+    // Actualizar estado local
+    setHistorial(prev=>prev.map((h,i)=>i===idx?{...h,eventos:nuevosEvs,resultado:nuevoRes}:h));
+    setEditEvs({});
+    setGuardandoEvs(false);
     setEditando(null);
   }
 
@@ -2448,19 +2540,48 @@ function PHistorial({ comunidad, esAdmin }) {
           </div>
           {expandido===i && (
             <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #EEF0F8"}}>
-              {/* Resultado editable */}
-              {/* Resultado — solo admin puede editar */}
+              {/* Editar goles y tarjetas — solo admin */}
               {esAdmin && (editando===i ? (
-                <div style={{marginBottom:14}}>
-                  <Inp label="Resultado del partido" value={resultado} onChange={e=>setResultado(e.target.value)} placeholder='Ej: "Oscuro ganó 4-2"' />
+                <div style={{marginBottom:14,background:G.surf1,borderRadius:G.r2,padding:14}}>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>✏️ Editar goles y tarjetas</div>
+                  {[{label:"🖤 Oscuro",ids:p.equipos?.oscuro||[]},{label:"🤍 Blanco",ids:p.equipos?.blanco||[]}].map(eq=>(
+                    <div key={eq.label} style={{marginBottom:12}}>
+                      <div style={{fontWeight:600,fontSize:12,color:G.t3,marginBottom:8}}>{eq.label}</div>
+                      {eq.ids.map(id=>{
+                        const j=jugData[id]||p.invitados?.[id];if(!j)return null;
+                        const ev=editEvs[id]||{goles:0,amarillas:0};
+                        return(
+                          <div key={id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                            <Av nom={j.nombre} foto={j.foto} size={28}/>
+                            <div style={{flex:1,fontSize:13,fontWeight:600}}>{j.nombre}</div>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{fontSize:12}}>⚽</span>
+                              <button onClick={()=>setEditEvs(e=>({...e,[id]:{...ev,goles:Math.max(0,(ev.goles||0)-1)}}))} style={{width:28,height:28,borderRadius:"50%",border:"none",background:G.surf2,cursor:"pointer",fontWeight:700}}>−</button>
+                              <span style={{minWidth:20,textAlign:"center",fontWeight:700}}>{ev.goles||0}</span>
+                              <button onClick={()=>setEditEvs(e=>({...e,[id]:{...ev,goles:(ev.goles||0)+1}}))} style={{width:28,height:28,borderRadius:"50%",border:"none",background:G.primary,color:"#fff",cursor:"pointer",fontWeight:700}}>+</button>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{fontSize:12}}>🟨</span>
+                              <button onClick={()=>setEditEvs(e=>({...e,[id]:{...ev,amarillas:Math.max(0,(ev.amarillas||0)-1)}}))} style={{width:28,height:28,borderRadius:"50%",border:"none",background:G.surf2,cursor:"pointer",fontWeight:700}}>−</button>
+                              <span style={{minWidth:20,textAlign:"center",fontWeight:700}}>{ev.amarillas||0}</span>
+                              <button onClick={()=>setEditEvs(e=>({...e,[id]:{...ev,amarillas:(ev.amarillas||0)+1}}))} style={{width:28,height:28,borderRadius:"50%",border:"none",background:"#FF6D00",color:"#fff",cursor:"pointer",fontWeight:700}}>+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  <div style={{marginTop:4,padding:"8px 12px",background:G.primary+"15",borderRadius:G.r1,fontSize:13,fontWeight:600,marginBottom:12}}>
+                    🖤 {(p.equipos?.oscuro||[]).reduce((s,id)=>s+(editEvs[id]?.goles||0),0)} — {(p.equipos?.blanco||[]).reduce((s,id)=>s+(editEvs[id]?.goles||0),0)} 🤍
+                  </div>
                   <div style={{display:"flex",gap:8}}>
-                    <Btn onClick={()=>guardarResultado(i)} full>Guardar</Btn>
-                    <Btn v="ghost" onClick={()=>setEditando(null)} full>Cancelar</Btn>
+                    <Btn onClick={()=>guardarEventos(i,p)} disabled={guardandoEvs} full>{guardandoEvs?"Guardando...":"💾 Guardar y actualizar stats"}</Btn>
+                    <Btn v="ghost" onClick={()=>{setEditando(null);setEditEvs({});}} full>Cancelar</Btn>
                   </div>
                 </div>
               ):(
-                <button onClick={()=>{setEditando(i);setResultado(p.resultado||"");}} style={{background:G.surf1,border:"none",borderRadius:G.r1,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:600,color:G.primary,marginBottom:12,width:"100%",textAlign:"left"}}>
-                  ✏️ {p.resultado?"Editar resultado":"+ Editar resultado"}
+                <button onClick={()=>{setEditando(i);iniciarEditEvs(p);}} style={{background:G.surf1,border:"none",borderRadius:G.r1,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:600,color:G.primary,marginBottom:12,width:"100%",textAlign:"left"}}>
+                  ✏️ Editar goles y tarjetas
                 </button>
               ))}
 
