@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Fix OneSignal ID — App8</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f6f8fc; }
+  button { background: #3D5AFE; color: #fff; border: none; padding: 11px 24px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 700; width: 100%; margin-top: 8px; }
+  button.go { background: #00C2A8; }
+  .card { background: #fff; border-radius: 14px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  pre { background: #f0f0f0; padding: 12px; border-radius: 8px; font-size: 12px; overflow: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h2>🔔 Fix OneSignal ID</h2>
+<div class="card">
+  <p style="font-size:14px;color:#555;margin:0 0 12px">
+    Abrí esta página desde el mismo browser donde tenés la app abierta y aceptaste las notificaciones.
+    Va a detectar tu OneSignal ID y guardarlo en Firebase bajo tu DNI <b>35270164</b>.
+  </p>
+  <button onclick="detectar()">🔍 Detectar y guardar mi OneSignal ID</button>
+  <span id="msg" style="display:block;margin-top:12px;font-weight:700;font-size:14px"></span>
+</div>
+<pre id="log">Esperando...</pre>
+
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const cfg = {
+  apiKey: "AIzaSyBkdakeLAzmp7zGz99nPswuqjtELSAOe8s",
+  authDomain: "futbol-app-5818a.firebaseapp.com",
+  projectId: "futbol-app-5818a",
+  storageBucket: "futbol-app-5818a.firebasestorage.app",
+  messagingSenderId: "861046895576",
+  appId: "1:861046895576:web:1e64b31f951194fbfaf8ad"
+};
+initializeApp(cfg);
+const db = getFirestore();
+const DNI = "35270164";
+const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
+
+const log = m => document.getElementById("log").textContent += m + "\n";
+
+window.detectar = async function() {
+  document.getElementById("log").textContent = "";
+  log("Iniciando OneSignal...");
+
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.init({ appId: ONESIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true });
+      log("OneSignal inicializado");
+
+      // Pedir permiso si no está dado
+      const permission = await OneSignal.Notifications.permission;
+      log(`Permiso de notificaciones: ${permission}`);
+
+      if (!permission) {
+        log("Pidiendo permiso...");
+        await OneSignal.Notifications.requestPermission();
+      }
+
+      // Obtener el Player ID
+      let playerId = null;
+      try { playerId = await OneSignal.User.PushSubscription.id; } catch(e) {}
+      if (!playerId) try { playerId = await OneSignal.getUserId(); } catch(e) {}
+
+      log(`OneSignal Player ID: ${playerId || "NO ENCONTRADO"}`);
+
+      if (!playerId) {
+        document.getElementById("msg").style.color = "#E53935";
+        document.getElementById("msg").textContent = "❌ No se pudo obtener el Player ID. Asegurate de haber aceptado las notificaciones en la app.";
+        return;
+      }
+
+      // Guardar en Firebase
+      const userSnap = await getDoc(doc(db, "app8_users", DNI));
+      if (!userSnap.exists()) { log("❌ Usuario no encontrado"); return; }
+
+      await setDoc(doc(db, "app8_users", DNI), { oneSignalId: playerId }, { merge: true });
+      log(`✅ Guardado en Firebase: ${playerId}`);
+
+      document.getElementById("msg").style.color = "#00C2A8";
+      document.getElementById("msg").textContent = `✅ ID guardado. Ahora probá enviar una notificación de prueba.`;
+    } catch(e) {
+      log(`Error: ${e.message}`);
+    }
+  });
+};
+</script>
+</body>
+</html>
