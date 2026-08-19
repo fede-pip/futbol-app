@@ -11,9 +11,10 @@
     <meta name="apple-mobile-web-app-title" content="App8" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="theme-color" content="#3D5AFE" />
-    <meta name="description" content="App8 — Tu red de fútbol." />
+    <meta name="description" content="App8 — Tu red de futbol." />
     <meta name="mobile-web-app-capable" content="yes" />
-    <!-- OneSignal SDK -->
+
+    <!-- OneSignal SDK — UNICO init de toda la app -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -22,9 +23,15 @@
           appId: "3fb550f4-3eb2-4006-bd3d-77f2951d94fe",
           notifyButton: { enable: false },
           allowLocalhostAsSecureOrigin: true,
+          // Le decimos a OneSignal que su worker vive dentro de /sw.js
+          // Sin esto registra /OneSignalSDKWorker.js aparte y quedan 2 SW peleando
+          serviceWorkerPath: "sw.js",
+          serviceWorkerParam: { scope: "/" },
         });
+        window.__OS_READY = true;
       });
     </script>
+
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { background: #f6f8fc; }
@@ -34,11 +41,13 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // El SW lo registra OneSignal (serviceWorkerPath: "sw.js").
+      // No lo registramos de nuevo para no crear una segunda registracion.
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(r => console.log('SW ok:', r.scope))
-            .catch(e => console.log('SW error:', e));
+          navigator.serviceWorker.getRegistrations()
+            .then(rs => console.log('SW registrados:', rs.length))
+            .catch(() => {});
         });
       }
     </script>
