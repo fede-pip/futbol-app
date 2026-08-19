@@ -1284,7 +1284,19 @@ function PanelNotificaciones({ comunidad }) {
     setEnviando(id);
     const notif = config[id];
     const playerIds = await getPlayerIds(comunidad.miembros||[]);
-    await sendNotif(playerIds, notif.titulo, notif.cuerpo, {tipo:id});
+    // Reemplazar variables con valores reales del partido activo o ejemplos
+    const partido = comunidad.partidoActivo ? null : null; // no tenemos partido acá
+    const varsEjemplo = {
+      comunidad: comunidad.nombre||"",
+      fecha: new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"}),
+      hora: "21:00", lugar: "Club", formato: "6 vs 6",
+      nombre: "Un jugador", restantes: "3",
+      golesO: "3", golesB: "2",
+      resultado: "¡Gran partido!",
+    };
+    const titulo = reemplazarVars(notif.titulo, varsEjemplo);
+    const cuerpo = reemplazarVars(notif.cuerpo, varsEjemplo);
+    await sendNotif(playerIds, titulo, cuerpo, {tipo:id});
     setEnviando(null);
     setMsg("✓ Enviada");
     setTimeout(()=>setMsg(""),2000);
@@ -1342,8 +1354,8 @@ function PanelNotificaciones({ comunidad }) {
                       <span style={{fontWeight:700,fontSize:13,color:G.t1}}>{NOTIF_LABELS[id]||id}</span>
                       <span style={{fontSize:10,background:G.surf2,color:G.t3,borderRadius:99,padding:"2px 7px"}}>{DEST_LABELS[notif.dest]||notif.dest}</span>
                     </div>
-                    <div style={{fontSize:12,color:G.t2,marginBottom:2}}>{notif.titulo}</div>
-                    <div style={{fontSize:11,color:G.t3}}>{notif.cuerpo}</div>
+                    <div style={{fontSize:12,color:G.t2,marginBottom:2}}>{reemplazarVars(notif.titulo,{comunidad:comunidad.nombre,fecha:"lun 18 ago",hora:"21:00",lugar:"Club",nombre:"Jugador",restantes:"3",golesO:"3",golesB:"2",resultado:"Blanco ganó 5-4"})}</div>
+                    <div style={{fontSize:11,color:G.t3}}>{reemplazarVars(notif.cuerpo,{comunidad:comunidad.nombre,fecha:"lun 18 ago",hora:"21:00",lugar:"Club",nombre:"Jugador",restantes:"3",golesO:"3",golesB:"2",resultado:"Blanco ganó 5-4"})}</div>
                     <div style={{display:"flex",gap:6,marginTop:8}}>
                       <button onClick={()=>iniciarEdicion(id)} style={{background:"none",border:"none",color:G.primary,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>✏️ Editar</button>
                       <button onClick={()=>enviarManual(id)} disabled={!!enviando} style={{background:"none",border:"none",color:G.secondary,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>
