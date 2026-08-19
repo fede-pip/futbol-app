@@ -807,7 +807,7 @@ export default function App() {
           {user && comActiva && pantalla==="votar"     && <PVotar   comunidad={comActiva} partido={partido} user={user} />}
           {user && comActiva && pantalla==="historial" && <PHistorial comunidad={comActiva} esAdmin={esAdminCom} />}
           {user && comActiva && pantalla==="stats"     && <PStats   comunidad={comActiva} user={user} esAdmin={esAdminCom} />}
-          {user && comActiva && pantalla==="com"       && <PComunidad comunidad={comActiva} user={user} loadComs={loadComs} setPantalla={setPantalla} />}
+          {user && comActiva && pantalla==="com"       && <PComunidad comunidad={comActiva} user={user} loadComs={loadComs} setPantalla={setPantalla} partido={partido} />}
         </div>
 
         {/* BOTTOM NAV */}
@@ -1213,7 +1213,7 @@ function PPerfil({ user, reloadUser, esAdminCom, comActiva }) {
 
 // ── COMUNIDAD ─────────────────────────────────────────────────────────────────
 // ── PANEL DE NOTIFICACIONES ───────────────────────────────────────────────────
-function PanelNotificaciones({ comunidad }) {
+function PanelNotificaciones({ comunidad, partido }) {
   const [abierto, setAbierto] = useState(false);
   const [config, setConfig] = useState(null);
   const [editando, setEditando] = useState(null); // id de notif editando
@@ -1280,22 +1280,28 @@ function PanelNotificaciones({ comunidad }) {
     await guardarConfig(nueva);
   }
 
+  // Variables reales del partido activo (o fallback si no hay partido)
+  const fechaPartido = partido?.fecha
+    ? new Date(partido.fecha+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})
+    : new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
+  const varsReales = {
+    comunidad: comunidad.nombre||"",
+    fecha: fechaPartido,
+    hora: partido?.hora || "—",
+    lugar: partido?.lugar || "—",
+    formato: partido?.formato || "—",
+    nombre: "Un jugador",
+    restantes: "3",
+    golesO: "3", golesB: "2",
+    resultado: "¡Gran partido!",
+  };
+
   async function enviarManual(id) {
     setEnviando(id);
     const notif = config[id];
     const playerIds = await getPlayerIds(comunidad.miembros||[]);
-    // Reemplazar variables con valores reales del partido activo o ejemplos
-    const partido = comunidad.partidoActivo ? null : null; // no tenemos partido acá
-    const varsEjemplo = {
-      comunidad: comunidad.nombre||"",
-      fecha: new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"}),
-      hora: "21:00", lugar: "Club", formato: "6 vs 6",
-      nombre: "Un jugador", restantes: "3",
-      golesO: "3", golesB: "2",
-      resultado: "¡Gran partido!",
-    };
-    const titulo = reemplazarVars(notif.titulo, varsEjemplo);
-    const cuerpo = reemplazarVars(notif.cuerpo, varsEjemplo);
+    const titulo = reemplazarVars(notif.titulo, varsReales);
+    const cuerpo = reemplazarVars(notif.cuerpo, varsReales);
     await sendNotif(playerIds, titulo, cuerpo, {tipo:id});
     setEnviando(null);
     setMsg("✓ Enviada");
@@ -1354,8 +1360,8 @@ function PanelNotificaciones({ comunidad }) {
                       <span style={{fontWeight:700,fontSize:13,color:G.t1}}>{NOTIF_LABELS[id]||id}</span>
                       <span style={{fontSize:10,background:G.surf2,color:G.t3,borderRadius:99,padding:"2px 7px"}}>{DEST_LABELS[notif.dest]||notif.dest}</span>
                     </div>
-                    <div style={{fontSize:12,color:G.t2,marginBottom:2}}>{reemplazarVars(notif.titulo,{comunidad:comunidad.nombre,fecha:"lun 18 ago",hora:"21:00",lugar:"Club",nombre:"Jugador",restantes:"3",golesO:"3",golesB:"2",resultado:"Blanco ganó 5-4"})}</div>
-                    <div style={{fontSize:11,color:G.t3}}>{reemplazarVars(notif.cuerpo,{comunidad:comunidad.nombre,fecha:"lun 18 ago",hora:"21:00",lugar:"Club",nombre:"Jugador",restantes:"3",golesO:"3",golesB:"2",resultado:"Blanco ganó 5-4"})}</div>
+                    <div style={{fontSize:12,color:G.t2,marginBottom:2}}>{reemplazarVars(notif.titulo,varsReales)}</div>
+                    <div style={{fontSize:11,color:G.t3}}>{reemplazarVars(notif.cuerpo,varsReales)}</div>
                     <div style={{display:"flex",gap:6,marginTop:8}}>
                       <button onClick={()=>iniciarEdicion(id)} style={{background:"none",border:"none",color:G.primary,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>✏️ Editar</button>
                       <button onClick={()=>enviarManual(id)} disabled={!!enviando} style={{background:"none",border:"none",color:G.secondary,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>
@@ -1404,7 +1410,7 @@ function PanelNotificaciones({ comunidad }) {
   );
 }
 
-function PComunidad({ comunidad, user, loadComs, setPantalla }) {
+function PComunidad({ comunidad, user, loadComs, setPantalla, partido }) {
   const [miembros, setMiembros] = useState([]);
   const [dniInv,   setDniInv]   = useState("");
   const [puntajes, setPuntajes] = useState({});
@@ -1735,7 +1741,7 @@ function PComunidad({ comunidad, user, loadComs, setPantalla }) {
 
       <Divider />
       {/* Panel de notificaciones — solo admin */}
-      {esAdmin && <PanelNotificaciones comunidad={comunidad} />}
+      {esAdmin && <PanelNotificaciones comunidad={comunidad} partido={partido} />}
 
       <Divider />
       {/* Salir del grupo */}
