@@ -664,6 +664,7 @@ function NumPad({ value, onChange, max=99 }) {
 export default function App() {
   const [loading,    setLoading]    = useState(true);
   const [user,       setUser]       = useState(null);
+  const [notifBanner, setNotifBanner] = useState(false); // mostrar banner de notificaciones
   const [pantalla,   setPantalla]   = useState("home");
   const [coms,       setComs]       = useState([]);
   const [comActiva,  setComActiva]  = useState(null);
@@ -683,6 +684,24 @@ export default function App() {
   },[]);
 
   useEffect(()=>{ if(user) loadComs(); },[user?.dni]);
+
+  // Verificar permiso de notificaciones — mostrar banner si no está dado
+  useEffect(()=>{
+    if(!user) return;
+    const checkPermission = () => {
+      try {
+        const permission = window.Notification?.permission || "default";
+        if(permission === "default") {
+          // No pidió permiso todavía — mostrar banner
+          const yaVioElBanner = localStorage.getItem("app8_notif_banner_visto");
+          if(!yaVioElBanner) setNotifBanner(true);
+        }
+      } catch(e) {}
+    };
+    // Esperar que OneSignal esté listo
+    const t = setTimeout(checkPermission, 2000);
+    return () => clearTimeout(t);
+  },[user?.dni]);
 
   useEffect(()=>{
     if(!comActiva?.partidoActivo){ setPartido(null); return; }
@@ -733,6 +752,31 @@ export default function App() {
     <>
       <style>{globalCSS}</style>
       <div className="app-wrapper" style={{minHeight:"100vh",background:G.bg,maxWidth:480,margin:"0 auto",paddingBottom:"max(80px, calc(80px + env(safe-area-inset-bottom)))",fontFamily:"'Outfit',sans-serif"}}>
+
+        {/* Banner de notificaciones */}
+        {notifBanner && user && (
+          <div style={{position:"sticky",top:0,zIndex:200,background:"#3D5AFE",padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+            <div style={{fontSize:22,flexShrink:0}}>🔔</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#fff"}}>Activá las notificaciones</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:1}}>Enterate de partidos, equipos y si salís MVP</div>
+            </div>
+            <button onClick={async()=>{
+              try {
+                await window.OneSignal?.Notifications?.requestPermission();
+                await registrarDispositivo(user.dni);
+              } catch(e) {}
+              localStorage.setItem("app8_notif_banner_visto","1");
+              setNotifBanner(false);
+            }} style={{background:"#fff",color:"#3D5AFE",border:"none",borderRadius:10,padding:"7px 14px",fontWeight:700,fontSize:13,cursor:"pointer",flexShrink:0}}>
+              Activar
+            </button>
+            <button onClick={()=>{
+              localStorage.setItem("app8_notif_banner_visto","1");
+              setNotifBanner(false);
+            }} style={{background:"none",border:"none",color:"rgba(255,255,255,0.7)",fontSize:20,cursor:"pointer",padding:"0 4px",flexShrink:0}}>×</button>
+          </div>
+        )}
 
         {/* TOP BAR */}
         <div className="top-bar" style={{background:G.surf0,boxShadow:G.sh1,paddingLeft:18,paddingRight:18,paddingBottom:14,position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",gap:12}}>
