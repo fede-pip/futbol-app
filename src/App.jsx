@@ -294,27 +294,45 @@ const CLOUDINARY_CLOUD = "dln7wkdgn";
 const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
 const ONESIGNAL_API_KEY = "os_v2_app_h62vb5b6wjaanpj5o7zjkhmu7ypfkfyuklgufe5hokgnntrpxqdowon7zzdsapfj3vocmnpml2eq2gszyx66zkd2ftpqgo5u4rwu66y";
 
-// Inicializar OneSignal y pedir permiso de notificaciones
-async function initOneSignal() {
-  if (typeof window === "undefined") return;
+// OneSignal ya se inicializa UNA sola vez en index.html.
+// Aca solo pedimos permiso y leemos el subscription ID.
+async function pedirPermisoNotif() {
   try {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({ appId: ONESIGNAL_APP_ID, notifyButton: { enable: false } });
-    });
-  } catch(e) { console.log("OneSignal init error:", e); }
+    const OS = window.OneSignal;
+    if (!OS?.Notifications) return false;
+    if (OS.Notifications.permission) return true;
+    await OS.Notifications.requestPermission();
+    return !!OS.Notifications.permission;
+  } catch(e) { return false; }
 }
 
-// Obtener el Player ID del usuario actual
-async function getOneSignalId() {
-  try {
-    if (!window.OneSignal) return null;
-    // SDK v16 — obtener subscription ID
-    const id = window.OneSignal.User?.PushSubscription?.id ||
-                await window.OneSignal.User?.PushSubscription?.optIn?.().then(()=>window.OneSignal.User?.PushSubscription?.id) ||
-                null;
-    return id || null;
-  } catch(e) { return null; }
+// Subscription ID del dispositivo actual (SDK v16)
+function getOneSignalId() {
+  try { return window.OneSignal?.User?.PushSubscription?.id || null; }
+  catch(e) { return null; }
+}
+
+// Guarda el ID de ESTE dispositivo sin pisar los otros dispositivos del usuario
+async function registrarDispositivo(dni) {
+  if (!dni) return;
+  await pedirPermisoNotif();
+  for (let i = 0; i < 10; i++) {
+    const id = getOneSignalId();
+    if (id) {
+      const snap = await getDoc(rUser(dni));
+      const prev = snap.exists() ? snap.data() : {};
+      const ids = new Set(prev.oneSignalIds || []);
+      if (prev.oneSignalId) ids.add(prev.oneSignalId);
+      if (ids.has(id) && prev.oneSignalId === id) return;
+      ids.add(id);
+      await setDoc(rUser(dni), { oneSignalId: id, oneSignalIds: [...ids] }, { merge: true });
+      invalidateUserCache(dni);
+      console.log("OneSignal: dispositivo registrado", id);
+      return;
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  console.log("OneSignal: no se obtuvo subscription ID");
 }
 
 // Configuración default de notificaciones
@@ -377,8 +395,13 @@ async function sendNotif(playerIds, title, body, data={}) {
 async function getPlayerIds(dnis) {
   const ids = [];
   const snaps = await Promise.all(dnis.map(dni => getDoc(rUser(dni))));
-  snaps.forEach(s => { if(s.exists() && s.data().oneSignalId) ids.push(s.data().oneSignalId); });
-  return ids;
+  snaps.forEach(s => {
+    if(!s.exists()) return;
+    const d = s.data();
+    (d.oneSignalIds || []).forEach(x => { if(x) ids.push(x); });
+    if(d.oneSignalId) ids.push(d.oneSignalId);
+  });
+  return [...new Set(ids)];
 }
 
 const CLOUDINARY_PRESET = "app8_fotos";
@@ -648,7 +671,14 @@ export default function App() {
 
   useEffect(()=>{
     const s = localStorage.getItem("app8_v4_session");
-    if(s) { try{ setUser(JSON.parse(s)); }catch{} }
+    if(s) {
+      try{
+        const u = JSON.parse(s);
+        setUser(u);
+        // Sesion restaurada: registrar este dispositivo para notificaciones
+        if(u?.dni) registrarDispositivo(u.dni);
+      }catch{}
+    }
     setLoading(false);
   },[]);
 
@@ -671,20 +701,7 @@ export default function App() {
   function login(u) {
     setUser(u);
     localStorage.setItem("app8_v4_session",JSON.stringify(u));
-    initOneSignal();
-    // Reintentar hasta 5 veces con 2s de espera entre intentos
-    let intentos = 0;
-    const guardarId = async () => {
-      intentos++;
-      const osId = window.OneSignal?.User?.PushSubscription?.id;
-      if (osId && osId !== u.oneSignalId) {
-        await setDoc(rUser(u.dni),{oneSignalId:osId},{merge:true});
-        console.log("OneSignal ID guardado:", osId);
-      } else if (intentos < 5) {
-        setTimeout(guardarId, 2000);
-      }
-    };
-    setTimeout(guardarId, 2000);
+    registrarDispositivo(u.dni);
   }
   function logout()  { setUser(null); localStorage.removeItem("app8_v4_session"); setPantalla("home"); setComActiva(null); }
   async function reloadUser() {
