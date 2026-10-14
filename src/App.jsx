@@ -80,6 +80,12 @@ function hashPwd(p) {
   for (let i = 0; i < p.length; i++) h = (Math.imul(31,h)+p.charCodeAt(i))|0;
   return h.toString(36);
 }
+// La sesión (state + localStorage) nunca debe contener el hash de contraseña
+function sinSecretos(u) {
+  if (!u) return u;
+  const { passHash, ...resto } = u;
+  return resto;
+}
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function calcProm(attrs) {
   if (!attrs) return 0;
@@ -292,7 +298,6 @@ function fixImgUrl(url) {
 
 const CLOUDINARY_CLOUD = "dln7wkdgn";
 const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
-const ONESIGNAL_API_KEY = "os_v2_app_h62vb5b6wjaanpj5o7zjkhmu7ypfkfyuklgufe5hokgnntrpxqdowon7zzdsapfj3vocmnpml2eq2gszyx66zkd2ftpqgo5u4rwu66y";
 
 // OneSignal ya se inicializa UNA sola vez en index.html.
 // Aca solo pedimos permiso y leemos el subscription ID.
@@ -674,7 +679,9 @@ export default function App() {
     const s = localStorage.getItem("app8_v4_session");
     if(s) {
       try{
-        const u = JSON.parse(s);
+        const u = sinSecretos(JSON.parse(s));
+        // Sesiones viejas guardaban el hash de contraseña: reescribir sin él
+        localStorage.setItem("app8_v4_session", JSON.stringify(u));
         setUser(u);
         // Sesion restaurada: registrar este dispositivo para notificaciones
         if(u?.dni) registrarDispositivo(u.dni);
@@ -718,6 +725,7 @@ export default function App() {
   }
 
   function login(u) {
+    u = sinSecretos(u);
     setUser(u);
     localStorage.setItem("app8_v4_session",JSON.stringify(u));
     registrarDispositivo(u.dni);
@@ -726,7 +734,7 @@ export default function App() {
   async function reloadUser() {
     if(!user) return;
     const s = await getDoc(rUser(user.dni));
-    if(s.exists()){ const u={...user,...s.data()}; setUser(u); localStorage.setItem("app8_v4_session",JSON.stringify(u)); }
+    if(s.exists()){ const u=sinSecretos({...user,...s.data()}); setUser(u); localStorage.setItem("app8_v4_session",JSON.stringify(u)); }
   }
 
   if(loading) return <><style>{globalCSS}</style><div style={{background:G.bg,minHeight:"100vh"}}><Spinner msg="Entrando al vestuario..." /></div></>;
@@ -862,8 +870,15 @@ function AuthScreen({ onLogin }) {
     setLoad(true);
     const snap=await getDoc(rUser(dni.trim()));
     if(snap.exists()){
+      // Si ya tiene contraseña, NO se puede pisar: debe ingresar. Solo se
+      // permite "reclamar" perfiles creados sin contraseña (invitados migrados).
+      if(snap.data().passHash){
+        setLoad(false);
+        setMsg("Ese DNI ya tiene cuenta. Ingresá con tu contraseña.");
+        return;
+      }
       const upd={...snap.data(),passHash:hashPwd(p1)};
-      await setDoc(rUser(dni.trim()),upd,{merge:true});
+      await setDoc(rUser(dni.trim()),{passHash:upd.passHash},{merge:true});
       setLoad(false);onLogin(upd);return;
     }
     const n={nombre:nom.trim(),dni:dni.trim(),apodo:"",foto:"",passHash:hashPwd(p1),atributos:{},atributosAnteriores:{},goles:0,partidos:0,historial:[],creadoEn:Date.now()};
@@ -899,7 +914,12 @@ function AuthScreen({ onLogin }) {
     setLoad(true);
     const snap = await getDoc(rUser(linkDni.trim()));
     if (snap.exists()) {
-      // Usuario existente — vincular Google UID
+      // Usuario existente — exigir su contraseña antes de vincular Google
+      if (snap.data().passHash && snap.data().passHash !== hashPwd(linkP1)) {
+        setLoad(false);
+        setLinkMsg("Contraseña incorrecta para ese DNI");
+        return;
+      }
       await setDoc(doc(db,"app8_uid_map",googleUser.uid),{dni:linkDni.trim()},{merge:true});
       await setDoc(rUser(linkDni.trim()),{googleUid:googleUser.uid,googleEmail:googleUser.email},{merge:true});
       setLoad(false);
@@ -930,7 +950,7 @@ function AuthScreen({ onLogin }) {
         </div>
         <Card>
           <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>Vinculá tu cuenta</div>
-          <div style={{fontSize:13,color:G.t2,marginBottom:16}}>Ingresá tu DNI para vincular tu cuenta de Google. Si ya tenés cuenta en App8, se vinculará automáticamente.</div>
+          <div style={{fontSize:13,color:G.t2,marginBottom:16}}>Ingresá tu DNI para vincular tu cuenta de Google. Si ya tenés cuenta en App8, ingresá tu contraseña actual para confirmar que sos vos. Si sos nuevo, completá nombre y elegí una contraseña.</div>
           <Inp label="Tu DNI" value={linkDni} onChange={e=>setLinkDni(e.target.value)} placeholder="38123456"/>
           <Inp label="Tu nombre completo" value={linkNom} onChange={e=>setLinkNom(e.target.value)} placeholder="Juan Pérez"/>
           <Inp label="Contraseña" type="password" value={linkP1} onChange={e=>setLinkP1(e.target.value)} placeholder="••••••"/>
