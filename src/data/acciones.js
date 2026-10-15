@@ -1,6 +1,6 @@
 // Escrituras de la app. Todo lo que requiere confianza (unirse, votar, cerrar) pasa por funciones del servidor.
 import {
-  arrayRemove, arrayUnion, collection, doc, getDoc, setDoc, Timestamp, updateDoc, writeBatch
+  arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, setDoc, Timestamp, updateDoc, writeBatch
 } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
 import { asignarVotaciones, uid as nuevoId } from '../lib/logica.js';
@@ -32,17 +32,18 @@ export async function agregarInvitado(gid, p, { nombre, nivel, registrados }) {
 }
 
 // ---- Partido (admin) ----
-export async function crearPartido(gid, { fecha, hora, lugar, formato, cupo }) {
+const datosLugar = geo => (geo && geo.lugarId ? { lugarId: geo.lugarId, lat: geo.lat, lng: geo.lng } : { lugarId: deleteField(), lat: deleteField(), lng: deleteField() });
+export async function crearPartido(gid, { fecha, hora, lugar, formato, cupo, geo }) {
   const pref = doc(collection(db, `grupos/${gid}/partidos`));
   await setDoc(pref, {
-    estado: 'abierto', fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo,
+    estado: 'abierto', fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo, ...(geo && geo.lugarId ? datosLugar(geo) : {}),
     inscriptos: [], listaEspera: [], cena: [], invitados: {}, equipos: null, eventos: {}, creadoEn: Timestamp.now()
   });
   await updateDoc(refGrupo(gid), { partidoActivo: pref.id });
   return pref.id;
 }
-export function editarPartido(gid, p, { fecha, hora, lugar, formato, cupo }) {
-  return updateDoc(refPartido(gid, p.id), { fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo });
+export function editarPartido(gid, p, { fecha, hora, lugar, formato, cupo, geo }) {
+  return updateDoc(refPartido(gid, p.id), { fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo, ...datosLugar(geo) });
 }
 export async function cancelarPartido(gid, p) {
   const b = writeBatch(db);

@@ -11,6 +11,8 @@ import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Icono, Meter, Pill, Vaci
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
+import CampoLugar from '../components/CampoLugar.jsx';
+import { urlMapa } from '../lib/mapas.js';
 import Equipos from './Equipos.jsx';
 import Goles from './Goles.jsx';
 import Votacion from './Votacion.jsx';
@@ -23,6 +25,7 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
   const [fecha, setFecha] = useState(inicial ? inicial.fecha : proximoLunes());
   const [hora, setHora] = useState(inicial ? inicial.hora : '21:30');
   const [lugar, setLugar] = useState(inicial ? inicial.lugar : '');
+  const [geo, setGeo] = useState(inicial && inicial.lugarId ? { lugarId: inicial.lugarId, lat: inicial.lat, lng: inicial.lng } : null);
   const [formato, setFormato] = useState(inicial ? inicial.formato : '6 vs 6');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -31,7 +34,7 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
     if (!fecha || !hora || lugar.trim().length < 2) return setError('Completá el día, la hora y el lugar.');
     const cupo = (FORMATOS.find(f => f.label === formato) || FORMATOS[1]).total;
     setCargando(true);
-    try { await onGuardar({ fecha, hora, lugar, formato, cupo }); } catch (err) { setError(mensajeError(err)); }
+    try { await onGuardar({ fecha, hora, lugar, formato, cupo, geo }); } catch (err) { setError(mensajeError(err)); }
     setCargando(false);
   }
   return (
@@ -40,7 +43,7 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
         <Campo label="Día" id="p-fecha" type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
         <Campo label="Hora" id="p-hora" type="time" value={hora} onChange={e => setHora(e.target.value)} />
       </div>
-      <Campo label="Lugar" id="p-lugar" value={lugar} onChange={e => setLugar(e.target.value)} placeholder="Cancha Palermo, Av. Libertador 1234" maxLength={120} />
+      <CampoLugar id="p-lugar" value={lugar} onCambio={(t, g) => { setLugar(t); setGeo(g); }} placeholder="Cancha Palermo, Av. Libertador 1234" />
       <div className="field"><label>Formato</label>
         <div className="chips">{FORMATOS.map(f => <button type="button" key={f.label} className={`chip ${formato === f.label ? 'on' : ''}`} aria-pressed={formato === f.label} onClick={() => setFormato(f.label)}>{f.label}</button>)}</div>
       </div>
@@ -87,7 +90,7 @@ function Inscripcion() {
   if (editando) return (
     <>
       <h2 className="t">Editar partido</h2>
-      <FormPartido etiqueta="Guardar cambios" inicial={{ fecha: aInputFecha(d), hora: horaTxt(d), lugar: p.lugar, formato: p.formato }}
+      <FormPartido etiqueta="Guardar cambios" inicial={{ fecha: aInputFecha(d), hora: horaTxt(d), lugar: p.lugar, lugarId: p.lugarId, lat: p.lat, lng: p.lng, formato: p.formato }}
         onGuardar={async datos => { await editarPartido(gid, p, datos); setEditando(false); }} onCancelar={() => setEditando(false)} />
       <p className="small">Si cambiás el día, la hora o el lugar, avisamos a los anotados.</p>
     </>
@@ -95,7 +98,7 @@ function Inscripcion() {
 
   return (
     <>
-      <div><h2 className="t">{mayus(diaLargo(d))}, {horaTxt(d)}</h2><p className="lead" style={{ marginTop: 2 }}>{p.lugar} · {p.formato}</p></div>
+      <div><h2 className="t">{mayus(diaLargo(d))}, {horaTxt(d)}</h2><p className="lead" style={{ marginTop: 2 }}>{p.lugar} · {p.formato} · <a className="link" href={urlMapa(p)} target="_blank" rel="noopener noreferrer">Cómo llegar</a></p></div>
       <Card>
         <div className="card-h"><h3 className="t">Anotados</h3><b className="num">{insc.length}/{cupo}</b></div>
         <div style={{ padding: '10px 16px 4px' }}><Meter pct={(insc.length / cupo) * 100} claro /></div>

@@ -1,4 +1,5 @@
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
+import { urlMapa } from '../lib/mapas.js';
 import { useState } from 'react';
 import { db } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
@@ -59,7 +60,7 @@ export default function Inicio() {
         <section className="kpi pitch" aria-label="Próximo partido">
           <div className="lb">{votando ? 'Votación abierta' : 'Próximo partido'}</div>
           <div className="v">{d ? tituloFecha(d) : ''}</div>
-          <div className="s"><span><Icono n="pin" style={{ width: 15, height: 15 }} />{partido.lugar}</span><span>{partido.formato}</span></div>
+          <div className="s"><span><Icono n="pin" style={{ width: 15, height: 15 }} /><a href={urlMapa(partido)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}>{partido.lugar}</a></span><span>{partido.formato}</span></div>
           {votando ? (
             <Btn v="white" style={{ marginTop: 16 }} onClick={() => ir('partido', 'votar')}>Ir a votar</Btn>
           ) : (
