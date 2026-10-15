@@ -7,7 +7,7 @@ import { crearPerfil, marcarOnboarding } from '../data/acciones.js';
 import { registrarSiHayPermiso } from '../lib/push.js';
 import Bienvenida from '../screens/Bienvenida.jsx';
 import Cuenta from '../screens/Cuenta.jsx';
-import { CompletarPerfil, GrupoElegir, MigrarDni, PermisoAvisos } from '../screens/Inicio1.jsx';
+import { AgregarEmail, CompletarPerfil, GrupoElegir, MigrarDni, PermisoAvisos, PreguntaAnterior } from '../screens/Inicio1.jsx';
 import Inicio from '../screens/Inicio.jsx';
 import Partido from '../screens/Partido.jsx';
 import Stats from '../screens/Stats.jsx';
@@ -37,7 +37,7 @@ function Contenido() {
   const s = useSesion();
   const nav = useNav();
   const [bienvenidaVista, setBienvenidaVista] = useState(() => !!leer('app8_bienvenida'));
-  const [migrando, setMigrando] = useState(() => !!leer('app8_migrar'));
+  const [viendoDni, setViendoDni] = useState(false);
   const [paso, setPaso] = useState(0); // fuerza re-render tras cambios locales
 
   // Quien entra con Google ya trae nombre: su perfil se crea solo.
@@ -50,15 +50,18 @@ function Contenido() {
   if (s.cargando) return <Splash />;
   if (!s.user) {
     if (!bienvenidaVista) return <Bienvenida onTerminar={() => { guardar('app8_bienvenida', '1'); setBienvenidaVista(true); }} />;
-    return <Cuenta migrando={migrando} onAtras={() => { try { localStorage.removeItem('app8_bienvenida'); } catch (e) { /* nada */ } setBienvenidaVista(false); }}
-      onMigrar={() => { try { sessionStorage.setItem('app8_migrar', '1'); } catch (e) { /* nada */ } setMigrando(true); }} />;
+    return <Cuenta onAtras={() => { try { localStorage.removeItem('app8_bienvenida'); } catch (e) { /* nada */ } setBienvenidaVista(false); }} />;
   }
   if (!s.perfil) return s.user.displayName ? <Splash /> : <CompletarPerfil uid={s.uid} />;
+  // Quien entró con DNI todavía no tiene email: es obligatorio, es su forma de entrar y de recuperar la contraseña.
+  if (!s.user.email) return <AgregarEmail nombre={s.perfil.nombre} onListo={s.refrescar} />;
   // El dueño de la plataforma llega a sus herramientas aunque todavía no tenga grupo.
   if (esSuper(s.user) && nav.ruta === 'plataforma') return <Plataforma />;
-  if (migrando) {
-    const fin = () => { try { sessionStorage.removeItem('app8_migrar'); } catch (e) { /* nada */ } setMigrando(false); };
-    return <MigrarDni onListo={fin} onOmitir={fin} />;
+  // Primera vez: ¿ya jugaba en la versión anterior? (se pregunta una sola vez)
+  const yaPregunto = !!(s.priv && (s.priv.legacyDni || (s.priv.onboarding && s.priv.onboarding.anterior)));
+  if (!yaPregunto || viendoDni) {
+    const seguir = () => { setViendoDni(false); marcarOnboarding(s.uid, 'anterior'); };
+    return viendoDni ? <MigrarDni onListo={seguir} onOmitir={() => setViendoDni(false)} /> : <PreguntaAnterior onListo={seguir} onDni={() => setViendoDni(true)} />;
   }
   if (!s.grupos.length) return <GrupoElegir uid={s.uid} superAdmin={esSuper(s.user)} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
   if (!(s.priv && s.priv.onboarding && s.priv.onboarding.avisos)) return <PermisoAvisos uid={s.uid} onListo={() => marcarOnboarding(s.uid, 'avisos')} />;

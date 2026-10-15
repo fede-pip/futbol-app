@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { llamar, mensajeError } from '../lib/firebase.js';
+import { useEffect, useState } from 'react';
+import { EmailAuthProvider, linkWithCredential, sendEmailVerification } from 'firebase/auth';
+import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
 import { Btn, Campo, Card, CardB, Icono, Marca, Fila } from '../components/ui.jsx';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
@@ -69,6 +70,78 @@ export function MigrarDni({ onListo, onOmitir }) {
       <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Verificando…' : 'Recuperar mi historial'}</Btn>
       <Btn type="button" v="ghost" onClick={onOmitir}>No jugaba antes</Btn>
     </form>
+  );
+}
+
+// ---- Cuenta sin email (entró con DNI): a partir de ahora se entra con un email ----
+export function AgregarEmail({ nombre, onListo }) {
+  const [email, setEmail] = useState('');
+  const [clave, setClave] = useState('');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+  async function guardar(e) {
+    e.preventDefault(); setError('');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Ese email no parece válido.');
+    if (clave.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+    setCargando(true);
+    try {
+      await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(email.trim(), clave));
+      sendEmailVerification(auth.currentUser).catch(() => {});
+      onListo();
+    } catch (err) {
+      setError(err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use'
+        ? 'Ese email ya tiene una cuenta. Usá otro, o ingresá con ese email y recuperá tu historial desde tu perfil.' : mensajeError(err));
+    }
+    setCargando(false);
+  }
+  return (
+    <form className="scr" style={{ flex: 1 }} onSubmit={guardar} noValidate>
+      <div className="bar-top"><div className="brand"><Marca />App8</div></div>
+      <div><h2 className="t">Hola{nombre ? `, ${nombre.split(' ')[0]}` : ''}</h2>
+        <p className="lead" style={{ marginTop: 4 }}>A partir de ahora entrás con tu email, ya no con el DNI. Con ese email también vas a poder recuperar tu contraseña si la olvidás.</p></div>
+      <Card><Fila icono="mail" titulo="Elegí un email que uses de verdad" sub="Te mandamos un mensaje para confirmarlo" /><Fila icono="key" titulo="Y una contraseña nueva" sub="Reemplaza a la clave de antes" /></Card>
+      <Campo label="Tu email" id="nuevo-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vos@ejemplo.com" autoComplete="email" />
+      <Campo label="Contraseña nueva" id="nueva-clave" type="password" value={clave} onChange={e => setClave(e.target.value)} placeholder="Al menos 8 caracteres" autoComplete="new-password" />
+      {error ? <div className="error" role="alert">{error}</div> : null}
+      <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Guardando…' : 'Guardar y continuar'}</Btn>
+    </form>
+  );
+}
+
+// ---- Primera vez: ¿ya jugabas en la versión anterior? ----
+export function PreguntaAnterior({ onListo, onDni }) {
+  const [hallada, setHallada] = useState(undefined); // undefined: buscando
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+  useEffect(() => { llamar('buscarCuentaAnterior').then(setHallada).catch(() => setHallada({ encontrada: false })); }, []);
+
+  async function confirmar() {
+    setError(''); setCargando(true);
+    try { await llamar('vincularCuentaAnterior', { confirmarGoogle: true }); onListo(); }
+    catch (e) { setError(mensajeError(e)); }
+    setCargando(false);
+  }
+
+  if (hallada === undefined) return <div className="scr" style={{ flex: 1 }}><div className="splash"><Marca px={64} /></div></div>;
+
+  if (hallada.encontrada) return (
+    <div className="scr" style={{ flex: 1 }}>
+      <div className="bar-top"><div className="brand"><Marca />App8</div></div>
+      <div><h2 className="t">Encontramos tu cuenta</h2><p className="lead" style={{ marginTop: 4 }}>Ya jugabas en App8 y tu Google estaba vinculado.</p></div>
+      <Card><Fila icono="user" titulo={hallada.nombre} sub={`DNI ${hallada.dniParcial}`} /></Card>
+      {error ? <div className="error" role="alert">{error}</div> : null}
+      <Btn v="pri" disabled={cargando} onClick={confirmar}>{cargando ? 'Recuperando…' : 'Sí, soy yo: recuperar mi historial'}</Btn>
+      <Btn v="ghost" onClick={onListo}>No soy esa persona</Btn>
+    </div>
+  );
+
+  return (
+    <div className="scr" style={{ flex: 1 }}>
+      <div className="bar-top"><div className="brand"><Marca />App8</div></div>
+      <div><h2 className="t">¿Ya jugabas en App8?</h2><p className="lead" style={{ marginTop: 4 }}>Si jugabas antes con tu DNI, recuperá tus partidos, goles y MVP. Si sos nuevo, seguí.</p></div>
+      <button className="choice" onClick={onDni}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Sí, jugaba con mi DNI</b><span>Ponés tu DNI y tu clave de antes y recuperás todo.</span></div><Icono n="chev" /></button>
+      <button className="choice" onClick={onListo}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>No, soy nuevo</b><span>Seguimos con tu cuenta nueva.</span></div><Icono n="chev" /></button>
+    </div>
   );
 }
 

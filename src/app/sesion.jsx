@@ -12,6 +12,8 @@ const leer = k => { try { return localStorage.getItem(k); } catch (e) { return n
 
 export function SesionProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined: todavía resolviendo la sesión
+  const [rev, setRev] = useState(0);
+  const refrescar = useCallback(async () => { if (auth.currentUser) { await auth.currentUser.reload(); setRev(r => r + 1); } }, []);
   useEffect(() => onAuthStateChanged(auth, u => setUser(u || null)), []);
   const uid = user ? user.uid : null;
 
@@ -35,7 +37,7 @@ export function SesionProvider({ children }) {
   const sinLeer = (avisos || []).filter(a => !a.leido).length;
   const cargando = user === undefined || (user && (perfil === undefined || priv === undefined || grupos === undefined));
 
-  const valor = { user, uid, perfil, priv, grupos, grupo, gid, elegirGrupo, jugadores, partido, esAdmin, esCreador, avisos: avisos || [], sinLeer, cargando };
+  const valor = { rev, refrescar, user, uid, perfil, priv, grupos, grupo, gid, elegirGrupo, jugadores, partido, esAdmin, esCreador, avisos: avisos || [], sinLeer, cargando };
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
 

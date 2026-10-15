@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { initializeApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithCustomToken, linkWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection, Timestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
@@ -323,6 +323,12 @@ describe('cuentas de la versión anterior', () => {
     expect(hist.docs.every(d => !JSON.stringify(d.data()).includes('l_30000002'))).toBe(true);
   });
 
+  it('quien no tenía Google vinculado no encuentra cuenta anterior ni puede confirmarla', async () => {
+    const G = await conPerfil('Gabi');
+    expect((await G.call('buscarCuentaAnterior', {})).encontrada).toBe(false);
+    await falla(G.call('vincularCuentaAnterior', { confirmarGoogle: true }), 'permission-denied');
+  });
+
   it('esa cuenta vieja no se puede reclamar dos veces', async () => {
     const E = await conPerfil('Eva');
     await falla(E.call('vincularCuentaAnterior', { dni: '30000002', clave: 'clave123' }), 'already-exists');
@@ -333,6 +339,40 @@ describe('cuentas de la versión anterior', () => {
     for (let i = 0; i < 5; i++) await falla(F.call('vincularCuentaAnterior', { dni: '30000003', clave: 'mal' + i }), 'permission-denied');
     await falla(F.call('vincularCuentaAnterior', { dni: '30000003', clave: 'clave123' }), 'resource-exhausted');
   });
+
+  it('quien jugaba con DNI entra con DNI y clave, agrega su email y después solo entra con el email', async () => {
+    // Limpieza: si una corrida anterior ya le puso email a esta cuenta, se borra para repetir la prueba.
+    const token = execSync('gcloud auth print-access-token').toString().trim();
+    await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${PROYECTO}/accounts:delete`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'x-goog-user-project': PROYECTO },
+      body: JSON.stringify({ localId: 'd30000005' })
+    });
+    await S.call('migrarDatosAnteriores', { sembrar: true, dryRun: false, forzar: true });
+
+    const anon = initializeApp(config, `dni-${corrida}`);
+    const llamarAnon = (n, d) => httpsCallable(getFunctions(anon, 'southamerica-east1'), n)(d).then(r => r.data);
+    await expect(llamarAnon('ingresarConDni', { dni: '30000005', clave: 'mal' })).rejects.toMatchObject({ code: 'functions/permission-denied' });
+    await expect(llamarAnon('ingresarConDni', { dni: '11111111', clave: 'clave123' })).rejects.toMatchObject({ code: 'functions/permission-denied' });
+    const r = await llamarAnon('ingresarConDni', { dni: '30000005', clave: 'clave123' });
+    expect(r.nombre).toBe('Agus Dal Maso');
+
+    const auth = getAuth(anon);
+    await signInWithCustomToken(auth, r.token);
+    expect(auth.currentUser.email).toBeNull();
+    const dbU = getFirestore(anon);
+    expect((await getDoc(doc(dbU, 'usuarios', auth.currentUser.uid))).data().nombre).toBe('Agus Dal Maso');
+    const g = (await getDoc(doc(dbU, 'grupos', 'comunidad-prueba'))).data();
+    expect(g.miembros).toContain(auth.currentUser.uid);
+    const j = (await getDoc(doc(dbU, 'grupos', 'comunidad-prueba', 'jugadores', auth.currentUser.uid))).data();
+    expect(j.stats.partidos).toBe(3);
+
+    // Agrega su email: desde ahí es su forma de entrar y de recuperar la contraseña.
+    await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(`dni+${corrida}@example.com`, 'nueva-clave-123'));
+    expect(auth.currentUser.email).toBe(`dni+${corrida}@example.com`);
+    // El ingreso con DNI queda cerrado.
+    await expect(llamarAnon('ingresarConDni', { dni: '30000005', clave: 'clave123' })).rejects.toMatchObject({ code: 'functions/failed-precondition' });
+  });
+
 });
 
 describe('avisos por tiempo y lista de espera', () => {

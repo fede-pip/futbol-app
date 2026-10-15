@@ -52,9 +52,15 @@ firebase deploy --only firestore:rules --project prod
 
 ## 3. Avisar al grupo
 
+Cómo entra cada uno:
+
+- **Si entraba con Google**: toca "Seguir con Google". La app encuentra su cuenta anterior y le muestra "Encontramos tu cuenta: (nombre). ¿Sos vos?". Confirma y listo.
+- **Si entraba con DNI y clave**: toca "Entrar con mi DNI de antes", pone su DNI y su clave de siempre, y en la pantalla siguiente elige un **email y una contraseña nueva**. Desde ese momento entra con el email, y ese email es también su forma de recuperar la contraseña. El ingreso con DNI queda cerrado para esa cuenta.
+- **Si es nuevo**: se registra con Google o con email.
+
 Mensaje sugerido:
 
-> Cambiamos la app de fútbol. Entrá a futbol-app-puce.vercel.app, creá tu cuenta con tu email (o con Google) y elegí "Ya jugaba en App8 con mi DNI". Ponés tu DNI y la clave de siempre y recuperás todo tu historial. Es la última vez que usás el DNI.
+> Cambiamos la app de fútbol. Entrá a futbol-app-puce.vercel.app. Si antes entrabas con Google, tocá "Seguir con Google". Si entrabas con tu DNI, tocá "Entrar con mi DNI de antes", poné tu DNI y tu clave de siempre y después elegí un email: desde ahí entrás con el email. Tu historial queda como estaba.
 
 ## 4. Si algo sale mal
 

@@ -1,4 +1,5 @@
 import { onCall } from 'firebase-functions/v2/https';
+import { getAuth } from 'firebase-admin/auth';
 import { db, Timestamp, HttpsError, REGION, requireAuth, requireAdmin, crearCodigoUnico, lotes } from './util.js';
 import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido } from './puro.js';
 import { AUD } from './compartido/catalogo.js';
@@ -101,8 +102,52 @@ async function reasignarJugador(desde, hacia) {
   return out;
 }
 
+// Deja a la persona (uid) como dueña del perfil anterior (DNI): perfil, vínculo y reasignación de datos.
+async function completarVinculo(uid, dni, ld) {
+  const lref = db.doc(`app8_users/${dni}`);
+  const uref = db.doc(`usuarios/${uid}`);
+  if (!(await uref.get()).exists) {
+    await uref.set({ nombre: ld.nombre || 'Jugador', apodo: ld.apodo || '', foto: ld.foto || '', creadoEn: Timestamp.now() });
+  }
+  await db.doc(`privado/${uid}`).set({ legacyDni: dni, onboarding: { anterior: true } }, { merge: true });
+  await lref.update({ nuevoUid: uid, vinculadoEn: Timestamp.now() });
+  const grupos = await reasignarJugador(`l_${dni}`, uid);
+  return { nombre: ld.nombre, grupos };
+}
+
+// Quien ya entraba con Google en la versión anterior tiene su cuenta vinculada (app8_uid_map):
+// la reconocemos y solo le pedimos que confirme que es él o ella.
+async function cuentaAnteriorDeGoogle(uid) {
+  const m = await db.doc(`app8_uid_map/${uid}`).get();
+  if (!m.exists) return null;
+  const dni = String(m.data().dni || '');
+  const l = dni ? await db.doc(`app8_users/${dni}`).get() : null;
+  if (!l || !l.exists) return null;
+  const ld = l.data();
+  if (ld.nuevoUid && ld.nuevoUid !== uid) return null;
+  return { dni, ld };
+}
+
+export const buscarCuentaAnterior = onCall(opts, async req => {
+  const uid = requireAuth(req);
+  if ((await db.doc(`privado/${uid}`).get()).data()?.legacyDni) return { encontrada: false };
+  const c = await cuentaAnteriorDeGoogle(uid);
+  if (!c) return { encontrada: false };
+  return { encontrada: true, nombre: c.ld.nombre || 'Jugador', dniParcial: `•••${c.dni.slice(-3)}` };
+});
+
 export const vincularCuentaAnterior = onCall(opts, async req => {
   const uid = requireAuth(req);
+
+  // Camino 1: confirmó que es la cuenta de Google que ya tenía vinculada.
+  if (req.data?.confirmarGoogle) {
+    if (req.auth.token?.firebase?.sign_in_provider !== 'google.com') throw new HttpsError('permission-denied', 'Para esto tenés que ingresar con Google.');
+    const c = await cuentaAnteriorDeGoogle(uid);
+    if (!c) throw new HttpsError('not-found', 'No encontramos una cuenta anterior vinculada a tu Google.');
+    return completarVinculo(uid, c.dni, c.ld);
+  }
+
+  // Camino 2: DNI y clave de siempre.
   const dni = String(req.data?.dni || '').replace(/\D/g, '');
   const clave = String(req.data?.clave || '');
   if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
@@ -114,8 +159,7 @@ export const vincularCuentaAnterior = onCall(opts, async req => {
   const vigente = ahora - i.desde < 3600000;
   if (vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Probá de nuevo en una hora.');
 
-  const lref = db.doc(`app8_users/${dni}`);
-  const l = await lref.get();
+  const l = await db.doc(`app8_users/${dni}`).get();
   const ld = l.exists ? l.data() : null;
   if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
     await iref.set({ n: vigente ? i.n + 1 : 1, desde: vigente ? i.desde : ahora });
@@ -123,15 +167,45 @@ export const vincularCuentaAnterior = onCall(opts, async req => {
   }
   if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('already-exists', 'Esa cuenta ya se pasó a otro usuario.');
   await iref.delete().catch(() => {});
+  return completarVinculo(uid, dni, ld);
+});
 
-  const uref = db.doc(`usuarios/${uid}`);
-  if (!(await uref.get()).exists) {
-    await uref.set({ nombre: ld.nombre || 'Jugador', apodo: ld.apodo || '', foto: ld.foto || '', creadoEn: Timestamp.now() });
+// Ingreso de quien jugaba con DNI: una última vez con DNI y clave de siempre. Se le devuelve un
+// acceso temporal y la app le pide que agregue un email, que pasa a ser su forma de entrar.
+// Cuando la cuenta ya tiene email, este camino se cierra (la clave vieja es débil y no debe quedar
+// como puerta trasera).
+export const ingresarConDni = onCall(opts, async req => {
+  const dni = String(req.data?.dni || '').replace(/\D/g, '');
+  const clave = String(req.data?.clave || '');
+  if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
+
+  // Máximo 5 intentos fallidos por hora por DNI.
+  const iref = db.doc(`intentosDni/${dni}`);
+  const ahora = Date.now();
+  const i = (await iref.get()).data() || { n: 0, desde: ahora };
+  const vigente = ahora - i.desde < 3600000;
+  if (vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos con ese DNI. Probá de nuevo en una hora.');
+
+  const lref = db.doc(`app8_users/${dni}`);
+  const l = await lref.get();
+  const ld = l.exists ? l.data() : null;
+  if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
+    await iref.set({ n: vigente ? i.n + 1 : 1, desde: vigente ? i.desde : ahora });
+    throw new HttpsError('permission-denied', 'El DNI o la clave no coinciden.');
   }
-  await db.doc(`privado/${uid}`).set({ legacyDni: dni }, { merge: true });
-  await lref.update({ nuevoUid: uid, vinculadoEn: Timestamp.now() });
-  const grupos = await reasignarJugador(`l_${dni}`, uid);
-  return { nombre: ld.nombre, grupos };
+
+  const uid = `d${dni}`;
+  if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('failed-precondition', 'Esa cuenta ya pasó a email. Ingresá con tu email.');
+  const auth = getAuth();
+  let existente = null;
+  try { existente = await auth.getUser(uid); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
+  if (existente && existente.email) throw new HttpsError('failed-precondition', 'Esa cuenta ya pasó a email. Ingresá con tu email.');
+  if (!existente) await auth.createUser({ uid, displayName: ld.nombre || 'Jugador' });
+
+  await iref.delete().catch(() => {});
+  await completarVinculo(uid, dni, ld); // crea el perfil y le devuelve su lugar en los grupos (se puede repetir sin problema)
+  const token = await auth.createCustomToken(uid);
+  return { token, nombre: ld.nombre || 'Jugador' };
 });
 
 export const enviarAvisoManual = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] }, async req => {
