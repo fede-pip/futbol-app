@@ -2,7 +2,7 @@
 // Importa OneSignal primero para que maneje las notificaciones push
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
-const CACHE_NAME = 'app8-shell-v2';
+const CACHE_NAME = 'app8-shell-v3';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
