@@ -334,3 +334,54 @@ describe('cuentas de la versión anterior', () => {
     await falla(F.call('vincularCuentaAnterior', { dni: '30000003', clave: 'clave123' }), 'resource-exhausted');
   });
 });
+
+describe('avisos por tiempo y lista de espera', () => {
+  let P, Q, gid2, pid2;
+  const bandeja = async u => (await getDocs(collection(u.db, 'privado', u.uid, 'avisos'))).docs.map(d => d.data());
+  const esperarAviso = async (u, tipo) => {
+    for (let i = 0; i < 12; i++) { const b = await bandeja(u); if (b.some(a => a.tipo === tipo)) return b.find(a => a.tipo === tipo); await dormir(2500); }
+    return null;
+  };
+
+  beforeAll(async () => {
+    P = await conPerfil('Paula');
+    Q = await conPerfil('Quique');
+    const r = await P.call('crearGrupo', { nombre: `Grupo tiempo ${corrida}` });
+    gid2 = r.gid;
+    await Q.call('unirsePorCodigo', { codigo: r.codigo });
+  });
+
+  it('el recordatorio y "faltan jugadores" salen solos cuando se acerca el partido', async () => {
+    pid2 = 'pt-' + corrida;
+    await setDoc(doc(P.db, 'grupos', gid2, 'partidos', pid2), { ...partidoBase(), cupo: 2, formato: '1 vs 1', fechaHora: Timestamp.fromMillis(Date.now() + 20 * 3600e3), inscriptos: [P.uid] });
+    await updateDoc(doc(P.db, 'grupos', gid2), { partidoActivo: pid2 });
+    await dormir(4000);
+    execSync(`gcloud scheduler jobs run firebase-schedule-programados-southamerica-east1 --location=southamerica-east1 --project=${PROYECTO}`);
+    const faltan = await esperarAviso(Q, 'faltan_jugadores');
+    expect(faltan, 'Quique (no anotado) recibe "faltan jugadores"').toBeTruthy();
+    expect(faltan.titulo).toMatch(/Faltan 1 para completar/);
+    const rec = await esperarAviso(P, 'recordatorio_24h');
+    expect(rec, 'Paula (anotada) recibe el recordatorio').toBeTruthy();
+    expect(rec.cuerpo).not.toMatch(/[{}]/);
+    // correr de nuevo no duplica
+    const antes = (await bandeja(P)).filter(a => a.tipo === 'recordatorio_24h').length;
+    execSync(`gcloud scheduler jobs run firebase-schedule-programados-southamerica-east1 --location=southamerica-east1 --project=${PROYECTO}`);
+    await dormir(15000);
+    expect((await bandeja(P)).filter(a => a.tipo === 'recordatorio_24h').length).toBe(antes);
+  });
+
+  it('con cupo completo avisa, y si alguien se baja sube el primero de la lista de espera', async () => {
+    const ref = doc(Q.db, 'grupos', gid2, 'partidos', pid2);
+    await updateDoc(ref, { inscriptos: [P.uid, Q.uid] }); // Quique se anota: cupo completo
+    expect(await esperarAviso(P, 'cupo_completo'), 'aviso de cupo completo').toBeTruthy();
+    const R = await conPerfil('Rita');
+    await P.call('nuevoCodigo', { gid: gid2 }).then(async c => { await R.call('unirsePorCodigo', { codigo: c.codigo }); });
+    await updateDoc(doc(R.db, 'grupos', gid2, 'partidos', pid2), { listaEspera: [R.uid] });
+    await updateDoc(ref, { inscriptos: [P.uid] }); // Quique se baja
+    const sube = await esperarAviso(R, 'lista_espera');
+    expect(sube, 'Rita recibe el aviso de que entró').toBeTruthy();
+    const p = (await getDoc(ref)).data();
+    expect(p.inscriptos).toContain(R.uid);
+    expect(p.listaEspera).toEqual([]);
+  });
+});

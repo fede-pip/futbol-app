@@ -66,7 +66,7 @@ export const alActualizarPartido = onDocumentUpdated(base, async ev => {
     const promovido = await promoverDeEspera(gid, pid);
     if (promovido) {
       const fresco = (await db.doc(`grupos/${gid}/partidos/${pid}`).get()).data();
-      await disparar(gid, 'lista_espera', { partido: { id: pid, ...fresco }, personaUids: [promovido], clave: `${pid}_${promovido}` });
+      await disparar(gid, 'lista_espera', { partido: { id: pid, ...fresco }, uidsFijos: [promovido], clave: `${pid}_${promovido}` });
     }
     const horas = (millis(b.fechaHora) - Date.now()) / 3600e3;
     if (esUid(x) && horas > 0 && horas < 24) {
