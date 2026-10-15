@@ -6,6 +6,7 @@ import { ATTRS } from '../lib/logica.js';
 import { Avatar, Btn, Campo, Card, CardB, Fila, Icono, Pill, useToast } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
+import { esSuper } from './Plataforma.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
 
 export default function Perfil() {
@@ -62,6 +63,7 @@ export default function Perfil() {
 
       {priv && !priv.legacyDni ? <Card><Fila icono="refresh" titulo="Recuperar mi historial anterior" sub="Si jugabas con tu DNI antes de la versión nueva" onClick={() => ir('migrar')} derecha={<Icono n="chev" />} /></Card> : null}
       <Card><Fila icono="bell" titulo="Mis avisos" sub="Qué querés recibir en el celular" onClick={() => ir('misAvisos')} derecha={<Icono n="chev" />} /></Card>
+      {esSuper(user) ? <Card><Fila icono="shield" titulo="Plataforma" sub="Migración de la versión anterior" onClick={() => ir('plataforma')} derecha={<Icono n="chev" />} /></Card> : null}
       <Btn onClick={() => signOut(auth)}><Icono n="logout" />Cerrar sesión</Btn>
     </div>
   );

@@ -15,6 +15,7 @@ import Grupo from '../screens/Grupo.jsx';
 import Perfil from '../screens/Perfil.jsx';
 import { CentroAvisos, MisAvisos } from '../screens/Avisos.jsx';
 import { AvisoEdit, AvisosAdmin } from '../screens/AvisosAdmin.jsx';
+import Plataforma from '../screens/Plataforma.jsx';
 
 const leer = k => { try { return sessionStorage.getItem(k) || localStorage.getItem(k); } catch (e) { return null; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } };
@@ -26,6 +27,7 @@ function Rutas() {
     inicio: <Inicio />, partido: <Partido />, stats: <Stats />, grupo: <Grupo />, perfil: <Perfil />,
     avisos: <CentroAvisos />, misAvisos: <MisAvisos />,
     avisosAdmin: esAdmin ? <AvisosAdmin /> : <Inicio />, avisoEdit: esAdmin ? <AvisoEdit /> : <Inicio />,
+    plataforma: <Plataforma />,
     migrar: <MigrarDni onListo={() => ir('inicio')} onOmitir={() => ir('perfil')} />
   };
   return <>{pantallas[ruta] || <Inicio />}<BarraInferior /></>;
