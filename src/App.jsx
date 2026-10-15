@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs, deleteDoc, updateDoc, arrayUnion, arrayRemove, increment, runTransaction, writeBatch } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 const LOGO_IMG = "data:image/jpeg;base64,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";
 
@@ -79,6 +79,12 @@ function hashPwd(p) {
   let h = 0;
   for (let i = 0; i < p.length; i++) h = (Math.imul(31,h)+p.charCodeAt(i))|0;
   return h.toString(36);
+}
+// La sesión (state + localStorage) nunca debe contener el hash de contraseña
+function sinSecretos(u) {
+  if (!u) return u;
+  const { passHash, ...resto } = u;
+  return resto;
 }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function calcProm(attrs) {
@@ -292,7 +298,6 @@ function fixImgUrl(url) {
 
 const CLOUDINARY_CLOUD = "dln7wkdgn";
 const ONESIGNAL_APP_ID = "3fb550f4-3eb2-4006-bd3d-77f2951d94fe";
-const ONESIGNAL_API_KEY = "os_v2_app_h62vb5b6wjaanpj5o7zjkhmu7ypfkfyuklgufe5hokgnntrpxqdowon7zzdsapfj3vocmnpml2eq2gszyx66zkd2ftpqgo5u4rwu66y";
 
 // OneSignal ya se inicializa UNA sola vez en index.html.
 // Aca solo pedimos permiso y leemos el subscription ID.
@@ -674,7 +679,9 @@ export default function App() {
     const s = localStorage.getItem("app8_v4_session");
     if(s) {
       try{
-        const u = JSON.parse(s);
+        const u = sinSecretos(JSON.parse(s));
+        // Sesiones viejas guardaban el hash de contraseña: reescribir sin él
+        localStorage.setItem("app8_v4_session", JSON.stringify(u));
         setUser(u);
         // Sesion restaurada: registrar este dispositivo para notificaciones
         if(u?.dni) registrarDispositivo(u.dni);
@@ -718,6 +725,7 @@ export default function App() {
   }
 
   function login(u) {
+    u = sinSecretos(u);
     setUser(u);
     localStorage.setItem("app8_v4_session",JSON.stringify(u));
     registrarDispositivo(u.dni);
@@ -726,7 +734,7 @@ export default function App() {
   async function reloadUser() {
     if(!user) return;
     const s = await getDoc(rUser(user.dni));
-    if(s.exists()){ const u={...user,...s.data()}; setUser(u); localStorage.setItem("app8_v4_session",JSON.stringify(u)); }
+    if(s.exists()){ const u=sinSecretos({...user,...s.data()}); setUser(u); localStorage.setItem("app8_v4_session",JSON.stringify(u)); }
   }
 
   if(loading) return <><style>{globalCSS}</style><div style={{background:G.bg,minHeight:"100vh"}}><Spinner msg="Entrando al vestuario..." /></div></>;
@@ -862,8 +870,15 @@ function AuthScreen({ onLogin }) {
     setLoad(true);
     const snap=await getDoc(rUser(dni.trim()));
     if(snap.exists()){
+      // Si ya tiene contraseña, NO se puede pisar: debe ingresar. Solo se
+      // permite "reclamar" perfiles creados sin contraseña (invitados migrados).
+      if(snap.data().passHash){
+        setLoad(false);
+        setMsg("Ese DNI ya tiene cuenta. Ingresá con tu contraseña.");
+        return;
+      }
       const upd={...snap.data(),passHash:hashPwd(p1)};
-      await setDoc(rUser(dni.trim()),upd,{merge:true});
+      await setDoc(rUser(dni.trim()),{passHash:upd.passHash},{merge:true});
       setLoad(false);onLogin(upd);return;
     }
     const n={nombre:nom.trim(),dni:dni.trim(),apodo:"",foto:"",passHash:hashPwd(p1),atributos:{},atributosAnteriores:{},goles:0,partidos:0,historial:[],creadoEn:Date.now()};
@@ -899,7 +914,12 @@ function AuthScreen({ onLogin }) {
     setLoad(true);
     const snap = await getDoc(rUser(linkDni.trim()));
     if (snap.exists()) {
-      // Usuario existente — vincular Google UID
+      // Usuario existente — exigir su contraseña antes de vincular Google
+      if (snap.data().passHash && snap.data().passHash !== hashPwd(linkP1)) {
+        setLoad(false);
+        setLinkMsg("Contraseña incorrecta para ese DNI");
+        return;
+      }
       await setDoc(doc(db,"app8_uid_map",googleUser.uid),{dni:linkDni.trim()},{merge:true});
       await setDoc(rUser(linkDni.trim()),{googleUid:googleUser.uid,googleEmail:googleUser.email},{merge:true});
       setLoad(false);
@@ -930,7 +950,7 @@ function AuthScreen({ onLogin }) {
         </div>
         <Card>
           <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>Vinculá tu cuenta</div>
-          <div style={{fontSize:13,color:G.t2,marginBottom:16}}>Ingresá tu DNI para vincular tu cuenta de Google. Si ya tenés cuenta en App8, se vinculará automáticamente.</div>
+          <div style={{fontSize:13,color:G.t2,marginBottom:16}}>Ingresá tu DNI para vincular tu cuenta de Google. Si ya tenés cuenta en App8, ingresá tu contraseña actual para confirmar que sos vos. Si sos nuevo, completá nombre y elegí una contraseña.</div>
           <Inp label="Tu DNI" value={linkDni} onChange={e=>setLinkDni(e.target.value)} placeholder="38123456"/>
           <Inp label="Tu nombre completo" value={linkNom} onChange={e=>setLinkNom(e.target.value)} placeholder="Juan Pérez"/>
           <Inp label="Contraseña" type="password" value={linkP1} onChange={e=>setLinkP1(e.target.value)} placeholder="••••••"/>
@@ -1928,6 +1948,15 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
   },[comunidad.id]);
   const [jugData,setJugData]=useState({});
 
+  // El marcador confirmado vive en Firestore: sobrevive a recargas y cierres de la app
+  useEffect(()=>{
+    if(partido?.marcador){
+      setMarcO(partido.marcador.oscuro||0);
+      setMarcB(partido.marcador.blanco||0);
+      setMarcadorConfirmado(true);
+    }
+  },[partido?.id]);
+
   const esAdmin=(comunidad.admins||[]).includes(user.dni);
   const fmtObj=FORMATOS.find(f=>f.label===partido?.formato);
   const cupo=fmtObj?.total||0;
@@ -1966,8 +1995,23 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
 
   async function anotarme(){
     if(cupoLibre<=0){setMsg("Partido completo");return;}
-    const nuevosInscriptos=[...inscripos,user.dni];
-    await setDoc(rPart(partido.id),{inscriptos:nuevosInscriptos},{merge:true});
+    // Transacción: valida el cupo contra el dato más reciente y evita que dos
+    // anotaciones simultáneas se pisen entre sí.
+    let nuevosInscriptos;
+    try {
+      nuevosInscriptos = await runTransaction(db, async tx => {
+        const snap = await tx.get(rPart(partido.id));
+        const actuales = snap.data()?.inscriptos || [];
+        if(actuales.includes(user.dni)) return actuales;
+        if(actuales.length >= cupo) throw new Error("completo");
+        const nuevos = [...actuales, user.dni];
+        tx.update(rPart(partido.id), { inscriptos: nuevos });
+        return nuevos;
+      });
+    } catch(e) {
+      setMsg(e.message==="completo" ? "Partido completo" : "No se pudo anotar, intentá de nuevo");
+      return;
+    }
     // Notificar a todos los miembros
     const playerIds = await getPlayerIds(comunidad.miembros||[]);
     const restantes = cupoLibre - 1;
@@ -1981,8 +2025,8 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
       await dispararNotif("inscripcion", comunidad, {nombre:nombreCorto,restantes:String(restantes),lugar:partido.lugar||""}, playerIds);
     }
   }
-  async function desanotarme(){ await setDoc(rPart(partido.id),{inscriptos:inscripos.filter(d=>d!==user.dni)},{merge:true}); }
-  async function borrarInscripto(id){ await setDoc(rPart(partido.id),{inscriptos:inscripos.filter(d=>d!==id)},{merge:true}); }
+  async function desanotarme(){ await updateDoc(rPart(partido.id),{inscriptos:arrayRemove(user.dni)}); }
+  async function borrarInscripto(id){ await updateDoc(rPart(partido.id),{inscriptos:arrayRemove(id)}); }
   async function agregarInvitado(){
     if(!nomInv.trim()){setInvMsg("Poné un nombre");return;}
     const normalizar = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -2007,22 +2051,27 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
     const id = idExistente || `inv_${uid()}`;
     const nivel=Number(nivelInv)||5;
     const atributos=Object.fromEntries(ATTRS.map(a=>[a.key,nivel]));
-    await setDoc(rPart(partido.id),{invitados:{...(partido.invitados||{}),[id]:{nombre:nomInv.trim(),esInvitado:true,atributos}},inscriptos:[...inscripos,id]},{merge:true});
+    await setDoc(rPart(partido.id),{invitados:{[id]:{nombre:nomInv.trim(),esInvitado:true,atributos}},inscriptos:arrayUnion(id)},{merge:true});
     setNomInv("");setNivelInv(5);setInvMsg("✓ Invitado agregado");setTimeout(()=>setInvMsg(""),2000);
   }
   async function actualizarEvento(id,key,delta){
-    const evs={...(partido.eventos||{})};
-    if(!evs[id])evs[id]={};
-    evs[id][key]=Math.max(0,(evs[id][key]||0)+delta);
-    await setDoc(rPart(partido.id),{eventos:evs},{merge:true});
+    // Solo se escribe el campo puntual (no todo `eventos`), así no se pisan
+    // cargas simultáneas de otros jugadores.
+    const nuevo=Math.max(0,((partido.eventos||{})[id]?.[key]||0)+delta);
+    await setDoc(rPart(partido.id),{eventos:{[id]:{[key]:nuevo}}},{merge:true});
+  }
+  async function confirmarMarcador(){
+    await setDoc(rPart(partido.id),{marcador:{oscuro:marcO,blanco:marcB}},{merge:true});
+    setMarcadorConfirmado(true);
   }
   async function finalizarPartido(golesOscuro=0, golesBlanco=0){
     if(inscripos.length<2){setMsg("Mínimo 2 jugadores");return;}
     if(!marcadorConfirmado){setMsg("Primero confirmá el marcador del partido");return;}
-    // Guardar goles del marcador en eventos si no hay goles individuales asignados aún
-    const evs={...(partido.eventos||{})};
-    const totalGolesInd=(partido.equipos?.oscuro||[]).reduce((s,id)=>s+(evs[id]?.goles||0),0) +
-      (partido.equipos?.blanco||[]).reduce((s,id)=>s+(evs[id]?.goles||0),0);
+    // Avisar si los goles individuales no coinciden con el marcador
+    const evs=partido.eventos||{};
+    const totalGolesInd=inscripos.reduce((s,id)=>s+(evs[id]?.goles||0),0);
+    if(totalGolesInd!==golesOscuro+golesBlanco &&
+       !confirm(`El marcador suma ${golesOscuro+golesBlanco} goles pero asignaste ${totalGolesInd} a jugadores. ¿Finalizar igual? (el resultado oficial será el marcador)`)) return;
     // Guardar marcador como metadata del partido
     const asig=asignarVotaciones(inscripos);
     await setDoc(rPart(partido.id),{
@@ -2146,10 +2195,10 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
         const cena = partido.cena || [];
         const yoEnCena = cena.includes(user.dni);
         async function anotarCena() {
-          await setDoc(rPart(partido.id),{cena:[...cena, user.dni]},{merge:true});
+          await setDoc(rPart(partido.id),{cena:arrayUnion(user.dni)},{merge:true});
         }
         async function salirCena() {
-          await setDoc(rPart(partido.id),{cena:cena.filter(d=>d!==user.dni)},{merge:true});
+          await updateDoc(rPart(partido.id),{cena:arrayRemove(user.dni)});
         }
         return (
           <Card accent={"#FF6D0030"}>
@@ -2289,7 +2338,7 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
                       </div>
                     </div>
                   </div>
-                  <Btn onClick={()=>setMarcadorConfirmado(true)} full>Confirmar resultado → Asignar goles</Btn>
+                  <Btn onClick={confirmarMarcador} full>Confirmar resultado → Asignar goles</Btn>
                 </>
               ) : (
                 <>
@@ -2298,7 +2347,19 @@ function PPartido({ comunidad, partido, user, loadComs, setPantalla }) {
                     <div style={{fontWeight:700,fontSize:15}}>🖤 Oscuro {marcO} — {marcB} Blanco 🤍</div>
                     <button onClick={()=>setMarcadorConfirmado(false)} style={{background:"none",border:"none",color:G.primary,fontSize:12,fontWeight:700,cursor:"pointer"}}>✏️ Editar</button>
                   </div>
-                  <p style={{color:G.t3,fontSize:12,marginBottom:14}}>Ahora asigná los goles individuales (deben sumar {marcO+marcB} en total)</p>
+                  {(()=>{
+                    const asignados=inscripos.reduce((s,id)=>s+(((partido.eventos||{})[id]||{}).goles||0),0);
+                    const faltan=marcO+marcB-asignados;
+                    return (
+                      <p style={{fontSize:12,marginBottom:14,fontWeight:600,color:faltan===0?G.secondary:G.warn}}>
+                        {faltan===0
+                          ? `✅ Goles asignados: ${asignados} de ${marcO+marcB}`
+                          : faltan>0
+                            ? `⚽ Asignaste ${asignados} de ${marcO+marcB} goles (faltan ${faltan})`
+                            : `⚠️ Asignaste ${asignados} goles pero el marcador suma ${marcO+marcB} (sobran ${-faltan})`}
+                      </p>
+                    );
+                  })()}
                   {inscripos.map(id=>{
                     const j=jugData[id];if(!j)return null;
                     const evs=(partido.eventos||{})[id]||{};
@@ -2513,19 +2574,24 @@ function PVotar({ comunidad, partido, user }) {
   async function enviar(){
     for(const id of asignados){ for(const a of ATTRS){ if(notas[id]?.[a.key]===undefined||notas[id]?.[a.key]===null){setMsg(`Votá ${a.label} de ${jugData[id]?.nombre||id}`);return;} } }
     if(!mvp){setMsg("Elegí el MVP");return;}
-    await setDoc(rVots(partido.id),{[user.dni]:true},{merge:true});
-    const notasAc={...(partido.notasAtributos||{})};
-    asignados.forEach(id=>{
-      if(!notasAc[id])notasAc[id]={};
-      ATTRS.forEach(a=>{
-        if(!notasAc[id][a.key])notasAc[id][a.key]={suma:0,cant:0};
-        notasAc[id][a.key].suma+=notas[id][a.key];
-        notasAc[id][a.key].cant+=1;
+    // Un solo batch atómico: o se registran el voto y todas las sumas, o nada.
+    // Los contadores usan increment(), así votos simultáneos no se pisan.
+    try {
+      const batch=writeBatch(db);
+      batch.set(rVots(partido.id),{[user.dni]:true},{merge:true});
+      const cambios={[`mvpConteo.${mvp}`]:increment(1)};
+      asignados.forEach(id=>{
+        ATTRS.forEach(a=>{
+          cambios[`notasAtributos.${id}.${a.key}.suma`]=increment(notas[id][a.key]);
+          cambios[`notasAtributos.${id}.${a.key}.cant`]=increment(1);
+        });
       });
-    });
-    const mvpC={...(partido.mvpConteo||{}),[mvp]:((partido.mvpConteo||{})[mvp]||0)+1};
-    await setDoc(rPart(partido.id),{notasAtributos:notasAc,mvpConteo:mvpC},{merge:true});
-    setEnviado(true);setMsg("✓ Votos enviados anónimamente");
+      batch.update(rPart(partido.id),cambios);
+      await batch.commit();
+      setEnviado(true);setMsg("✓ Votos enviados anónimamente");
+    } catch(e) {
+      setMsg("No se pudieron enviar los votos. Intentá de nuevo.");
+    }
   }
 
   async function cerrarVotacion(){
@@ -2567,8 +2633,15 @@ function PVotar({ comunidad, partido, user }) {
     let resultado="";
     let golesO=0, golesB=0;
     if(partido.equipos){
-      golesO=(partido.equipos.oscuro||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
-      golesB=(partido.equipos.blanco||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+      // El marcador que cargó el admin es el resultado oficial. Solo si no existe
+      // (partidos viejos) se estima sumando los goles individuales.
+      if(partido.marcador){
+        golesO=partido.marcador.oscuro||0;
+        golesB=partido.marcador.blanco||0;
+      } else {
+        golesO=(partido.equipos.oscuro||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+        golesB=(partido.equipos.blanco||[]).reduce((s,id)=>s+((partido.eventos||{})[id]?.goles||0),0);
+      }
       if(golesO>golesB) resultado=`Oscuro gano ${golesO}-${golesB}`;
       else if(golesB>golesO) resultado=`Blanco gano ${golesB}-${golesO}`;
       else resultado=`Empate ${golesO}-${golesB}`;
@@ -2583,9 +2656,14 @@ function PVotar({ comunidad, partido, user }) {
       return "perdido";
     };
 
-    // Loop único: atributos + historial + resultado en una sola escritura por jugador
-    for(const id of jugadores){
-      const s=await getDoc(rUser(id));if(!s.exists())continue;
+    // Todo el cierre va en UN batch atómico (usuarios + historial + borrado del
+    // partido): si algo falla no queda nada a medias ni stats duplicadas.
+    // Lecturas primero, en paralelo; escrituras después en el batch.
+    const batch=writeBatch(db);
+    const userSnaps=await Promise.all(jugadores.map(id=>getDoc(rUser(id))));
+    for(const s of userSnaps){
+      if(!s.exists())continue;
+      const id=s.id;
       const j=s.data();
       const attrsAnt={...j.atributos||{}};
       const nuevos={...j.atributos||{}};
@@ -2601,12 +2679,12 @@ function PVotar({ comunidad, partido, user }) {
       const evs=(partido.eventos||{})[id]||{};
       const resJug=getResJug(id);
       const nuevaEntrada={fecha:new Date().toLocaleDateString("es-AR"),mvp:mvpIds.includes(id),resultado:resJug,eventos:{goles:evs.goles||0,amarillas:evs.amarillas||0}};
-      await setDoc(rUser(id),{
+      batch.set(rUser(id),{
         atributos:nuevos,
         atributosAnteriores:attrsAnt,
-        goles:(j.goles||0)+(evs.goles||0),
-        partidos:(j.partidos||0)+1,
-        historial:[...(j.historial||[]),nuevaEntrada],
+        goles:increment(evs.goles||0),
+        partidos:increment(1),
+        historial:arrayUnion(nuevaEntrada),
       },{merge:true});
     }
 
@@ -2616,13 +2694,21 @@ function PVotar({ comunidad, partido, user }) {
     // Evitar duplicados: no agregar si ya existe una entrada con este partidoId
     const yaExiste=histExistente.some(h=>h.partidoId===partido.id);
     if(!yaExiste){
-      const nuevaEntradaHist={partidoId:partido.id,fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,mvps:mvpIds,jugadores,invitados:partido.invitados||{},resultado};
-      await setDoc(rCom(comunidad.id),{historialPartidos:[...histExistente,nuevaEntradaHist],partidoActivo:null},{merge:true});
+      const nuevaEntradaHist={partidoId:partido.id,fecha:partido.fechaFin,lugar:partido.lugar,formato:partido.formato,equipos:partido.equipos||null,eventos:partido.eventos||{},mvp:mvpId,mvps:mvpIds,jugadores,invitados:partido.invitados||{},resultado,marcador:partido.marcador||null};
+      batch.set(rCom(comunidad.id),{historialPartidos:[...histExistente,nuevaEntradaHist],partidoActivo:null},{merge:true});
     } else {
-      await setDoc(rCom(comunidad.id),{partidoActivo:null},{merge:true});
+      batch.set(rCom(comunidad.id),{partidoActivo:null},{merge:true});
     }
 
-    await deleteDoc(rPart(partido.id));
+    batch.delete(rPart(partido.id));
+    batch.delete(rVots(partido.id)); // registro de quién votó: ya no se necesita
+    try {
+      await batch.commit();
+    } catch(e) {
+      setMsg("❌ No se pudo cerrar la votación. No se guardó nada, intentá de nuevo.");
+      return;
+    }
+    jugadores.forEach(invalidateUserCache);
     setMsg("✓ ¡Resultados guardados!");
 
     // Notificar resultado y MVP a todos los jugadores
