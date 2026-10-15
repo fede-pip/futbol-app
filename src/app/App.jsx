@@ -15,7 +15,7 @@ import Grupo from '../screens/Grupo.jsx';
 import Perfil from '../screens/Perfil.jsx';
 import { CentroAvisos, MisAvisos } from '../screens/Avisos.jsx';
 import { AvisoEdit, AvisosAdmin } from '../screens/AvisosAdmin.jsx';
-import Plataforma from '../screens/Plataforma.jsx';
+import Plataforma, { esSuper } from '../screens/Plataforma.jsx';
 
 const leer = k => { try { return sessionStorage.getItem(k) || localStorage.getItem(k); } catch (e) { return null; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } };
@@ -35,6 +35,7 @@ function Rutas() {
 
 function Contenido() {
   const s = useSesion();
+  const nav = useNav();
   const [bienvenidaVista, setBienvenidaVista] = useState(() => !!leer('app8_bienvenida'));
   const [migrando, setMigrando] = useState(() => !!leer('app8_migrar'));
   const [paso, setPaso] = useState(0); // fuerza re-render tras cambios locales
@@ -53,11 +54,13 @@ function Contenido() {
       onMigrar={() => { try { sessionStorage.setItem('app8_migrar', '1'); } catch (e) { /* nada */ } setMigrando(true); }} />;
   }
   if (!s.perfil) return s.user.displayName ? <Splash /> : <CompletarPerfil uid={s.uid} />;
+  // El dueño de la plataforma llega a sus herramientas aunque todavía no tenga grupo.
+  if (esSuper(s.user) && nav.ruta === 'plataforma') return <Plataforma />;
   if (migrando) {
     const fin = () => { try { sessionStorage.removeItem('app8_migrar'); } catch (e) { /* nada */ } setMigrando(false); };
     return <MigrarDni onListo={fin} onOmitir={fin} />;
   }
-  if (!s.grupos.length) return <GrupoElegir uid={s.uid} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
+  if (!s.grupos.length) return <GrupoElegir uid={s.uid} superAdmin={esSuper(s.user)} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
   if (!(s.priv && s.priv.onboarding && s.priv.onboarding.avisos)) return <PermisoAvisos uid={s.uid} onListo={() => marcarOnboarding(s.uid, 'avisos')} />;
   return <Rutas />;
 }

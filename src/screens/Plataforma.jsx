@@ -26,7 +26,7 @@ export default function Plataforma() {
 
   return (
     <div className="scr">
-      <BarraSuperior atras onAtras={() => ir('perfil')} />
+      <BarraSuperior atras onAtras={() => ir('inicio')} />
       <div><h2 className="t">Plataforma</h2><p className="lead" style={{ marginTop: 2 }}>Datos de la versión anterior · {esProduccion ? 'PRODUCCIÓN' : 'pruebas'}</p></div>
       <Hint>Primero mirá qué se migraría. Migrar crea los grupos nuevos con cada jugador como perfil pendiente; no borra nada de lo anterior y no pisa grupos ya migrados.</Hint>
       <Btn disabled={cargando} onClick={() => correr({ dryRun: true })}>{cargando ? 'Mirando…' : 'Ver qué se migraría'}</Btn>

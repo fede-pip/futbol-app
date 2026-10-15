@@ -73,7 +73,7 @@ export function MigrarDni({ onListo, onOmitir }) {
 }
 
 // ---- Crear un grupo o unirse con un código ----
-export function GrupoElegir({ onListo, uid }) {
+export function GrupoElegir({ onListo, uid, superAdmin }) {
   const [modo, setModo] = useState(null); // 'crear' | 'unirse'
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
@@ -105,6 +105,7 @@ export function GrupoElegir({ onListo, uid }) {
         <>
           <button className="choice" onClick={() => setModo('crear')}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Crear un grupo</b><span>Sos el admin y después compartís un código por WhatsApp.</span></div><Icono n="chev" /></button>
           <button className="choice" onClick={() => setModo('unirse')}><span className="ti"><Icono n="key" /></span><div className="grow"><b>Unirme con un código</b><span>Te lo pasa quien armó el grupo.</span></div><Icono n="chev" /></button>
+          {superAdmin ? <button className="link" onClick={() => { location.hash = '#/plataforma'; }}>Herramientas de la plataforma</button> : null}
         </>
       ) : modo === 'crear' ? (
         <form onSubmit={crear} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
