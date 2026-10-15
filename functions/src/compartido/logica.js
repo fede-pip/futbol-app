@@ -165,3 +165,5 @@ export function nuevoAtributo(actual, suma, cant) {
   const delta = Math.min(0.25, Math.max(-0.25, prom * 0.25));
   return Math.min(10, Math.max(1, +((actual || 5) + delta).toFixed(2)));
 }
+
+export function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
