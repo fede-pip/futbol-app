@@ -1,0 +1,155 @@
+import { onCall } from 'firebase-functions/v2/https';
+import { db, Timestamp, HttpsError, REGION, requireAuth, requireAdmin, crearCodigoUnico, lotes } from './util.js';
+import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido } from './puro.js';
+import { AUD } from './compartido/catalogo.js';
+import { disparar, entregar, audiencia, ONESIGNAL_API_KEY } from './avisos.js';
+
+const opts = { region: REGION, cors: true };
+const MAX_GRUPOS = 10;
+
+export const crearGrupo = onCall(opts, async req => {
+  const uid = requireAuth(req);
+  const nombre = String(req.data?.nombre || '').trim();
+  if (nombre.length < 2 || nombre.length > 60) throw new HttpsError('invalid-argument', 'Poné un nombre de entre 2 y 60 letras.');
+  const foto = String(req.data?.foto || '').slice(0, 600);
+  const perfil = await db.doc(`usuarios/${uid}`).get();
+  if (!perfil.exists) throw new HttpsError('failed-precondition', 'Completá tu perfil antes de crear un grupo.');
+  const cuantos = await db.collection('grupos').where('miembros', 'array-contains', uid).count().get();
+  if (cuantos.data().count >= MAX_GRUPOS) throw new HttpsError('resource-exhausted', `Podés estar en hasta ${MAX_GRUPOS} grupos.`);
+
+  const gref = db.collection('grupos').doc();
+  const codigo = await crearCodigoUnico(gref.id);
+  const p = perfil.data();
+  const batch = db.batch();
+  batch.set(gref, {
+    nombre, foto, deporte: 'futbol', creadorUid: uid, admins: [uid], miembros: [uid], codigo,
+    precioCancha: 0, pozo: 0, partidoActivo: null, avisos: {}, silencio: { on: true, desde: 23, hasta: 8 }, maxDia: 3,
+    creadoEn: Timestamp.now()
+  });
+  batch.set(gref.collection('jugadores').doc(uid), { nombre: p.nombre, apodo: p.apodo || '', foto: p.foto || '', stats: statsVacias(), racha: '', tendencia: {}, desde: Timestamp.now() });
+  batch.set(gref.collection('niveles').doc(uid), { atributos: {}, previos: {} });
+  await batch.commit();
+  return { gid: gref.id, codigo };
+});
+
+export const nuevoCodigo = onCall(opts, async req => {
+  const { gref, g } = await requireAdmin(req, req.data?.gid);
+  const codigo = await crearCodigoUnico(gref.id);
+  if (g.codigo) await db.doc(`codigos/${g.codigo}`).delete().catch(() => {});
+  await gref.update({ codigo });
+  return { codigo };
+});
+
+export const unirsePorCodigo = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] }, async req => {
+  const uid = requireAuth(req);
+  const codigo = String(req.data?.codigo || '').trim().toUpperCase().replace(/\s/g, '');
+  if (!/^[A-Z0-9-]{5,12}$/.test(codigo)) throw new HttpsError('invalid-argument', 'Ese código no es válido.');
+  const c = await db.doc(`codigos/${codigo}`).get();
+  if (!c.exists) throw new HttpsError('not-found', 'No encontramos ese código. Revisá que esté bien escrito.');
+  const gid = c.data().gid;
+  const gref = db.doc(`grupos/${gid}`);
+  const uref = db.doc(`usuarios/${uid}`);
+  let nuevo = false, nombreGrupo = '';
+  await db.runTransaction(async tx => {
+    const [gs, us] = await Promise.all([tx.get(gref), tx.get(uref)]);
+    if (!gs.exists) throw new HttpsError('not-found', 'Ese grupo ya no existe.');
+    if (!us.exists) throw new HttpsError('failed-precondition', 'Completá tu perfil antes de unirte.');
+    const g = gs.data();
+    nombreGrupo = g.nombre;
+    if ((g.miembros || []).includes(uid)) return;
+    if ((g.miembros || []).length >= 60) throw new HttpsError('resource-exhausted', 'El grupo está completo.');
+    const p = us.data();
+    tx.update(gref, { miembros: [...g.miembros, uid] });
+    tx.set(gref.collection('jugadores').doc(uid), { nombre: p.nombre, apodo: p.apodo || '', foto: p.foto || '', stats: statsVacias(), racha: '', tendencia: {}, desde: Timestamp.now() });
+    tx.set(gref.collection('niveles').doc(uid), { atributos: {}, previos: {} });
+    nuevo = true;
+  });
+  if (nuevo) {
+    const nombre = ((await uref.get()).data()?.nombre || '').split(' ')[0];
+    await disparar(gid, 'nuevo_miembro', { personaUid: uid, excluir: [uid], vars: { nombre }, clave: uid });
+    await disparar(gid, 'bienvenida', { personaUids: [uid], clave: uid });
+  }
+  return { gid, nombre: nombreGrupo, nuevo };
+});
+
+// Pasa a una persona real (uid) todo lo que estaba a nombre de su perfil pendiente (l_DNI).
+async function reasignarJugador(desde, hacia) {
+  const gs = await db.collection('grupos').where('miembros', 'array-contains', desde).get();
+  const out = [];
+  for (const gd of gs.docs) {
+    const gref = gd.ref;
+    const ops = [];
+    for (const col of ['jugadores', 'niveles']) {
+      const s = await gref.collection(col).doc(desde).get();
+      if (s.exists) {
+        ops.push(b => b.set(gref.collection(col).doc(hacia), s.data(), { merge: true }));
+        ops.push(b => b.delete(s.ref));
+      }
+    }
+    const g2 = deepReplace(gd.data(), desde, hacia);
+    g2.miembros = [...new Set(g2.miembros)];
+    g2.admins = [...new Set(g2.admins)];
+    ops.push(b => b.set(gref, g2));
+    const ps = await gref.collection('partidos').get();
+    for (const pd of ps.docs) {
+      const d = pd.data(), d2 = deepReplace(d, desde, hacia);
+      if (cambio(d, d2)) ops.push(b => b.set(pd.ref, d2));
+    }
+    await lotes(ops);
+    out.push({ id: gd.id, nombre: gd.data().nombre });
+  }
+  return out;
+}
+
+export const vincularCuentaAnterior = onCall(opts, async req => {
+  const uid = requireAuth(req);
+  const dni = String(req.data?.dni || '').replace(/\D/g, '');
+  const clave = String(req.data?.clave || '');
+  if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
+
+  // Máximo 5 intentos fallidos por hora y por persona.
+  const iref = db.doc(`intentosVinculo/${uid}`);
+  const ahora = Date.now();
+  const i = (await iref.get()).data() || { n: 0, desde: ahora };
+  const vigente = ahora - i.desde < 3600000;
+  if (vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Probá de nuevo en una hora.');
+
+  const lref = db.doc(`app8_users/${dni}`);
+  const l = await lref.get();
+  const ld = l.exists ? l.data() : null;
+  if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
+    await iref.set({ n: vigente ? i.n + 1 : 1, desde: vigente ? i.desde : ahora });
+    throw new HttpsError('permission-denied', 'El DNI o la clave no coinciden.');
+  }
+  if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('already-exists', 'Esa cuenta ya se pasó a otro usuario.');
+  await iref.delete().catch(() => {});
+
+  const uref = db.doc(`usuarios/${uid}`);
+  if (!(await uref.get()).exists) {
+    await uref.set({ nombre: ld.nombre || 'Jugador', apodo: ld.apodo || '', foto: ld.foto || '', creadoEn: Timestamp.now() });
+  }
+  await db.doc(`privado/${uid}`).set({ legacyDni: dni }, { merge: true });
+  await lref.update({ nuevoUid: uid, vinculadoEn: Timestamp.now() });
+  const grupos = await reasignarJugador(`l_${dni}`, uid);
+  return { nombre: ld.nombre, grupos };
+});
+
+export const enviarAvisoManual = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] }, async req => {
+  const { g, gref } = await requireAdmin(req, req.data?.gid);
+  const gid = gref.id;
+  const titulo = String(req.data?.titulo || '').trim().slice(0, 60);
+  const cuerpo = String(req.data?.cuerpo || '').trim().slice(0, 160);
+  const aud = (Array.isArray(req.data?.aud) ? req.data.aud : []).filter(k => AUD[k] && k !== 'persona');
+  if (!titulo || !cuerpo || !aud.length) throw new HttpsError('invalid-argument', 'Completá el título, el mensaje y para quién es.');
+  let partido = null;
+  if (g.partidoActivo) {
+    const s = await db.doc(`grupos/${gid}/partidos/${g.partidoActivo}`).get();
+    if (s.exists) partido = { id: s.id, ...s.data() };
+  }
+  const ctx = { partido, clave: `manual_${Date.now()}`, quienTxt: aud.map(k => AUD[k][0]).join(', ') };
+  const uids = await audiencia(gid, g, aud, ctx);
+  if (!uids.length) throw new HttpsError('failed-precondition', 'No hay nadie en esa selección.');
+  const vars = partido ? varsPartido(g, partido) : { comunidad: g.nombre };
+  const r = await entregar(gid, g, { tipo: 'manual', titulo, cuerpo, uids, ctx: { ...ctx, vars }, auto: false });
+  return r;
+});

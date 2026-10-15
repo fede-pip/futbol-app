@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "futbol-app-dev-fp",
+    "dev": "futbol-app-dev-fp",
+    "prod": "futbol-app-5818a"
+  }
+}

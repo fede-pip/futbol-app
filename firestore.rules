@@ -1,0 +1,152 @@
+rules_version = '2';
+
+// App8 v2: toda lectura y escritura exige sesión. Las operaciones sensibles
+// (unirse a un grupo, votar, cerrar votación, enviar avisos, migrar cuentas)
+// las hacen Cloud Functions con permisos de servidor; el cliente no puede.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function grupo(gid) { return get(/databases/$(database)/documents/grupos/$(gid)).data; }
+    function esMiembro(gid) { return signedIn() && request.auth.uid in grupo(gid).miembros; }
+    function esAdmin(gid) { return signedIn() && request.auth.uid in grupo(gid).admins; }
+    function soloCambia(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function textoValido(v, max) { return v is string && v.size() >= 1 && v.size() <= max; }
+
+    // Un jugador solo puede sumarse (a sí mismo o a un invitado, al final de la lista)
+    // o quitarse él mismo, de a uno. Quitar invitados u otras personas es de admin.
+    function agregaUno(nuevos, viejos) {
+      return nuevos.size() == viejos.size() + 1
+        && nuevos.toSet().size() == nuevos.size()
+        && viejos.toSet().difference(nuevos.toSet()).size() == 0
+        && (nuevos.toSet().difference(viejos.toSet()).hasOnly([request.auth.uid])
+            || nuevos[nuevos.size() - 1].matches('inv_.*'));
+    }
+    function quitaYo(nuevos, viejos) {
+      return nuevos.size() == viejos.size() - 1
+        && nuevos.toSet().difference(viejos.toSet()).size() == 0
+        && viejos.toSet().difference(nuevos.toSet()).hasOnly([request.auth.uid]);
+    }
+    function cambioPropio(nuevos, viejos) {
+      return nuevos == viejos || agregaUno(nuevos, viejos) || quitaYo(nuevos, viejos);
+    }
+
+    // ---------- Perfil público ----------
+    match /usuarios/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['nombre', 'apodo', 'foto', 'creadoEn'])
+        && textoValido(request.resource.data.nombre, 80);
+      allow update: if isSelf(uid) && soloCambia(['nombre', 'apodo', 'foto'])
+        && textoValido(request.resource.data.nombre, 80);
+      allow delete: if false;
+    }
+
+    // ---------- Datos privados de cada persona ----------
+    match /privado/{uid} {
+      allow read: if isSelf(uid);
+      allow create: if isSelf(uid) && !('legacyDni' in request.resource.data);
+      allow update: if isSelf(uid) && soloCambia(['dispositivos', 'prefs', 'onboarding']);
+      allow delete: if false;
+
+      // Bandeja de avisos: la crea el servidor; la persona solo marca leído o borra.
+      match /avisos/{avisoId} {
+        allow read: if isSelf(uid);
+        allow update: if isSelf(uid) && soloCambia(['leido']);
+        allow delete: if isSelf(uid);
+        allow create: if false;
+      }
+    }
+
+    // ---------- Códigos de invitación ----------
+    // Cerrados al cliente: crear, regenerar y usar un código lo hacen las Cloud Functions.
+    match /codigos/{codigo} {
+      allow read, write: if false;
+    }
+
+    // ---------- Grupos ----------
+    match /grupos/{gid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.miembros;
+      // Los grupos los crea la función crearGrupo (deja listo al creador, su nivel y el código).
+      allow create: if false;
+      allow update: if signedIn() && (
+        // Admin: edita todo, pero no suma miembros (eso lo hace el servidor), no cambia al creador
+        // y el creador sigue siendo admin.
+        (request.auth.uid in resource.data.admins
+          && request.resource.data.creadorUid == resource.data.creadorUid
+          && resource.data.creadorUid in request.resource.data.admins
+          && request.resource.data.miembros.toSet().difference(resource.data.miembros.toSet()).size() == 0)
+        ||
+        // Cualquier miembro (que no sea el creador) puede salirse del grupo.
+        (request.auth.uid in resource.data.miembros
+          && request.auth.uid != resource.data.creadorUid
+          && soloCambia(['miembros', 'admins'])
+          && request.resource.data.miembros.toSet() == resource.data.miembros.toSet().difference([request.auth.uid].toSet())
+          && request.resource.data.admins.toSet() == resource.data.admins.toSet().difference([request.auth.uid].toSet()))
+      );
+      allow delete: if signedIn() && request.auth.uid == resource.data.creadorUid;
+
+      // Datos visibles de cada jugador del grupo (estadísticas, racha, tendencia).
+      match /jugadores/{jid} {
+        allow read: if esMiembro(gid);
+        // Cada persona puede actualizar solo su nombre, apodo y foto visibles en el grupo.
+        allow update: if isSelf(jid) && soloCambia(['nombre', 'apodo', 'foto']);
+        allow create, delete: if false;
+      }
+
+      // Puntajes exactos: privados, solo los ve el admin.
+      match /niveles/{jid} {
+        allow read: if esAdmin(gid);
+        allow create, update: if esAdmin(gid);
+        allow delete: if false;
+      }
+
+      // Invitados que vienen seguido.
+      match /invitados/{iid} {
+        allow read: if esMiembro(gid);
+        allow create: if esMiembro(gid) && request.resource.data.keys().hasOnly(['nombre', 'nivel', 'creadoEn'])
+          && textoValido(request.resource.data.nombre, 60);
+        allow update, delete: if esAdmin(gid);
+      }
+
+      // Partidos (el abierto y el historial).
+      match /partidos/{pid} {
+        allow read: if esMiembro(gid);
+        allow create: if esAdmin(gid);
+        allow update: if resource.data.estado != 'cerrado' && (
+          esAdmin(gid)
+          || (esMiembro(gid) && resource.data.estado == 'abierto'
+              && soloCambia(['inscriptos', 'cena', 'listaEspera', 'invitados'])
+              && cambioPropio(request.resource.data.inscriptos, resource.data.inscriptos)
+              && cambioPropio(request.resource.data.cena, resource.data.cena)
+              && cambioPropio(request.resource.data.listaEspera, resource.data.listaEspera)
+              && request.resource.data.inscriptos.size() <= resource.data.cupo)
+        );
+        allow delete: if esAdmin(gid) && resource.data.estado != 'cerrado';
+
+        // Quién votó (no qué votó): lo escribe el servidor.
+        match /votos/{vid} {
+          allow read: if esMiembro(gid);
+          allow write: if false;
+        }
+      }
+
+      // Registro de avisos enviados: lo ve el admin, lo escribe el servidor.
+      match /avisosHistorial/{hid} {
+        allow read: if esAdmin(gid);
+        allow write: if false;
+      }
+
+      // Totales de votación: solo el servidor.
+      match /agregados/{aid} {
+        allow read, write: if false;
+      }
+    }
+
+    // Todo lo demás (incluidas las colecciones app8_* anteriores): cerrado al cliente.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
