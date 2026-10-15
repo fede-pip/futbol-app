@@ -1,17 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs, deleteDoc, updateDoc, arrayUnion, arrayRemove, increment, runTransaction, writeBatch } from 'firebase/firestore';
+import { ATTRS, FORMATOS, calcProm, calcPuntos, calcRacha, fmtNombre, balancear, asignarVotaciones, horasRestantes, reemplazarVars, nuevoAtributo } from './lib/logica.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 const LOGO_IMG = "data:image/jpeg;base64,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";
 
 
+// La config de Firebase es pública por diseño (la seguridad la dan las reglas de
+// Firestore), pero se lee de variables de entorno para poder apuntar la app a un
+// proyecto de pruebas sin tocar el código. Sin variables, usa el proyecto real.
+const env = import.meta.env;
 const firebaseConfig = {
-  apiKey: "AIzaSyBkdakeLAzmp7zGz99nPswuqjtELSAOe8s",
-  authDomain: "futbol-app-5818a.firebaseapp.com",
-  projectId: "futbol-app-5818a",
-  storageBucket: "futbol-app-5818a.firebasestorage.app",
-  messagingSenderId: "861046895576",
-  appId: "1:861046895576:web:1e64b31f951194fbfaf8ad"
+  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyBkdakeLAzmp7zGz99nPswuqjtELSAOe8s",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "futbol-app-5818a.firebaseapp.com",
+  projectId: env.VITE_FIREBASE_PROJECT_ID || "futbol-app-5818a",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "futbol-app-5818a.firebasestorage.app",
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "861046895576",
+  appId: env.VITE_FIREBASE_APP_ID || "1:861046895576:web:1e64b31f951194fbfaf8ad"
 };
 
 const fbApp = initializeApp(firebaseConfig);
@@ -59,21 +64,6 @@ function invalidateUserCache(dni) {
 }
 const SUPER_ADMIN = "35270164";
 
-const ATTRS = [
-  { key:"velocidad",   label:"Velocidad",   icon:"⚡", ej:"corrió" },
-  { key:"pases",       label:"Pases",       icon:"🎯", ej:"pasó la pelota" },
-  { key:"definicion",  label:"Definición",  icon:"🥅", ej:"definió" },
-  { key:"amagues",     label:"Amagues",     icon:"🕺", ej:"gambeteó" },
-  { key:"defensa",     label:"Defensa",     icon:"🛡️", ej:"defendió" },
-  { key:"resistencia", label:"Resistencia", icon:"💪", ej:"aguantó físicamente" },
-  { key:"arquero",     label:"Arquero",     icon:"🧤", ej:"atajó" },
-];
-
-const FORMATOS = [
-  {label:"5 vs 5",total:10},{label:"6 vs 6",total:12},{label:"7 vs 7",total:14},
-  {label:"8 vs 8",total:16},{label:"9 vs 9",total:18},{label:"10 vs 10",total:20},{label:"11 vs 11",total:22}
-];
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 function hashPwd(p) {
   let h = 0;
@@ -87,140 +77,6 @@ function sinSecretos(u) {
   return resto;
 }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-function calcProm(attrs) {
-  if (!attrs) return 0;
-  const v = ATTRS.map(a=>attrs[a.key]||0).filter(x=>x>0);
-  return v.length ? +(v.reduce((s,x)=>s+x,0)/v.length).toFixed(2) : 0;
-}
-function calcPuntos(historial) {
-  // 3 pts ganado, 1 empate, 0 perdido — inferido del campo mvp/resultado del historial
-  // Se guarda en historial como {resultado: "ganado"|"empatado"|"perdido"}
-  return (historial||[]).reduce((s,h)=>{
-    if(h.resultado==="ganado") return s+3;
-    if(h.resultado==="empatado") return s+1;
-    return s;
-  },0);
-}
-
-function calcRacha(historial) {
-  const hist = (historial||[]).filter(h => ["ganado","empatado","perdido"].includes(h.resultado));
-  if (hist.length === 0) return { tipo: null, n: 0 };
-  const ultimo = hist[hist.length - 1].resultado;
-  let n = 0;
-  for (let i = hist.length - 1; i >= 0; i--) {
-    if (hist[i].resultado === ultimo) n++;
-    else break;
-  }
-  return { tipo: ultimo, n };
-}
-
-// Formatea nombre: "Apellido, N." para tabla, nombre completo para resto
-function fmtNombre(nombre, modo="completo") {
-  if(!nombre) return "—";
-  const partes = nombre.trim().split(" ").filter(Boolean);
-  if(partes.length === 1) return partes[0];
-  if(modo === "tabla") {
-    // Inicial del primer nombre + apellido completo (todo menos la primera palabra)
-    // Ej: "Agustin Dal Maso" → "A. Dal Maso"
-    // Ej: "Federico Pipkin" → "F. Pipkin"
-    const inicial = partes[0][0].toUpperCase();
-    const apellido = partes.slice(1).join(" ");
-    return `${inicial}. ${apellido}`;
-  }
-  return nombre; // completo
-}
-function balancear(lista) {
-  const n = lista.length;
-  const mitad = Math.floor(n/2);
-  const shuffle = arr => [...arr].sort(()=>Math.random()-.5);
-
-  if(n <= 2) {
-    const s=[...lista].sort((a,b)=>calcProm(b.atributos)-calcProm(a.atributos));
-    return {oscuro:shuffle([s[0]]), blanco:shuffle(s.slice(1))};
-  }
-
-  // Para grupos pequeños (≤14): buscar la combinación óptima por fuerza bruta parcial
-  // Para grupos grandes: usar algoritmo greedy mejorado
-  const prom = j => calcProm(j.atributos||{});
-  const sumEquipo = eq => eq.reduce((s,j)=>s+prom(j),0);
-
-  let mejorO=[], mejorB=[], mejorDiff=Infinity;
-
-  if(n <= 12) {
-    // Greedy con múltiples iteraciones aleatorias — encuentra combinación muy cercana al óptimo
-    const intentos = 200;
-    for(let t=0; t<intentos; t++){
-      const shuffled = [...lista].sort(()=>Math.random()-.5);
-      const o=shuffled.slice(0,mitad), b=shuffled.slice(mitad);
-      const diff=Math.abs(sumEquipo(o)-sumEquipo(b));
-      if(diff<mejorDiff){
-        mejorDiff=diff;
-        mejorO=[...o];
-        mejorB=[...b];
-      }
-    }
-    // Refinamiento: intentar swaps para mejorar
-    let mejorado=true;
-    while(mejorado){
-      mejorado=false;
-      for(let i=0;i<mejorO.length;i++){
-        for(let j=0;j<mejorB.length;j++){
-          // Probar swap
-          const newO=[...mejorO]; const newB=[...mejorB];
-          [newO[i],newB[j]]=[newB[j],newO[i]];
-          const diff=Math.abs(sumEquipo(newO)-sumEquipo(newB));
-          if(diff<mejorDiff-0.001){
-            mejorDiff=diff;
-            mejorO=newO; mejorB=newB;
-            mejorado=true;
-          }
-        }
-      }
-    }
-  } else {
-    // Greedy para grupos grandes: ordenar y distribuir en serpenteo con swaps
-    const s=[...lista].sort((a,b)=>prom(b.atributos)-prom(a.atributos));
-    s.forEach((j,i)=>(i%2===0?mejorO:mejorB).push(j));
-    // Refinamiento con swaps
-    let mejorado=true;
-    mejorDiff=Math.abs(sumEquipo(mejorO)-sumEquipo(mejorB));
-    while(mejorado){
-      mejorado=false;
-      for(let i=0;i<mejorO.length;i++){
-        for(let j=0;j<mejorB.length;j++){
-          const newO=[...mejorO]; const newB=[...mejorB];
-          [newO[i],newB[j]]=[newB[j],newO[i]];
-          const diff=Math.abs(sumEquipo(newO)-sumEquipo(newB));
-          if(diff<mejorDiff-0.001){
-            mejorDiff=diff;
-            mejorO=newO; mejorB=newB;
-            mejorado=true;
-          }
-        }
-      }
-    }
-  }
-
-  // Mezclar display para no revelar ranking
-  return {oscuro:shuffle(mejorO), blanco:shuffle(mejorB)};
-}
-function asignarVotaciones(inscriptos) {
-  const jugadores = inscriptos.filter(id=>!id.startsWith("inv_"));
-  const asig = {};
-  jugadores.forEach(dni => {
-    const otros = jugadores.filter(d=>d!==dni);
-    asig[dni] = [...otros].sort(()=>Math.random()-.5).slice(0,Math.min(3,otros.length));
-  });
-  return asig;
-}
-function horasRestantes(fechaFin) {
-  if (!fechaFin) return null;
-  const fin = new Date(fechaFin).getTime() + 24*60*60*1000;
-  const diff = fin - Date.now();
-  if (diff <= 0) return 0;
-  return Math.ceil(diff / (1000*60*60));
-}
-
 // ── Firestore refs ────────────────────────────────────────────────────────────
 const rUser = dni  => doc(db,"app8_users",dni);
 const rCom  = id   => doc(db,"app8_comunidades",id);
@@ -356,14 +212,6 @@ const DEST_LABELS = {
   no_anotados:"Miembros NO anotados", jugadores:"Jugadores del partido",
   mvp:"Solo el MVP", admins:"Solo admins"
 };
-
-function reemplazarVars(texto, vars) {
-  let t = texto||"";
-  Object.entries(vars).forEach(([k,v])=>{ t=t.replace(new RegExp(`{${k}}`,"g"),v||""); });
-  // {es} para plural de "lugar"
-  t = t.replace(/{es}/g, (vars.restantes===1||vars.restantes==="1")?"":"es");
-  return t;
-}
 
 // Enviar notificación usando config de la comunidad
 async function dispararNotif(tipo, comunidadData, vars={}, playerIdsOverride=null) {
@@ -2670,10 +2518,7 @@ function PVotar({ comunidad, partido, user }) {
       ATTRS.forEach(a=>{
         const n=notasAc[id]?.[a.key];
         if(n&&n.cant>0){
-          const prom=n.suma/n.cant;
-          const actual=nuevos[a.key]||5;
-          const delta=Math.min(0.25,Math.max(-0.25,prom*0.25));
-          nuevos[a.key]=Math.min(10,Math.max(1,+(actual+delta).toFixed(2)));
+          nuevos[a.key]=nuevoAtributo(nuevos[a.key]||5,n.suma,n.cant);
         }
       });
       const evs=(partido.eventos||{})[id]||{};
