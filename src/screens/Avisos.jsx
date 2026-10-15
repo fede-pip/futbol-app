@@ -80,7 +80,7 @@ export function MisAvisos() {
       {activo
         ? <CardB className="row"><span className="ti" style={{ width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center', background: 'var(--ok-bg)', color: 'var(--ok)', flex: 'none' }}><Icono n="phone" /></span><div className="grow"><b>Avisos activos en este celular</b><div className="muted">Los recibís aunque no tengas la app abierta.</div></div></CardB>
         : esIPhone() && !esAppInstalada()
-          ? <Hint><b>Estás en iPhone.</b> Para recibir avisos tocá Compartir, elegí "Agregar a inicio" y abrí App8 desde ese ícono.</Hint>
+          ? <Hint><b>Estás en iPhone.</b> Para recibir avisos tocá Compartir, elegí "Agregar a inicio" y abrí Me Anoto desde ese ícono.</Hint>
           : <Hint icono="bell" accion={<button className="chip on" disabled={cargando} onClick={activar}>{cargando ? '…' : 'Activar'}</button>}><b>Este celular no recibe avisos</b><br />Activalos para enterarte cuando hay partido.</Hint>}
       {msg ? <div className="error" role="alert">{msg}</div> : null}
       <Card>

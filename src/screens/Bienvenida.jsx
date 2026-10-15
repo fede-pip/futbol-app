@@ -37,7 +37,7 @@ export default function Bienvenida({ onTerminar }) {
   const ultima = i === DIAPOS.length - 1;
   return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />App8</div><button className="back" onClick={onTerminar}>Saltar</button></div>
+      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div><button className="back" onClick={onTerminar}>Saltar</button></div>
       <div className="prog" aria-label={`Paso ${i + 1} de 3`}>{DIAPOS.map((_, k) => <i key={k} className={k <= i ? 'on' : ''} />)}</div>
       <Arte i={i} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><h2 className="t">{d.t}</h2><p className="lead">{d.p}</p></div>

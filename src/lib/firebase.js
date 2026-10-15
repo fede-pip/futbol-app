@@ -15,7 +15,9 @@ const DEV = {
   messagingSenderId: '132423966478', appId: '1:132423966478:web:519436aa2eb23563ee815f'
 };
 
-// Solo el dominio de producción usa los datos reales. Las vistas previas de Vercel y
+const HOSTS_PRODUCCION = ['meanoto.com.ar', 'www.meanoto.com.ar', 'futbol-app-puce.vercel.app'];
+
+// Solo los dominios de producción usan los datos reales. Las vistas previas de Vercel y
 // localhost usan el proyecto de pruebas, así nunca se tocan datos reales sin querer.
 function elegirConfig() {
   const e = import.meta.env;
@@ -24,7 +26,7 @@ function elegirConfig() {
       storageBucket: e.VITE_FIREBASE_STORAGE_BUCKET, messagingSenderId: e.VITE_FIREBASE_MESSAGING_SENDER_ID, appId: e.VITE_FIREBASE_APP_ID };
   }
   const host = typeof location !== 'undefined' ? location.hostname : '';
-  return host === 'futbol-app-puce.vercel.app' ? PROD : DEV;
+  return HOSTS_PRODUCCION.includes(host) ? PROD : DEV;
 }
 
 export const config = elegirConfig();

@@ -51,7 +51,7 @@ export default function Grupo() {
   const copiar = async () => {
     try { await navigator.clipboard.writeText(grupo.codigo); toast('Código copiado'); } catch (e) { toast('Seleccioná el código para copiarlo'); }
   };
-  const texto = encodeURIComponent(`Sumate a ${grupo.nombre} en App8. Entrá a ${location.origin} y usá el código ${grupo.codigo}`);
+  const texto = encodeURIComponent(`Sumate a ${grupo.nombre} en Me Anoto. Entrá a ${location.origin} y usá el código ${grupo.codigo}`);
   const roles = [['Jugador', null, ['Anotarse y traer invitados', 'Votar después del partido', 'Ver estadísticas']],
     ['Admin', 'Admin', ['Crear el partido', 'Armar y publicar los equipos', 'Cargar resultado y goles', 'Cerrar la votación', 'Editar los avisos del grupo']],
     ['Creador', 'Creador', ['Todo lo del admin', 'Nombrar o quitar admins']]];

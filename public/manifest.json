@@ -1,6 +1,6 @@
 {
-  "name": "App8 — Fútbol",
-  "short_name": "App8",
+  "name": "Me Anoto",
+  "short_name": "Me Anoto",
   "description": "Tu red de fútbol — organizá partidos, votá el MVP y seguí las stats",
   "start_url": "/",
   "display": "standalone",

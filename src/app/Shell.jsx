@@ -12,7 +12,7 @@ export function BarraSuperior({ titulo, atras, onAtras }) {
     <div className="bar-top">
       {atras
         ? <button className="back" onClick={onAtras}><Icono n="back" />{atras === true ? 'Volver' : atras}</button>
-        : <div className="brand"><Marca />{titulo || 'App8'}</div>}
+        : <div className="brand"><Marca />{titulo || 'Me Anoto'}</div>}
       <div className="row" style={{ gap: 8 }}>
         <button className="iconbtn" onClick={() => ir('avisos')} aria-label={sinLeer ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}>
           <Icono n="bell" />{sinLeer ? <span className="dot" /> : null}

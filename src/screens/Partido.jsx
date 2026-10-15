@@ -81,7 +81,7 @@ function Inscripcion() {
   const lleno = insc.length >= cupo;
   const cena = p.cena || [];
   const yoCena = cena.includes(uid);
-  const mensajeWA = encodeURIComponent(`⚽ ${tituloFecha(d)} en ${p.lugar}. Vamos ${insc.length} de ${cupo}. Anotate en App8: ${location.origin}`);
+  const mensajeWA = encodeURIComponent(`⚽ ${tituloFecha(d)} en ${p.lugar}. Vamos ${insc.length} de ${cupo}. Anotate en Me Anoto: ${location.origin}`);
 
   if (editando) return (
     <>

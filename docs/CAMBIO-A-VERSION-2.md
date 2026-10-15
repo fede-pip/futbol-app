@@ -38,7 +38,7 @@ Comprobación: `curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type:
 
 ## 2. El cambio (hacerlo seguido, son unos minutos)
 
-1. **Merge de `feat/v2` a `main`** (el PR). Vercel despliega la versión nueva en `futbol-app-puce.vercel.app`.
+1. **Merge de `feat/v2` a `main`** (el PR). Vercel despliega la versión nueva en `meanoto.com.ar`.
 2. Entrá a la app con tu cuenta (`fede@inmetricswetrust.com`, con Google o email verificado) → **Grupo → Mi perfil → Plataforma**.
 3. **Ver qué se migraría**: revisá que aparezca "Fútbol de los Lunes" con la cantidad esperada de jugadores y partidos.
 4. **Migrar los datos**.
@@ -60,7 +60,7 @@ Cómo entra cada uno:
 
 Mensaje sugerido:
 
-> Cambiamos la app de fútbol. Entrá a futbol-app-puce.vercel.app. Si antes entrabas con Google, tocá "Seguir con Google". Si entrabas con tu DNI, tocá "Entrar con mi DNI de antes", poné tu DNI y tu clave de siempre y después elegí un email: desde ahí entrás con el email. Tu historial queda como estaba.
+> Cambiamos la app de fútbol. Entrá a meanoto.com.ar. Si antes entrabas con Google, tocá "Seguir con Google". Si entrabas con tu DNI, tocá "Entrar con mi DNI de antes", poné tu DNI y tu clave de siempre y después elegí un email: desde ahí entrás con el email. Tu historial queda como estaba.
 
 ## 4. Si algo sale mal
 

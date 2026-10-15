@@ -11,7 +11,7 @@ export const ES_PROD = PROYECTO === 'futbol-app-5818a';
 // Los disparadores de Firestore deben estar en la región de la base de datos.
 // Producción usa nam5 (EE.UU.); pruebas está en São Paulo.
 export const REGION = ES_PROD ? 'us-central1' : 'southamerica-east1';
-export const URL_APP = 'https://futbol-app-puce.vercel.app';
+export const URL_APP = 'https://meanoto.com.ar';
 export const SUPER_EMAILS = ['fede@inmetricswetrust.com', 'hola@inmetricswetrust.com'];
 
 export function requireAuth(req) {

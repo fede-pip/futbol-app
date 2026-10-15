@@ -22,7 +22,7 @@ const efectivo = (c, g) => {
 function Push({ titulo, cuerpo }) {
   return (
     <div className="push" aria-label="Así se ve en el celular"><span className="pi"><img src={LOGO} alt="" /></span>
-      <div className="grow"><div className="pm"><span>App8</span><span>ahora</span></div>
+      <div className="grow"><div className="pm"><span>Me Anoto</span><span>ahora</span></div>
         <div className="pt">{llenar(titulo) || 'Título del aviso'}</div><div className="pc">{llenar(cuerpo) || 'Escribí el mensaje'}</div></div></div>
   );
 }

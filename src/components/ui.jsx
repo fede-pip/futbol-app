@@ -43,7 +43,7 @@ export const IconoGoogle = () => (
   </svg>
 );
 
-export const Marca = ({ px = 30 }) => <span className="mark" style={{ width: px, height: px }}><img src={LOGO} alt="App8" /></span>;
+export const Marca = ({ px = 30 }) => <span className="mark" style={{ width: px, height: px }}><img src={LOGO} alt="Me Anoto" /></span>;
 
 export function Btn({ v, sm, children, className = '', ...p }) {
   return <button type="button" className={`btn ${v || ''} ${sm ? 'sm' : ''} ${className}`} {...p}>{children}</button>;

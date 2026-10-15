@@ -88,7 +88,7 @@ export default function Cuenta({ onAtras }) {
         <Marca />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <h2 className="t">Entrá a App8</h2>
+        <h2 className="t">Entrá a Me Anoto</h2>
         <p className="lead">Con Google o con tu email.</p>
       </div>
       <Btn type="button" onClick={conGoogle} disabled={cargando}><IconoGoogle />Seguir con Google</Btn>
