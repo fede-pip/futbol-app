@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { EmailAuthProvider, linkWithCredential, sendEmailVerification } from 'firebase/auth';
 import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
-import { Btn, Campo, Card, CardB, Icono, Marca, Fila } from '../components/ui.jsx';
+import { Btn, Campo, Card, CardB, Icono, Lockup, Marca, Fila } from '../components/ui.jsx';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
 
 // ---- Completar perfil (cuando entró con Google sin nombre o con un nombre vacío) ----
@@ -19,7 +19,7 @@ export function CompletarPerfil({ uid, sugerido = '' }) {
   }
   return (
     <form className="scr" style={{ flex: 1 }} onSubmit={guardar}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">¿Cómo te llaman?</h2><p className="lead" style={{ marginTop: 4 }}>Es el nombre que van a ver tus compañeros.</p></div>
       <Campo label="Nombre y apellido" id="nombre" value={nombre} onChange={e => setNombre(e.target.value)} autoComplete="name" placeholder="Fede Pipkin" />
       {error ? <div className="error" role="alert">{error}</div> : null}
@@ -48,7 +48,7 @@ export function MigrarDni({ onListo, onOmitir }) {
 
   if (exito) return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">¡Listo, {exito.nombre.split(' ')[0]}!</h2><p className="lead" style={{ marginTop: 4 }}>Tu historial viene con vos: partidos, goles y MVP.</p></div>
       {exito.grupos.length ? <Card>{exito.grupos.map(g => <Fila key={g.id} icono="users" titulo={g.nombre} sub="Ya sos parte de este grupo" />)}</Card> : null}
       <Btn v="pri" onClick={onListo}>Continuar</Btn>
@@ -57,7 +57,7 @@ export function MigrarDni({ onListo, onOmitir }) {
 
   return (
     <form className="scr" style={{ flex: 1 }} onSubmit={vincular}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">Recuperá tu historial</h2><p className="lead" style={{ marginTop: 4 }}>Ingresá el DNI y la clave con la que jugabas antes. Es la última vez que los vas a necesitar.</p></div>
       <Card>
         <Fila icono="user" titulo="Con tu DNI y tu clave de siempre" sub="Confirmamos que esa cuenta es tuya" />
@@ -96,7 +96,7 @@ export function AgregarEmail({ nombre, onListo }) {
   }
   return (
     <form className="scr" style={{ flex: 1 }} onSubmit={guardar} noValidate>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">Hola{nombre ? `, ${nombre.split(' ')[0]}` : ''}</h2>
         <p className="lead" style={{ marginTop: 4 }}>A partir de ahora entrás con tu email, ya no con el DNI. Con ese email también vas a poder recuperar tu contraseña si la olvidás.</p></div>
       <Card><Fila icono="mail" titulo="Elegí un email que uses de verdad" sub="Te mandamos un mensaje para confirmarlo" /><Fila icono="key" titulo="Y una contraseña nueva" sub="Reemplaza a la clave de antes" /></Card>
@@ -126,7 +126,7 @@ export function PreguntaAnterior({ onListo, onDni }) {
 
   if (hallada.encontrada) return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">Encontramos tu cuenta</h2><p className="lead" style={{ marginTop: 4 }}>Ya jugabas en App8 y tu Google estaba vinculado.</p></div>
       <Card><Fila icono="user" titulo={hallada.nombre} sub={`DNI ${hallada.dniParcial}`} /></Card>
       {error ? <div className="error" role="alert">{error}</div> : null}
@@ -137,7 +137,7 @@ export function PreguntaAnterior({ onListo, onDni }) {
 
   return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">¿Ya jugabas en App8?</h2><p className="lead" style={{ marginTop: 4 }}>Si jugabas antes con tu DNI, recuperá tus partidos, goles y MVP. Si sos nuevo, seguí.</p></div>
       <button className="choice" onClick={onDni}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Sí, jugaba con mi DNI</b><span>Ponés tu DNI y tu clave de antes y recuperás todo.</span></div><Icono n="chev" /></button>
       <button className="choice" onClick={onListo}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>No, soy nuevo</b><span>Seguimos con tu cuenta nueva.</span></div><Icono n="chev" /></button>
@@ -172,7 +172,7 @@ export function GrupoElegir({ onListo, uid, superAdmin }) {
 
   return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div><h2 className="t">¿Con quién jugás?</h2><p className="lead" style={{ marginTop: 4 }}>Un grupo es la gente con la que armás el partido todas las semanas.</p></div>
       {modo === null ? (
         <>
@@ -215,7 +215,7 @@ export function PermisoAvisos({ uid, onListo }) {
 
   return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div></div>
+      <div className="bar-top"><Lockup /></div>
       <div className="art">
         {[['Se armó el partido del lunes', 'Ahora'], ['Quedan 2 lugares, anotate', 'Hace 5 min'], ['Ya están los equipos', 'Hace 2 h']].map(n => (
           <div className="mini" key={n[0]}><Marca px={28} /><div className="grow"><b style={{ fontSize: 13.5 }}>{n[0]}</b><div className="small">{n[1]}</div></div></div>

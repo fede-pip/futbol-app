@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
-import { LOGO } from '../assets/logo.js';
 
 const IC = {
   home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -43,7 +42,8 @@ export const IconoGoogle = () => (
   </svg>
 );
 
-export const Marca = ({ px = 30 }) => <span className="mark" style={{ width: px, height: px }}><img src={LOGO} alt="Me Anoto" /></span>;
+export const Marca = ({ px = 30 }) => <span className="mark" style={{ width: px, height: px }}><img src="/favicon.svg" alt="Me Anoto" /></span>;
+export const Lockup = ({ px = 30 }) => <div className="brand"><Marca px={px} /><span className="wordmark">me anoto</span></div>;
 
 export function Btn({ v, sm, children, className = '', ...p }) {
   return <button type="button" className={`btn ${v || ''} ${sm ? 'sm' : ''} ${className}`} {...p}>{children}</button>;
@@ -103,7 +103,7 @@ export const Vacio = ({ titulo, texto, children }) => (
   <Card className="lista-vacia"><b>{titulo}</b>{texto}{children ? <div style={{ marginTop: 12 }}>{children}</div> : null}</Card>
 );
 
-export const Splash = () => <div className="splash"><Marca px={64} /></div>;
+export const Splash = () => <div className="splash"><div style={{ display: 'grid', placeItems: 'center', gap: 14 }}><Marca px={76} /><span className="wordmark" style={{ fontSize: 26 }}>me anoto</span></div></div>;
 
 export function CabeceraPantalla({ titulo, sub }) {
   return <div><h2 className="t">{titulo}</h2>{sub ? <p className="lead" style={{ marginTop: 2 }}>{sub}</p> : null}</div>;

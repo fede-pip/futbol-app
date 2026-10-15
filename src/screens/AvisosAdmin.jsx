@@ -7,7 +7,6 @@ import {
   AUD, CAT_DEF, GRUPOS_AV, MUESTRA, PLANTILLAS, VARS_DESC, catalogoPorId, llenar, quienTxt
 } from '../lib/catalogo.js';
 import { haceCuanto } from '../lib/fechas.js';
-import { LOGO } from '../assets/logo.js';
 import { Btn, Campo, Card, CardB, HbTabs, Hint, Icono, Pill, Switch, useToast } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
@@ -21,7 +20,7 @@ const efectivo = (c, g) => {
 
 function Push({ titulo, cuerpo }) {
   return (
-    <div className="push" aria-label="Así se ve en el celular"><span className="pi"><img src={LOGO} alt="" /></span>
+    <div className="push" aria-label="Así se ve en el celular"><span className="pi"><img src="/favicon.svg" alt="" /></span>
       <div className="grow"><div className="pm"><span>Me Anoto</span><span>ahora</span></div>
         <div className="pt">{llenar(titulo) || 'Título del aviso'}</div><div className="pc">{llenar(cuerpo) || 'Escribí el mensaje'}</div></div></div>
   );

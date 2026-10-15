@@ -3,6 +3,7 @@
    leer bien. Neutros con matiz verde. Los estados (ok, aviso, error, info) conservan su significado. */
 :root {
   --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-marca:'Bricolage Grotesque','Inter',system-ui,sans-serif;
   --bg:#f1f6f2; --card:#ffffff; --surface-2:#f7faf7; --surface-3:#eaf1eb;
   --line:#e0e9e2; --line-2:#cfdbd2; --line-3:#bccac0;
   --text:#10211a; --text-2:#4a5d53; --text-3:#78897f;
@@ -275,3 +276,20 @@ button.todo-r:hover { background:var(--surface-2); }
 .grid2 > * { min-width:0; }
 .field input, .field textarea, .field select { min-width:0; }
 input[type="date"], input[type="time"] { appearance:none; -webkit-appearance:none; text-align:left; }
+
+/* ---------- Marca: me anoto ---------- */
+.wordmark { font-family:var(--font-marca); font-weight:800; font-size:21px; letter-spacing:-.03em; line-height:1; text-transform:lowercase; font-optical-sizing:auto; }
+.brand .wordmark { color:var(--text); }
+.kpi .v, .score .n, .code, .kp .v, .num-marca { font-family:var(--font-marca); }
+.kpi .v { font-weight:800; letter-spacing:-.035em; }
+.portada { flex:1; min-height:100dvh; display:flex; flex-direction:column; justify-content:space-between; gap:24px; padding:max(48px, env(safe-area-inset-top, 0px)) 22px max(26px, env(safe-area-inset-bottom, 0px)); color:#fff; position:relative; overflow:hidden;
+  background:linear-gradient(160deg,var(--turf-1,#17a062) 0%,#0f7a4a 36%,#0a4f31 76%,#073722 100%); }
+.portada::before { content:""; position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(90deg,rgba(255,255,255,.055) 0 36px,rgba(0,0,0,.06) 36px 72px); }
+.portada::after { content:""; position:absolute; left:50%; top:46%; width:150%; aspect-ratio:1; transform:translate(-50%,-50%); border:6px solid rgba(255,255,255,.10); border-radius:50%; pointer-events:none; }
+.portada > * { position:relative; z-index:1; }
+.portada-centro { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; }
+.portada-centro .mark { border-radius:30px; box-shadow:0 18px 40px rgba(0,0,0,.28); }
+.portada-nombre { font-family:var(--font-marca); font-weight:800; font-size:clamp(44px, 15vw, 64px); letter-spacing:-.04em; line-height:.95; margin:0; text-transform:lowercase; }
+.portada-lema { font-size:17px; color:#c9f0dc; max-width:20ch; text-wrap:balance; }
+.portada-botones { display:flex; flex-direction:column; gap:10px; }
+@media (prefers-reduced-motion:no-preference) { .portada-centro .mark { animation:flota 4s ease-in-out infinite; } @keyframes flota { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } } }

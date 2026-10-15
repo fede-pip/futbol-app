@@ -1,10 +1,10 @@
 {
   "name": "Me Anoto",
   "short_name": "Me Anoto",
-  "description": "Tu red de fútbol — organizá partidos, votá el MVP y seguí las stats",
+  "description": "El partido de todas las semanas, sin vueltas. Anotate, armá los equipos y votá al MVP.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#0f7a4a",
   "theme_color": "#0f7a4a",
   "orientation": "portrait",
   "categories": ["sports", "social"],

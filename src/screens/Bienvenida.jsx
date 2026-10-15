@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Btn, Marca, Meter } from '../components/ui.jsx';
-import { LOGO } from '../assets/logo.js';
+import { Btn, Lockup, Marca, Meter } from '../components/ui.jsx';
 
 const DIAPOS = [
   { t: 'Anotate en un toque', p: 'Ves quién juega, cuántos lugares quedan y si te quedás a comer.' },
@@ -31,13 +30,30 @@ function Arte({ i }) {
   );
 }
 
+function Portada({ onEmpezar, onSaltar }) {
+  return (
+    <div className="portada">
+      <div className="portada-centro">
+        <Marca px={112} />
+        <h1 className="portada-nombre">me anoto</h1>
+        <p className="portada-lema">El partido de todas las semanas, sin vueltas.</p>
+      </div>
+      <div className="portada-botones">
+        <Btn v="white" onClick={onEmpezar}>Empezar</Btn>
+        <Btn v="glass" onClick={onSaltar}>Ya tengo cuenta</Btn>
+      </div>
+    </div>
+  );
+}
+
 export default function Bienvenida({ onTerminar }) {
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(-1); // -1: portada
+  if (i === -1) return <Portada onEmpezar={() => setI(0)} onSaltar={onTerminar} />;
   const d = DIAPOS[i];
   const ultima = i === DIAPOS.length - 1;
   return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><div className="brand"><Marca />Me Anoto</div><button className="back" onClick={onTerminar}>Saltar</button></div>
+      <div className="bar-top"><Lockup /><button className="back" onClick={onTerminar}>Saltar</button></div>
       <div className="prog" aria-label={`Paso ${i + 1} de 3`}>{DIAPOS.map((_, k) => <i key={k} className={k <= i ? 'on' : ''} />)}</div>
       <Arte i={i} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><h2 className="t">{d.t}</h2><p className="lead">{d.p}</p></div>

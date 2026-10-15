@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { db } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
 import { anotarse, bajarse } from '../data/acciones.js';
-import { aFecha, faltan, titulo as tituloFecha, diaCorto } from '../lib/fechas.js';
-import { Btn, Card, CardB, Fila, Icono, Meter, Pill, Vacio } from '../components/ui.jsx';
+import { aFecha, diaSemana, faltan, titulo as tituloFecha, diaCorto } from '../lib/fechas.js';
+import { Btn, Card, CardB, Fila, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
@@ -15,6 +15,7 @@ const iniciales = n => (n || '').split(' ').filter(Boolean).map(p => p[0]).slice
 export default function Inicio() {
   const { uid, perfil, grupo, grupos, gid, elegirGrupo, partido, jugadores, esAdmin } = useSesion();
   const { ir } = useNav();
+  const toast = useToast();
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const ultimo = useColl(query(collection(db, `grupos/${gid}/partidos`), where('estado', '==', 'cerrado'), orderBy('fechaHora', 'desc'), limit(1)), gid);
@@ -66,10 +67,10 @@ export default function Inicio() {
               <div className="row sp" style={{ margin: '16px 0 8px' }}><b className="num" style={{ fontSize: 15 }}>{n} de {cupo} anotados</b><span style={{ fontSize: 13, color: '#c9f0dc' }}>{lleno ? 'Completo' : `Quedan ${cupo - n}`}</span></div>
               <Meter pct={cupo ? (n / cupo) * 100 : 0} />
               {anotado
-                ? <Btn v="glass" style={{ marginTop: 14 }} disabled={cargando} onClick={() => accion(() => bajarse(gid, partido, uid))}><Icono n="check" />Estás anotado · Salir</Btn>
+                ? <Btn v="glass" style={{ marginTop: 14 }} disabled={cargando} onClick={() => accion(() => bajarse(gid, partido, uid))}><Icono n="check" />Estás anotado · Me bajo</Btn>
                 : enEspera >= 0
                   ? <Btn v="glass" style={{ marginTop: 14 }} disabled={cargando} onClick={() => accion(() => bajarse(gid, partido, uid))}>En lista de espera (puesto {enEspera + 1}) · Salir</Btn>
-                  : <Btn v="white" style={{ marginTop: 14 }} disabled={cargando} onClick={() => accion(() => anotarse(gid, partido, uid))}>{lleno ? 'Sumarme a la lista de espera' : 'Anotarme'}</Btn>}
+                  : <Btn v="white" style={{ marginTop: 14 }} disabled={cargando} onClick={() => accion(async () => { await anotarse(gid, partido, uid); toast(lleno ? 'Quedaste en la lista de espera.' : `¡Anotado! Nos vemos el ${diaSemana(d)}.`); })}>{lleno ? 'Sumarme a la lista de espera' : 'Me anoto'}</Btn>}
             </>
           )}
         </section>

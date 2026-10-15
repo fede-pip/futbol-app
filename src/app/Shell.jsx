@@ -1,4 +1,4 @@
-import { Icono, Marca } from '../components/ui.jsx';
+import { Icono, Lockup, Marca } from '../components/ui.jsx';
 import { useSesion } from './sesion.jsx';
 import { useNav } from './nav.jsx';
 
@@ -12,7 +12,7 @@ export function BarraSuperior({ titulo, atras, onAtras }) {
     <div className="bar-top">
       {atras
         ? <button className="back" onClick={onAtras}><Icono n="back" />{atras === true ? 'Volver' : atras}</button>
-        : <div className="brand"><Marca />{titulo || 'Me Anoto'}</div>}
+        : titulo ? <div className="brand"><Marca />{titulo}</div> : <Lockup />}
       <div className="row" style={{ gap: 8 }}>
         <button className="iconbtn" onClick={() => ir('avisos')} aria-label={sinLeer ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}>
           <Icono n="bell" />{sinLeer ? <span className="dot" /> : null}

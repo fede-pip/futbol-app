@@ -6,8 +6,8 @@ import {
   agregarInvitado, anotarse, bajarse, cancelarPartido, crearPartido, editarPartido, quitarInscripto, salirCena, sumarseCena
 } from '../data/acciones.js';
 import { FORMATOS } from '../lib/logica.js';
-import { aFecha, aInputFecha, diaLargo, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
-import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Icono, Meter, Pill, Vacio } from '../components/ui.jsx';
+import { aFecha, aInputFecha, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
+import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
@@ -53,6 +53,7 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
 
 function Inscripcion() {
   const { uid, gid, partido: p, jugadores, esAdmin } = useSesion();
+  const toast = useToast();
   const registrados = useColl(collection(db, `grupos/${gid}/invitados`), gid) || [];
   const [error, setError] = useState('');
   const [editando, setEditando] = useState(false);
@@ -112,10 +113,10 @@ function Inscripcion() {
       </Card>
 
       {anotado
-        ? <Btn disabled={cargando} onClick={() => ejecutar(() => bajarse(gid, p, uid))}>Desanotarme</Btn>
+        ? <Btn disabled={cargando} onClick={() => ejecutar(() => bajarse(gid, p, uid))}>Me bajo</Btn>
         : enEspera >= 0
           ? <Btn disabled={cargando} onClick={() => ejecutar(() => bajarse(gid, p, uid))}>Salir de la lista de espera (puesto {enEspera + 1})</Btn>
-          : <Btn v="pri" disabled={cargando} onClick={() => ejecutar(() => anotarse(gid, p, uid))}>{lleno ? 'Sumarme a la lista de espera' : 'Anotarme'}</Btn>}
+          : <Btn v="pri" disabled={cargando} onClick={() => ejecutar(async () => { await anotarse(gid, p, uid); toast(lleno ? 'Quedaste en la lista de espera.' : `¡Anotado! Nos vemos el ${diaSemana(d)}.`); })}>{lleno ? 'Sumarme a la lista de espera' : 'Me anoto'}</Btn>}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {espera.length ? <Card><Fila icono="clock" titulo={`Lista de espera: ${espera.length}`} sub="Si alguien se baja, sube el primero y le avisamos." /></Card> : null}
 
