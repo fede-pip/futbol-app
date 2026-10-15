@@ -34,7 +34,7 @@ function Portada({ onEmpezar, onSaltar }) {
   return (
     <div className="portada">
       <div className="portada-centro">
-        <Marca px={112} />
+        <Marca px={156} />
         <h1 className="portada-nombre">me anoto</h1>
         <p className="portada-lema">El partido de todas las semanas, sin vueltas.</p>
       </div>

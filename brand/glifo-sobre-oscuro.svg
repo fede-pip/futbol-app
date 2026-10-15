@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Me Anoto"><g transform="translate(-20 15)">
-    <path d="M146 276 L226 352 L352 196" fill="none" stroke="#ffffff" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="388" cy="148" r="64" fill="#ffffff"/>
-    <circle cx="388" cy="148" r="58" fill="#8be05a"/>
-    <g stroke="#073722" stroke-width="5" stroke-linecap="round"><line x1="388.0" y1="127.0" x2="388.0" y2="98.0"/><line x1="408.0" y1="141.5" x2="435.6" y2="132.5"/><line x1="400.3" y1="165.0" x2="417.4" y2="188.5"/><line x1="375.7" y1="165.0" x2="358.6" y2="188.5"/><line x1="368.0" y1="141.5" x2="340.4" y2="132.5"/></g>
-    <polygon points="388.0,127.0 408.0,141.5 400.3,165.0 375.7,165.0 368.0,141.5" fill="#073722" stroke="#073722" stroke-width="3" stroke-linejoin="round"/>
-  </g></svg>

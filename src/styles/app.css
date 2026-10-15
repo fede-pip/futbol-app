@@ -3,7 +3,7 @@
    leer bien. Neutros con matiz verde. Los estados (ok, aviso, error, info) conservan su significado. */
 :root {
   --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
-  --font-marca:'Bricolage Grotesque','Inter',system-ui,sans-serif;
+  --font-marca:'Graduate','Inter',system-ui,sans-serif;
   --bg:#f1f6f2; --card:#ffffff; --surface-2:#f7faf7; --surface-3:#eaf1eb;
   --line:#e0e9e2; --line-2:#cfdbd2; --line-3:#bccac0;
   --text:#10211a; --text-2:#4a5d53; --text-3:#78897f;
@@ -164,7 +164,7 @@ button.todo-r:hover { background:var(--surface-2); }
 /* resultado */
 .score { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; padding:16px; }
 .score .side { display:flex; flex-direction:column; align-items:center; gap:10px; }
-.score .n { font-size:56px; font-weight:650; line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.score .n { font-size:56px; font-weight:400; line-height:1; letter-spacing:0; font-variant-numeric:tabular-nums; }
 .round { width:44px; height:44px; border-radius:50%; background:var(--surface-3); border:1px solid var(--line-2); display:grid; place-items:center; color:var(--text); }
 .round.pl { background:linear-gradient(180deg,var(--primary-l),var(--primary)); border-color:var(--primary-d); color:var(--on-primary); }
 .stepper { display:flex; align-items:center; gap:10px; }
@@ -214,7 +214,7 @@ button.todo-r:hover { background:var(--surface-2); }
 .choice span { color:var(--text-2); font-size:13px; }
 .sep { display:flex; align-items:center; gap:10px; color:var(--text-3); font-size:12px; }
 .sep::before, .sep::after { content:""; flex:1; height:1px; background:var(--line); }
-.code { font-size:34px; font-weight:650; letter-spacing:.08em; font-variant-numeric:tabular-nums; }
+.code { font-size:34px; font-weight:400; letter-spacing:.08em; font-variant-numeric:tabular-nums; }
 .n-step { width:28px; height:28px; border-radius:50%; background:var(--tint-2); color:var(--primary); display:grid; place-items:center; font-weight:700; font-size:13px; flex:none; }
 .toast { position:absolute; left:16px; right:16px; bottom:76px; background:var(--night); color:#fff; border-radius:var(--r-md); padding:12px 14px; font-weight:550; font-size:13.5px; box-shadow:var(--shadow-md); }
 .mini { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; }
@@ -278,18 +278,18 @@ button.todo-r:hover { background:var(--surface-2); }
 input[type="date"], input[type="time"] { appearance:none; -webkit-appearance:none; text-align:left; }
 
 /* ---------- Marca: me anoto ---------- */
-.wordmark { font-family:var(--font-marca); font-weight:800; font-size:21px; letter-spacing:-.03em; line-height:1; text-transform:lowercase; font-optical-sizing:auto; }
+.wordmark { font-family:var(--font-marca); font-weight:400; font-size:19px; letter-spacing:.06em; line-height:1; text-transform:uppercase; }
 .brand .wordmark { color:var(--text); }
-.kpi .v, .score .n, .code, .kp .v, .num-marca { font-family:var(--font-marca); }
-.kpi .v { font-weight:800; letter-spacing:-.035em; }
+.kpi .v, .score .n, .code, .kp .v, .num-marca { font-family:var(--font-marca); font-weight:400; }
+.kpi .v { font-weight:400; letter-spacing:0; }
 .portada { flex:1; min-height:100dvh; display:flex; flex-direction:column; justify-content:space-between; gap:24px; padding:max(48px, env(safe-area-inset-top, 0px)) 22px max(26px, env(safe-area-inset-bottom, 0px)); color:#fff; position:relative; overflow:hidden;
   background:linear-gradient(160deg,var(--turf-1,#17a062) 0%,#0f7a4a 36%,#0a4f31 76%,#073722 100%); }
 .portada::before { content:""; position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(90deg,rgba(255,255,255,.055) 0 36px,rgba(0,0,0,.06) 36px 72px); }
 .portada::after { content:""; position:absolute; left:50%; top:46%; width:150%; aspect-ratio:1; transform:translate(-50%,-50%); border:6px solid rgba(255,255,255,.10); border-radius:50%; pointer-events:none; }
 .portada > * { position:relative; z-index:1; }
 .portada-centro { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; }
-.portada-centro .mark { border-radius:30px; box-shadow:0 18px 40px rgba(0,0,0,.28); }
-.portada-nombre { font-family:var(--font-marca); font-weight:800; font-size:clamp(44px, 15vw, 64px); letter-spacing:-.04em; line-height:.95; margin:0; text-transform:lowercase; }
+.portada-centro .mark { border-radius:30%; box-shadow:0 18px 40px rgba(0,0,0,.28); }
+.portada-nombre { font-family:var(--font-marca); font-weight:400; font-size:clamp(38px, 12vw, 54px); letter-spacing:.06em; line-height:1; margin:0; text-transform:uppercase; }
 .portada-lema { font-size:17px; color:#c9f0dc; max-width:20ch; text-wrap:balance; }
 .portada-botones { display:flex; flex-direction:column; gap:10px; }
 @media (prefers-reduced-motion:no-preference) { .portada-centro .mark { animation:flota 4s ease-in-out infinite; } @keyframes flota { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } } }
