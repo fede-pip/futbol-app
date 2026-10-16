@@ -146,7 +146,7 @@ export function PreguntaAnterior({ onListo, onDni }) {
 }
 
 // ---- Crear un grupo o unirse con un código ----
-export function GrupoElegir({ onListo, uid, superAdmin, onAnterior }) {
+export function GrupoElegir({ onListo, uid, superAdmin, onAnterior, onVolver }) {
   const [modo, setModo] = useState(null); // 'crear' | 'unirse'
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
@@ -172,8 +172,8 @@ export function GrupoElegir({ onListo, uid, superAdmin, onAnterior }) {
 
   return (
     <div className="scr" style={{ flex: 1 }}>
-      <div className="bar-top"><Lockup /></div>
-      <div><h2 className="t">¿Con quién jugás?</h2><p className="lead" style={{ marginTop: 4 }}>Un grupo es la gente con la que armás el partido todas las semanas.</p></div>
+      <div className="bar-top">{onVolver ? <button type="button" className="back" onClick={onVolver}><Icono n="back" />Volver</button> : <Lockup />}</div>
+      <div><h2 className="t">{onVolver ? 'Sumar otro grupo' : '¿Con quién jugás?'}</h2><p className="lead" style={{ marginTop: 4 }}>{onVolver ? 'Podés estar en todos los grupos que quieras y cambiar de uno a otro cuando quieras.' : 'Un grupo es la gente con la que armás el partido todas las semanas.'}</p></div>
       {modo === null ? (
         <>
           <button className="choice" onClick={() => setModo('crear')}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Crear un grupo</b><span>Sos el admin y después compartís un código por WhatsApp.</span></div><Icono n="chev" /></button>

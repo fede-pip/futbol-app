@@ -49,7 +49,7 @@ export default function Inicio() {
           <select className="select" style={{ width: 'auto', minHeight: 36, fontSize: 14 }} value={gid} onChange={e => elegirGrupo(e.target.value)} aria-label="Cambiar de grupo">
             {grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
           </select>
-        ) : null}
+        ) : <button className="chip sm" onClick={() => ir('grupo')}>+ Otro grupo</button>}
       </div>
       <div>
         <h2 className="t">Hola, {(perfil.apodo || perfil.nombre).split(' ')[0]}</h2>

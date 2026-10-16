@@ -7,6 +7,7 @@ import { Avatar, Btn, Card, CardB, Fila, Icono, Pill } from '../components/ui.js
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
+import { GrupoElegir } from './Inicio1.jsx';
 import { useToast } from '../components/ui.jsx';
 
 function EditorNiveles({ gid, id, nombre, onCerrar }) {
@@ -36,7 +37,7 @@ function EditorNiveles({ gid, id, nombre, onCerrar }) {
 }
 
 export default function Grupo() {
-  const { uid, gid, grupo, jugadores, esAdmin, esCreador } = useSesion();
+  const { uid, gid, grupo, grupos, elegirGrupo, jugadores, esAdmin, esCreador } = useSesion();
   const { ir } = useNav();
   const toast = useToast();
   const [abierto, setAbierto] = useState(null);   // id con panel abierto
@@ -46,6 +47,7 @@ export default function Grupo() {
   const [precio, setPrecio] = useState(grupo.precioCancha || 0);
   const [error, setError] = useState('');
   const [confirmaSalir, setConfirmaSalir] = useState(false);
+  const [sumando, setSumando] = useState(false);
 
   async function ejecutar(fn, ok) { setError(''); try { await fn(); if (ok) toast(ok); } catch (e) { setError(mensajeError(e)); } }
   const copiar = async () => {
@@ -56,9 +58,21 @@ export default function Grupo() {
     ['Admin', 'Admin', ['Crear el partido', 'Armar y publicar los equipos', 'Cargar resultado y goles', 'Cerrar la votación', 'Editar los avisos del grupo']],
     ['Creador', 'Creador', ['Todo lo del admin', 'Nombrar o quitar admins']]];
 
+  if (sumando) return <GrupoElegir uid={uid} onVolver={() => setSumando(false)} onListo={id => { elegirGrupo(id); setSumando(false); ir('inicio'); }} />;
+
   return (
     <div className="scr">
       <BarraSuperior titulo="Grupo" />
+      <div>
+        <h3 className="t" style={{ marginBottom: 8 }}>Mis grupos</h3>
+        <Card>
+          {grupos.map(g => (
+            <Fila key={g.id} icono={g.id === gid ? 'check' : 'users'} hecho={g.id === gid} titulo={g.nombre} sub={g.id === gid ? 'Es el que estás viendo' : 'Tocá para verlo'}
+              onClick={g.id === gid ? undefined : () => { elegirGrupo(g.id); toast(`Ahora ves ${g.nombre}`); }} derecha={g.id === gid ? <Pill t="tint">Actual</Pill> : <Icono n="chev" />} />
+          ))}
+        </Card>
+        <button className="choice" style={{ marginTop: 10 }} onClick={() => setSumando(true)}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Sumar otro grupo</b><span>Unirte con un código o crear uno nuevo.</span></div><Icono n="chev" /></button>
+      </div>
       <section className="kpi pitch">
         <div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div>
         <div className="s"><span>{grupo.miembros.length} jugadores</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}</div>

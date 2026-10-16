@@ -27,6 +27,9 @@ export default function Stats() {
       <div className="seg" role="group" aria-label="Ver">
         {[['puntos', 'Puntos'], ['goles', 'Goles'], ['partidos', 'Partidos']].map(([k, t]) => <button key={k} aria-pressed={vista === k} onClick={() => setVista(k)} style={{ minHeight: 40 }}>{t}</button>)}
       </div>
+      {vista !== 'partidos' && hayDatos ? (
+        <Hint><b>Cómo leer la tabla.</b> Ganar suma 3 puntos y empatar 1. A la derecha, los últimos 5 partidos: <span className="racha" style={{ display: 'inline-flex', verticalAlign: 'middle' }}><b className="G">G</b></span> ganó, <span className="racha" style={{ display: 'inline-flex', verticalAlign: 'middle' }}><b className="E">E</b></span> empató y <span className="racha" style={{ display: 'inline-flex', verticalAlign: 'middle' }}><b className="P">P</b></span> perdió. El número final es {vista === 'goles' ? 'los goles' : 'los puntos'} de la temporada.</Hint>
+      ) : null}
       {mvp && vista !== 'partidos' ? (
         <CardB className="row"><span className="ti" style={{ width: 40, height: 40, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'var(--warn-bg)', color: 'var(--warn)', flex: 'none' }}><Icono n="star" /></span>
           <div className="grow"><b>MVP del último partido</b><div className="muted">{nombreDe(mvp, jugadores, cerrados[0])}</div></div></CardB>
@@ -62,7 +65,6 @@ export default function Stats() {
               </div>
             ))}
           </Card>
-          <Hint><b>Cómo leer la racha.</b> <span className="racha" style={{ display: 'inline-flex', verticalAlign: 'middle' }}><b className="G">G</b></span> ganó, <span className="racha" style={{ display: 'inline-flex', verticalAlign: 'middle' }}><b className="E">E</b></span> empató y <span className="racha" style={{ display: 'inline-flex', verticalAlign: 'middle' }}><b className="P">P</b></span> perdió. Ganar suma 3 puntos y empatar 1.</Hint>
         </>
       )}
     </div>
