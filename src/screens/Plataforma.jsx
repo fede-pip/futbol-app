@@ -17,7 +17,7 @@ function AyudaAcceso() {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const lista = Object.entries(jugadores || {}).filter(([id, j]) => !id.startsWith('l_') && j.nombre && (!q.trim() || norm(j.nombre + ' ' + (j.apodo || '')).includes(norm(q)))).slice(0, 8);
+  const lista = Object.entries(jugadores || {}).filter(([id, j]) => !id.startsWith('l_') && j.nombre && (!q.trim() || norm(j.nombre + ' ' + (j.apodo || '')).includes(norm(q)))).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre)).slice(0, 60);
   async function generar(id, nombre) {
     setError(''); setRes(null); setCargando(true);
     try { const r = await llamar('enlaceDeAcceso', { uid: id }); setRes({ ...r, nombre }); } catch (e) { setError(mensajeError(e)); }
@@ -29,7 +29,8 @@ function AyudaAcceso() {
       <h3 className="t">Ayudar a alguien a entrar</h3>
       <p className="muted">Buscá a la persona y generá un enlace para que elija una contraseña nueva, sin esperar el mail. Mandáselo solo a ella por WhatsApp.</p>
       <div className="field"><label htmlFor="ayuda-q">Nombre</label><input id="ayuda-q" value={q} onChange={e => { setQ(e.target.value); setRes(null); }} placeholder="Nico" autoComplete="off" /></div>
-      {q.trim() ? lista.map(([id, j]) => <Fila key={id} icono="user" titulo={j.nombre} sub={j.apodo || ''} onClick={() => generar(id, j.nombre)} derecha={<Pill t="tint">Generar enlace</Pill>} />) : null}
+      {lista.length === 0 ? <p className="small">{Object.keys(jugadores || {}).length ? 'No encontramos a nadie con ese nombre en el grupo que estás viendo.' : 'No hay jugadores para mostrar: elegí un grupo en Inicio y volvé acá.'}</p> : null}
+      {lista.map(([id, j]) => <Fila key={id} icono="user" titulo={j.nombre} sub={j.apodo || ''} onClick={() => generar(id, j.nombre)} derecha={<Pill t="tint">Generar enlace</Pill>} />)}
       {cargando ? <p className="small">Generando…</p> : null}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {res ? (
