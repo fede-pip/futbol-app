@@ -303,3 +303,10 @@ input[type="date"], input[type="time"] { appearance:none; -webkit-appearance:non
 .lugar-lista li span { font-size:12.5px; color:var(--text-2); }
 .lugar-lista .lugar-google { min-height:0; padding:4px 10px; font-size:11px; color:var(--text-3); cursor:default; background:none !important; text-align:right; }
 .link { color:var(--primary); font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+
+/* ---------- Partido en vivo ---------- */
+.vivo-jug { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:56px; padding:8px 12px; border-radius:var(--r-md); border:1px solid var(--line-2); background:var(--card); font:inherit; font-weight:600; font-size:15px; color:var(--text); text-align:left; cursor:pointer; box-shadow:var(--shadow-xs); }
+.vivo-jug:active { background:var(--tint-2); transform:scale(.98); }
+.vivo-jug:disabled { opacity:.6; }
+.vivo-jug .nom { overflow-wrap:anywhere; }
+.vivo-jug .cnt { font-size:13px; color:var(--primary); font-weight:650; white-space:nowrap; }

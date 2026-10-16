@@ -15,6 +15,7 @@ import CampoLugar from '../components/CampoLugar.jsx';
 import { urlMapa } from '../lib/mapas.js';
 import Equipos from './Equipos.jsx';
 import Goles from './Goles.jsx';
+import EnVivo from './EnVivo.jsx';
 import Votacion from './Votacion.jsx';
 
 function proximoLunes() {
@@ -169,6 +170,7 @@ export default function Partido() {
   const tabs = [
     { id: 'inscripcion', label: 'Inscripción' },
     { id: 'equipos', label: 'Equipos' },
+    ...(partido && partido.estado === 'abierto' ? [{ id: 'vivo', label: 'En vivo', badge: partido.vivo ? '●' : '' }] : []),
     ...(esAdmin ? [{ id: 'goles', label: 'Goles' }] : []),
     { id: 'votar', label: 'Votación', badge: votando ? '!' : '' }
   ];
@@ -176,7 +178,7 @@ export default function Partido() {
     <div className="scr">
       <BarraSuperior titulo="Partido" />
       {partido ? <HbTabs items={tabs} cur={tab} onSel={t => ir('partido', t)} /> : null}
-      {tab === 'equipos' && partido ? <Equipos /> : tab === 'goles' && partido && esAdmin ? <Goles /> : tab === 'votar' && partido ? <Votacion /> : <Inscripcion />}
+      {tab === 'equipos' && partido ? <Equipos /> : tab === 'vivo' && partido && partido.estado === 'abierto' ? <EnVivo /> : tab === 'goles' && partido && esAdmin ? <Goles /> : tab === 'votar' && partido ? <Votacion /> : <Inscripcion />}
     </div>
   );
 }

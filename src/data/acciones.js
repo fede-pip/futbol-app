@@ -2,7 +2,7 @@
 import {
   arrayRemove, arrayUnion, collection, deleteField, doc, getDoc, setDoc, Timestamp, updateDoc, writeBatch
 } from 'firebase/firestore';
-import { db } from '../lib/firebase.js';
+import { db, llamar } from '../lib/firebase.js';
 import { asignarVotaciones, uid as nuevoId } from '../lib/logica.js';
 
 const refGrupo = gid => doc(db, 'grupos', gid);
@@ -89,3 +89,10 @@ export async function marcarTodosLeidos(uid, avisos) {
 }
 export async function existeInvitado(gid, id) { return (await getDoc(doc(db, `grupos/${gid}/invitados/${id}`))).exists(); }
 export const borrarEquipos = (gid, p) => updateDoc(refPartido(gid, p.id), { equipos: null });
+
+// ---- Partido en vivo: una persona carga los goles (todo pasa por el servidor) ----
+const idOperacion = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 24) : Math.random().toString(36).slice(2) + Date.now().toString(36));
+export const tomarEnVivo = (gid, pid, forzar = false) => llamar('tomarEnVivo', { gid, pid, forzar });
+export const soltarEnVivo = (gid, pid) => llamar('soltarEnVivo', { gid, pid });
+export const registrarGol = (gid, pid, jugadorId, enContra = false) => llamar('registrarGol', { gid, pid, jugadorId, enContra, opId: idOperacion() });
+export const deshacerGol = (gid, pid) => llamar('deshacerGol', { gid, pid });

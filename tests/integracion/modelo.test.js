@@ -203,6 +203,63 @@ describe('avisos: bandeja y servidor', () => {
   });
 });
 
+describe('partido en vivo', () => {
+  let vid;
+  const op = () => 'op' + Math.random().toString(36).slice(2, 12);
+  it('prepara un partido con equipos', async () => {
+    vid = 'v-' + corrida;
+    await setDoc(doc(A.db, 'grupos', gid, 'partidos', vid), { ...partidoBase(), fechaHora: Timestamp.fromMillis(Date.now() + 3600e3),
+      inscriptos: [A.uid, B.uid, 'inv_v1', 'inv_v2'], equipos: { oscuro: [A.uid, 'inv_v1'], blanco: [B.uid, 'inv_v2'], publicado: true } });
+  });
+  it('quien no es del grupo no puede tomar la carga', async () => {
+    await falla(C.call('tomarEnVivo', { gid, pid: vid }), 'permission-denied');
+  });
+  it('el primero que la toma queda como cargador y otro no puede pisarlo', async () => {
+    await B.call('tomarEnVivo', { gid, pid: vid });
+    const v = (await getDoc(doc(A.db, 'grupos', gid, 'partidos', vid))).data().vivo;
+    expect(v.uid).toBe(B.uid);
+    await falla(A.call('registrarGol', { gid, pid: vid, jugadorId: A.uid, opId: op() }), 'permission-denied');
+  });
+  it('los goles suman al marcador y al jugador; el reintento no duplica', async () => {
+    const o1 = op();
+    await B.call('registrarGol', { gid, pid: vid, jugadorId: A.uid, opId: o1 });
+    const r = await B.call('registrarGol', { gid, pid: vid, jugadorId: A.uid, opId: o1 });
+    expect(r.repetido).toBe(true);
+    await B.call('registrarGol', { gid, pid: vid, jugadorId: 'inv_v2', opId: op() });
+    const p = (await getDoc(doc(A.db, 'grupos', gid, 'partidos', vid))).data();
+    expect(p.marcador).toEqual({ oscuro: 1, blanco: 1 });
+    expect(p.eventos[A.uid].goles).toBe(1);
+  });
+  it('un gol en contra suma al rival y no cuenta como gol del jugador', async () => {
+    await B.call('registrarGol', { gid, pid: vid, jugadorId: 'inv_v1', enContra: true, opId: op() });
+    const p = (await getDoc(doc(A.db, 'grupos', gid, 'partidos', vid))).data();
+    expect(p.marcador).toEqual({ oscuro: 1, blanco: 2 });
+    expect(p.eventos.inv_v1.goles || 0).toBe(0);
+    expect(p.eventos.inv_v1.enContra).toBe(1);
+  });
+  it('deshacer revierte el último gol, de a uno', async () => {
+    await B.call('deshacerGol', { gid, pid: vid });
+    const p = (await getDoc(doc(A.db, 'grupos', gid, 'partidos', vid))).data();
+    expect(p.marcador).toEqual({ oscuro: 1, blanco: 1 });
+    expect(p.eventos.inv_v1.enContra).toBe(0);
+  });
+  it('un jugador que no está en el partido no recibe goles', async () => {
+    await falla(B.call('registrarGol', { gid, pid: vid, jugadorId: C.uid, opId: op() }), 'invalid-argument');
+  });
+  it('el cliente no puede escribir el marcador en vivo ni el registro', async () => {
+    await denegado(updateDoc(doc(B.db, 'grupos', gid, 'partidos', vid), { marcador: { oscuro: 9, blanco: 0 } }));
+    await denegado(setDoc(doc(B.db, 'grupos', gid, 'partidos', vid, 'golesVivo', 'x'), { anulado: false }));
+  });
+  it('el admin puede tomar la carga con forzar y el cargador puede soltarla', async () => {
+    await falla(A.call('tomarEnVivo', { gid, pid: vid }), 'failed-precondition');
+    await A.call('tomarEnVivo', { gid, pid: vid, forzar: true });
+    await falla(B.call('soltarEnVivo', { gid, pid: vid }), 'permission-denied').catch(() => {});
+    await A.call('soltarEnVivo', { gid, pid: vid });
+    const p = (await getDoc(doc(A.db, 'grupos', gid, 'partidos', vid))).data();
+    expect(p.vivo).toBeUndefined();
+  });
+});
+
 describe('votación y cierre', () => {
   it('el admin finaliza el partido y abre la votación', async () => {
     await updateDoc(doc(A.db, 'grupos', gid, 'partidos', pid), {
