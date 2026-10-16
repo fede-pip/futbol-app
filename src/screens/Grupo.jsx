@@ -46,6 +46,7 @@ export default function Grupo() {
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState(grupo.nombre);
   const [precio, setPrecio] = useState(grupo.precioCancha || 0);
+  const [pozo, setPozo] = useState(grupo.pozo || 0);
   const [error, setError] = useState('');
   const [confirmaSalir, setConfirmaSalir] = useState(false);
   const [sumando, setSumando] = useState(false);
@@ -79,7 +80,7 @@ export default function Grupo() {
       </div>
       <section className="kpi pitch">
         <div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div>
-        <div className="s"><span>{grupo.miembros.length} jugadores</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}</div>
+        <div className="s"><span>{grupo.miembros.length} jugadores</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}{grupo.pozo ? <span>Pozo: ${grupo.pozo}</span> : null}</div>
         <div className="row" style={{ marginTop: 14, gap: 0 }}>
           {grupo.miembros.slice(0, 6).map((id, i) => <span key={id} style={{ marginLeft: i ? -8 : 0, border: '2px solid #0e4d31', borderRadius: '50%', display: 'inline-flex' }}><Avatar nombre={(jugadores[id] || {}).nombre} foto={(jugadores[id] || {}).foto} /></span>)}
           {grupo.miembros.length > 6 ? <span style={{ marginLeft: 10, fontSize: 13, color: '#c9f0dc' }}>+{grupo.miembros.length - 6}</span> : null}
@@ -102,10 +103,11 @@ export default function Grupo() {
               <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div className="field"><label htmlFor="g-nombre">Nombre del grupo</label><input id="g-nombre" value={nombre} onChange={e => setNombre(e.target.value)} maxLength={60} /></div>
                 <div className="field"><label htmlFor="g-precio">Precio por persona ($)</label><input id="g-precio" type="number" inputMode="numeric" min="0" value={precio} onChange={e => setPrecio(e.target.value)} /></div>
+                <div className="field"><label htmlFor="g-pozo">Pozo acumulado ($)</label><input id="g-pozo" type="number" inputMode="numeric" min="0" value={pozo} onChange={e => setPozo(e.target.value)} /></div>
                 <div className="row"><Btn onClick={() => setEditando(false)}>Cancelar</Btn>
-                  <Btn v="pri" onClick={() => ejecutar(async () => { await actualizarGrupo(gid, { nombre: nombre.trim(), precioCancha: Number(precio) || 0 }); setEditando(false); }, 'Cambios guardados')}>Guardar</Btn></div>
+                  <Btn v="pri" onClick={() => ejecutar(async () => { await actualizarGrupo(gid, { nombre: nombre.trim(), precioCancha: Number(precio) || 0, pozo: Number(pozo) || 0 }); setEditando(false); }, 'Cambios guardados')}>Guardar</Btn></div>
               </div>
-            ) : <Fila icono="edit" titulo="Nombre y precio de la cancha" sub={`${grupo.nombre}${grupo.precioCancha ? ` · $${grupo.precioCancha} por persona` : ''}`} onClick={() => setEditando(true)} derecha={<Icono n="chev" />} />}
+            ) : <Fila icono="edit" titulo="Nombre, precio y pozo" sub={`${grupo.nombre}${grupo.precioCancha ? ` · $${grupo.precioCancha} por persona` : ''}${grupo.pozo ? ` · pozo $${grupo.pozo}` : ''}`} onClick={() => setEditando(true)} derecha={<Icono n="chev" />} />}
           </Card>
         </>
       ) : null}

@@ -17,28 +17,47 @@ function AyudaAcceso() {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const lista = Object.entries(jugadores || {}).filter(([id, j]) => !id.startsWith('l_') && j.nombre && (!q.trim() || norm(j.nombre + ' ' + (j.apodo || '')).includes(norm(q)))).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre)).slice(0, 60);
+  const lista = Object.entries(jugadores || {}).filter(([id, j]) => j.nombre && (!q.trim() || norm(j.nombre + ' ' + (j.apodo || '')).includes(norm(q)))).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre)).slice(0, 60);
+  const dniDe = id => (id.startsWith('l_') ? id.slice(2) : /^d\d+$/.test(id) ? id.slice(1) : '');
   async function generar(id, nombre) {
     setError(''); setRes(null); setCargando(true);
-    try { const r = await llamar('enlaceDeAcceso', { uid: id }); setRes({ ...r, nombre }); } catch (e) { setError(mensajeError(e)); }
+    try {
+      // Quien todavía no pasó a email (no se acuerda de su clave de antes): clave temporal. El resto: enlace para elegir contraseña.
+      if (id.startsWith('l_')) { const r = await llamar('claveTemporalDni', { dni: dniDe(id) }); setRes({ ...r, nombre, temporal: true }); }
+      else {
+        try { const r = await llamar('enlaceDeAcceso', { uid: id }); setRes({ ...r, nombre }); }
+        catch (e) {
+          if (dniDe(id)) { const r = await llamar('claveTemporalDni', { dni: dniDe(id) }); setRes({ ...r, nombre, temporal: true }); } else throw e;
+        }
+      }
+    } catch (e) { setError(mensajeError(e)); }
     setCargando(false);
   }
-  const mensaje = r => `Hola ${r.nombre.split(' ')[0]}! Entrá a este enlace para elegir una contraseña nueva en Me Anoto (es solo para vos): ${r.enlace}`;
+  const mensaje = r => r.temporal ? `Hola ${r.nombre.split(' ')[0]}! Para entrar a Me Anoto: abrí meanoto.com.ar, tocá "Entrar con mi DNI de antes", poné tu DNI y esta clave: ${r.clave}. Después elegí tu email y una contraseña nueva.` : `Hola ${r.nombre.split(' ')[0]}! Entrá a este enlace para elegir una contraseña nueva en Me Anoto (es solo para vos): ${r.enlace}`;
   return (
     <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <h3 className="t">Ayudar a alguien a entrar</h3>
       <p className="muted">Buscá a la persona y generá un enlace para que elija una contraseña nueva, sin esperar el mail. Mandáselo solo a ella por WhatsApp.</p>
       <div className="field"><label htmlFor="ayuda-q">Nombre</label><input id="ayuda-q" value={q} onChange={e => { setQ(e.target.value); setRes(null); }} placeholder="Nico" autoComplete="off" /></div>
       {lista.length === 0 ? <p className="small">{Object.keys(jugadores || {}).length ? 'No encontramos a nadie con ese nombre en el grupo que estás viendo.' : 'No hay jugadores para mostrar: elegí un grupo en Inicio y volvé acá.'}</p> : null}
-      {lista.map(([id, j]) => <Fila key={id} icono="user" titulo={j.nombre} sub={j.apodo || ''} onClick={() => generar(id, j.nombre)} derecha={<Pill t="tint">Generar enlace</Pill>} />)}
+      {lista.map(([id, j]) => <Fila key={id} icono="user" titulo={j.nombre} onClick={() => generar(id, j.nombre)} sub={id.startsWith('l_') ? 'Todavía no entró con su email' : (j.apodo || '')} derecha={<Pill t="tint">{id.startsWith('l_') ? 'Clave temporal' : 'Ayudar a entrar'}</Pill>} />)}
       {cargando ? <p className="small">Generando…</p> : null}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {res ? (
         <div className="confirm">
-          <b>Enlace para {res.nombre}</b>
-          <span className="muted">{res.email}{res.soloGoogle ? ' · Entra con Google: puede usar "Seguir con Google" sin contraseña.' : ''}</span>
+          {res.temporal ? (
+            <>
+              <b>Clave temporal para {res.nombre}: <span className="num" style={{ fontSize: 20 }}>{res.clave}</span></b>
+              <span className="muted">Tiene que entrar a meanoto.com.ar, tocar "Entrar con mi DNI de antes", poner su DNI y esta clave, y después elegir su email y contraseña nueva.</span>
+            </>
+          ) : (
+            <>
+              <b>Enlace para {res.nombre}</b>
+              <span className="muted">{res.email}{res.soloGoogle ? ' · Entra con Google: puede usar "Seguir con Google" sin contraseña.' : ''}</span>
+            </>
+          )}
           <div className="row" style={{ gap: 8 }}>
-            <Btn onClick={async () => { try { await navigator.clipboard.writeText(res.enlace); toast('Enlace copiado'); } catch (e) { toast('No se pudo copiar'); } }}>Copiar</Btn>
+            <Btn onClick={async () => { try { await navigator.clipboard.writeText(res.temporal ? res.clave : res.enlace); toast('Copiado'); } catch (e) { toast('No se pudo copiar'); } }}>Copiar</Btn>
             <Btn v="pri" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(mensaje(res))}`, '_blank', 'noopener')}>WhatsApp</Btn>
           </div>
         </div>
