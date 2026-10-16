@@ -56,7 +56,7 @@ svg.i { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.
 .num { font-variant-numeric:tabular-nums; }
 
 /* ---------- teléfono ---------- */
-.scr { flex:1; min-width:0; padding:14px 16px 22px; display:flex; flex-direction:column; gap:14px; }
+.scr { flex:1; min-width:0; padding:calc(14px + env(safe-area-inset-top, 0px)) 16px 22px; display:flex; flex-direction:column; gap:14px; }
 .scr > * { flex-shrink:0; }
 .bar-top { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:44px; }
 .brand { display:flex; align-items:center; gap:9px; font-weight:650; font-size:16px; letter-spacing:-.02em; }
