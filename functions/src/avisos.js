@@ -11,7 +11,7 @@ export async function enviarPush(ids, titulo, cuerpo, data = {}) {
   const lista = [...new Set((ids || []).filter(Boolean))];
   if (!lista.length) return false;
   let key = '';
-  try { key = ONESIGNAL_API_KEY.value(); } catch (e) { console.warn('push OneSignal: no se pudo leer la clave'); return false; }
+  try { key = String(ONESIGNAL_API_KEY.value() || '').trim(); } catch (e) { console.warn('push OneSignal: no se pudo leer la clave'); return false; }
   if (!key || key === 'pendiente') { console.warn('push OneSignal: falta la clave (ONESIGNAL_API_KEY)'); return false; }
   try {
     const r = await fetch('https://onesignal.com/api/v1/notifications', {
