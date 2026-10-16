@@ -146,7 +146,7 @@ export function PreguntaAnterior({ onListo, onDni }) {
 }
 
 // ---- Crear un grupo o unirse con un código ----
-export function GrupoElegir({ onListo, uid, superAdmin }) {
+export function GrupoElegir({ onListo, uid, superAdmin, onAnterior }) {
   const [modo, setModo] = useState(null); // 'crear' | 'unirse'
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
@@ -178,6 +178,7 @@ export function GrupoElegir({ onListo, uid, superAdmin }) {
         <>
           <button className="choice" onClick={() => setModo('crear')}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Crear un grupo</b><span>Sos el admin y después compartís un código por WhatsApp.</span></div><Icono n="chev" /></button>
           <button className="choice" onClick={() => setModo('unirse')}><span className="ti"><Icono n="key" /></span><div className="grow"><b>Unirme con un código</b><span>Te lo pasa quien armó el grupo.</span></div><Icono n="chev" /></button>
+          {onAnterior ? <button className="choice" onClick={onAnterior}><span className="ti"><Icono n="clock" /></span><div className="grow"><b>Ya jugaba antes</b><span>Recuperá tu historial con tu DNI y tu clave de siempre.</span></div><Icono n="chev" /></button> : null}
           {superAdmin ? <button className="link" onClick={() => { location.hash = '#/plataforma'; }}>Herramientas de la plataforma</button> : null}
         </>
       ) : modo === 'crear' ? (

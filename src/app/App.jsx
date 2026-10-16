@@ -63,7 +63,7 @@ function Contenido() {
     const seguir = () => { setViendoDni(false); marcarOnboarding(s.uid, 'anterior'); };
     return viendoDni ? <MigrarDni onListo={seguir} onOmitir={() => setViendoDni(false)} /> : <PreguntaAnterior onListo={seguir} onDni={() => setViendoDni(true)} />;
   }
-  if (!s.grupos.length) return <GrupoElegir uid={s.uid} superAdmin={esSuper(s.user)} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
+  if (!s.grupos.length) return <GrupoElegir uid={s.uid} superAdmin={esSuper(s.user)} onAnterior={() => setViendoDni(true)} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
   if (!(s.priv && s.priv.onboarding && s.priv.onboarding.avisos)) return <PermisoAvisos uid={s.uid} onListo={() => marcarOnboarding(s.uid, 'avisos')} />;
   return <Rutas />;
 }
