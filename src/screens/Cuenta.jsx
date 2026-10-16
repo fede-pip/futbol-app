@@ -75,7 +75,7 @@ export default function Cuenta({ onAtras }) {
   async function olvide() {
     setError(''); setAviso('');
     if (!email.trim()) return setError('Escribí tu email y tocá de nuevo.');
-    try { await sendPasswordResetEmail(auth, email.trim()); setAviso('Te mandamos un email para elegir una contraseña nueva.'); }
+    try { await sendPasswordResetEmail(auth, email.trim()); setAviso(`Si ${email.trim()} tiene una cuenta, te mandamos un email para elegir una contraseña nueva. Puede tardar unos minutos: revisá también Spam o Promociones. Si entrabas con Google, tocá "Seguir con Google": no usás contraseña.`); }
     catch (e) { setError(mensajeError(e)); }
   }
 
