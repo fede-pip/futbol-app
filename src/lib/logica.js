@@ -167,3 +167,19 @@ export function nuevoAtributo(actual, suma, cant) {
 }
 
 export function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// ---- Invitados guardados: sin duplicados y sin quienes ya son del grupo ----
+const sinTildes = s => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[̀-ͯ]/g, '');
+// registrados: [{id, nombre, nivel}]; nombresDelGrupo: nombres y apodos de los jugadores del grupo.
+// Devuelve { utiles, sobrantes }: se conserva uno por nombre, el resto (y quienes ya juegan en el grupo) sobra.
+export function depurarInvitados(registrados, nombresDelGrupo) {
+  const miembros = new Set((nombresDelGrupo || []).map(sinTildes).filter(Boolean));
+  const vistos = new Set(), utiles = [], sobrantes = [];
+  const orden = [...(registrados || [])].sort((a, b) => sinTildes(a.nombre).localeCompare(sinTildes(b.nombre)) || String(a.id).localeCompare(String(b.id)));
+  for (const r of orden) {
+    const k = sinTildes(r.nombre);
+    if (!k || miembros.has(k) || vistos.has(k)) { sobrantes.push(r); continue; }
+    vistos.add(k); utiles.push(r);
+  }
+  return { utiles, sobrantes };
+}

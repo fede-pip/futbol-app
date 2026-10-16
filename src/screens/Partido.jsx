@@ -5,7 +5,7 @@ import { useColl } from '../data/hooks.js';
 import {
   agregarInvitado, anotarse, bajarse, cancelarPartido, crearPartido, editarPartido, quitarInscripto, salirCena, sumarseCena
 } from '../data/acciones.js';
-import { FORMATOS } from '../lib/logica.js';
+import { FORMATOS, depurarInvitados } from '../lib/logica.js';
 import { aFecha, aInputFecha, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
 import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
@@ -58,7 +58,8 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
 function Inscripcion() {
   const { uid, gid, partido: p, jugadores, esAdmin } = useSesion();
   const toast = useToast();
-  const registrados = useColl(collection(db, `grupos/${gid}/invitados`), gid) || [];
+  const guardados = useColl(collection(db, `grupos/${gid}/invitados`), gid) || [];
+  const registrados = depurarInvitados(guardados, Object.values(jugadores).flatMap(j => [j.nombre, j.apodo])).utiles;
   const [error, setError] = useState('');
   const [editando, setEditando] = useState(false);
   const [confirmaCancelar, setConfirmaCancelar] = useState(false);

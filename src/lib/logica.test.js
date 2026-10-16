@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ATTRS, calcProm, calcPuntos, calcRacha, fmtNombre, balancear,
-  asignarVotaciones, horasRestantes, reemplazarVars, nuevoAtributo,
+  asignarVotaciones, depurarInvitados, horasRestantes, reemplazarVars, nuevoAtributo,
 } from './logica.js';
 
 const attrsTodos = n => Object.fromEntries(ATTRS.map(a => [a.key, n]));
@@ -149,5 +149,21 @@ describe('nuevoAtributo', () => {
   });
   it('sin votos no cambia', () => {
     expect(nuevoAtributo(7, 0, 0)).toBe(7);
+  });
+});
+
+describe('depurarInvitados', () => {
+  const nombres = ['Nico Ferrari', 'Juani'];
+  it('conserva uno por nombre y saca a los que ya son del grupo', () => {
+    const r = depurarInvitados([
+      { id: 'a', nombre: 'Pablo Díaz' }, { id: 'b', nombre: 'pablo diaz ' }, { id: 'c', nombre: 'Nico Ferrari' },
+      { id: 'd', nombre: 'Juani' }, { id: 'e', nombre: 'Agus' }
+    ], nombres);
+    expect(r.utiles.map(x => x.nombre)).toEqual(['Agus', 'Pablo Díaz']);
+    expect(r.sobrantes.map(x => x.id).sort()).toEqual(['b', 'c', 'd']);
+  });
+  it('lista vacía o sin nombres no rompe', () => {
+    expect(depurarInvitados([], [])).toEqual({ utiles: [], sobrantes: [] });
+    expect(depurarInvitados(undefined, undefined)).toEqual({ utiles: [], sobrantes: [] });
   });
 });

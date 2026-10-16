@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
 import { db, llamar, mensajeError } from '../lib/firebase.js';
-import { ATTRS } from '../lib/logica.js';
-import { actualizarGrupo, guardarNiveles, ponerAdmin, quitarMiembro, sacarAdmin } from '../data/acciones.js';
-import { Avatar, Btn, Card, CardB, Fila, Icono, Pill } from '../components/ui.jsx';
+import { ATTRS, depurarInvitados } from '../lib/logica.js';
+import { useColl } from '../data/hooks.js';
+import { actualizarGrupo, borrarInvitados, guardarNiveles, ponerAdmin, quitarMiembro, sacarAdmin } from '../data/acciones.js';
+import { Avatar, Btn, Card, CardB, Fila, Hint, Icono, Pill } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
@@ -48,6 +49,9 @@ export default function Grupo() {
   const [error, setError] = useState('');
   const [confirmaSalir, setConfirmaSalir] = useState(false);
   const [sumando, setSumando] = useState(false);
+  const [limpiando, setLimpiando] = useState(false);
+  const guardados = useColl(esAdmin ? collection(db, `grupos/${gid}/invitados`) : null, gid) || [];
+  const { utiles: invitadosUtiles, sobrantes: invitadosSobrantes } = depurarInvitados(guardados, Object.values(jugadores).flatMap(j => [j.nombre, j.apodo]));
 
   async function ejecutar(fn, ok) { setError(''); try { await fn(); if (ok) toast(ok); } catch (e) { setError(mensajeError(e)); } }
   const copiar = async () => {
@@ -140,6 +144,23 @@ export default function Grupo() {
           })}
         </Card>
       </div>
+
+      {esAdmin && guardados.length ? (
+        <div><h3 className="t" style={{ marginBottom: 8 }}>Invitados guardados</h3>
+          <Card>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span className="muted">{invitadosUtiles.length} {invitadosUtiles.length === 1 ? 'invitado' : 'invitados'} para elegir cuando alguien trae a un amigo.</span>
+              {invitadosSobrantes.length ? (
+                <>
+                  <Hint>Hay {invitadosSobrantes.length} repetidos o que ya juegan en el grupo. Limpiar no cambia ningún partido anterior.</Hint>
+                  <Btn disabled={limpiando} onClick={() => ejecutar(async () => { setLimpiando(true); try { await borrarInvitados(gid, invitadosSobrantes.map(x => x.id)); } finally { setLimpiando(false); } }, 'Lista limpia')}>Limpiar repetidos ({invitadosSobrantes.length})</Btn>
+                </>
+              ) : null}
+              <div className="chips">{invitadosUtiles.map(x => <span key={x.id} className="chip">{x.nombre}<button type="button" aria-label={`Borrar a ${x.nombre} de la lista`} style={{ border: 0, background: 'none', marginLeft: 6, cursor: 'pointer', color: 'var(--text-3)', font: 'inherit' }} onClick={() => ejecutar(() => borrarInvitados(gid, [x.id]), 'Invitado borrado')}>×</button></span>)}</div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       <div><h3 className="t" style={{ marginBottom: 8 }}>Qué puede hacer cada uno</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

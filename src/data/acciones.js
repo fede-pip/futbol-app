@@ -31,6 +31,15 @@ export async function agregarInvitado(gid, p, { nombre, nivel, registrados }) {
   return id;
 }
 
+// Borra invitados guardados (los partidos anteriores conservan su nombre y nivel).
+export async function borrarInvitados(gid, ids) {
+  for (let i = 0; i < ids.length; i += 400) {
+    const b = writeBatch(db);
+    ids.slice(i, i + 400).forEach(id => b.delete(doc(db, `grupos/${gid}/invitados/${id}`)));
+    await b.commit();
+  }
+}
+
 // ---- Partido (admin) ----
 const datosLugar = geo => (geo && geo.lugarId ? { lugarId: geo.lugarId, lat: geo.lat, lng: geo.lng } : { lugarId: deleteField(), lat: deleteField(), lng: deleteField() });
 export async function crearPartido(gid, { fecha, hora, lugar, formato, cupo, geo }) {
