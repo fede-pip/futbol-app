@@ -66,7 +66,7 @@ export async function entregar(gid, g, { tipo, titulo, cuerpo, uids, ctx = {}, c
     ? horaAhora >= silencio.desde || horaAhora < silencio.hasta
     : horaAhora >= silencio.desde && horaAhora < silencio.hasta);
   const cat = categoriaDe(tipo);
-  let enviados = 0, conPush = 0;
+  let enviados = 0, conPush = 0, sinDispositivo = 0, porPreferencias = 0;
 
   await Promise.all(uids.map(async uid => {
     const [perfil, priv] = await Promise.all([db.doc(`usuarios/${uid}`).get(), db.doc(`privado/${uid}`).get()]);
@@ -93,16 +93,18 @@ export async function entregar(gid, g, { tipo, titulo, cuerpo, uids, ctx = {}, c
     enviados++;
 
     const prefs = priv.data()?.prefs || {};
-    if (!critico && cat && prefs[cat] === false) return;
-    if (!critico && prefs.silencio !== false && enSilencio) return;
+    if (!critico && cat && prefs[cat] === false) { porPreferencias++; return; }
+    if (!critico && prefs.silencio !== false && enSilencio) { porPreferencias++; return; }
     if (!critico) {
       const hoy = await db.collection(`privado/${uid}/avisos`).where('creadoEn', '>=', Timestamp.fromDate(inicioDia)).count().get();
       if (hoy.data().count > maxDia) return;
     }
     const ids = (priv.data()?.dispositivos || []).map(d => d.id).filter(Boolean);
+    if (!ids.length) sinDispositivo++;
     if (ids.length && await enviarPush(ids, t, c, { tipo, gid, pid: p.id || null })) conPush++;
   }));
 
+  console.log(`entregar ${tipo}: destinatarios=${uids.length} enBandeja=${enviados} sinDispositivo=${sinDispositivo} sinPushPorPreferencias=${porPreferencias} push=${conPush}`);
   if (enviados) {
     await db.collection(`grupos/${gid}/avisosHistorial`).add({
       tipo, titulo: llenar(titulo, ctx.vars || {}, true).replace(/\s+/g, ' ').trim(), n: enviados, conPush,
