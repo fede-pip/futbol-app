@@ -127,7 +127,7 @@ export function PreguntaAnterior({ onListo, onDni }) {
   if (hallada.encontrada) return (
     <div className="scr" style={{ flex: 1 }}>
       <div className="bar-top"><Lockup /></div>
-      <div><h2 className="t">Encontramos tu cuenta</h2><p className="lead" style={{ marginTop: 4 }}>Ya jugabas en App8 y tu Google estaba vinculado.</p></div>
+      <div><h2 className="t">Encontramos tu cuenta</h2><p className="lead" style={{ marginTop: 4 }}>Ya jugabas antes y tu Google estaba vinculado.</p></div>
       <Card><Fila icono="user" titulo={hallada.nombre} sub={`DNI ${hallada.dniParcial}`} /></Card>
       {error ? <div className="error" role="alert">{error}</div> : null}
       <Btn v="pri" disabled={cargando} onClick={confirmar}>{cargando ? 'Recuperando…' : 'Sí, soy yo: recuperar mi historial'}</Btn>
@@ -138,7 +138,7 @@ export function PreguntaAnterior({ onListo, onDni }) {
   return (
     <div className="scr" style={{ flex: 1 }}>
       <div className="bar-top"><Lockup /></div>
-      <div><h2 className="t">¿Ya jugabas en App8?</h2><p className="lead" style={{ marginTop: 4 }}>Si jugabas antes con tu DNI, recuperá tus partidos, goles y MVP. Si sos nuevo, seguí.</p></div>
+      <div><h2 className="t">¿Ya jugabas antes?</h2><p className="lead" style={{ marginTop: 4 }}>Si jugabas antes con tu DNI, recuperá tus partidos, goles y MVP. Si sos nuevo, seguí.</p></div>
       <button className="choice" onClick={onDni}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Sí, jugaba con mi DNI</b><span>Ponés tu DNI y tu clave de antes y recuperás todo.</span></div><Icono n="chev" /></button>
       <button className="choice" onClick={onListo}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>No, soy nuevo</b><span>Seguimos con tu cuenta nueva.</span></div><Icono n="chev" /></button>
     </div>
