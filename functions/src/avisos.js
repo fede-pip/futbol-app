@@ -11,8 +11,8 @@ export async function enviarPush(ids, titulo, cuerpo, data = {}) {
   const lista = [...new Set((ids || []).filter(Boolean))];
   if (!lista.length) return false;
   let key = '';
-  try { key = ONESIGNAL_API_KEY.value(); } catch (e) { return false; }
-  if (!key || key === 'pendiente') return false;
+  try { key = ONESIGNAL_API_KEY.value(); } catch (e) { console.warn('push OneSignal: no se pudo leer la clave'); return false; }
+  if (!key || key === 'pendiente') { console.warn('push OneSignal: falta la clave (ONESIGNAL_API_KEY)'); return false; }
   try {
     const r = await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
@@ -22,8 +22,11 @@ export async function enviarPush(ids, titulo, cuerpo, data = {}) {
         headings: { en: titulo, es: titulo }, contents: { en: cuerpo, es: cuerpo }, data, url: URL_APP
       })
     });
+    const cuerpoRta = await r.text().catch(() => '');
+    // Se registra el resultado para poder ver por qué no llega un push (clave inválida, dispositivos sin suscripción, etc.).
+    console.log(`push OneSignal: ${r.status} destinos=${lista.length} ${cuerpoRta.slice(0, 300)}`);
     return r.ok;
-  } catch (e) { return false; }
+  } catch (e) { console.warn(`push OneSignal: falló la llamada: ${e.message}`); return false; }
 }
 
 // ---- Quiénes reciben un aviso ----

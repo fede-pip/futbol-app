@@ -1,17 +1,33 @@
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { urlMapa } from '../lib/mapas.js';
+import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
 import { useState } from 'react';
 import { db } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
 import { anotarse, bajarse } from '../data/acciones.js';
 import { aFecha, diaSemana, faltan, titulo as tituloFecha, diaCorto } from '../lib/fechas.js';
-import { Btn, Card, CardB, Fila, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
+import { Btn, Card, CardB, Fila, Hint, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
 import { mensajeError } from '../lib/firebase.js';
 
 const iniciales = n => (n || '').split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+
+// Si este dispositivo no recibe avisos (permiso sin dar, bloqueado o iPhone sin instalar), se explica y se ofrece activarlos.
+function BannerAvisos() {
+  const { uid } = useSesion();
+  const [permiso, setPermiso] = useState(estadoPermiso());
+  const [fallo, setFallo] = useState(false);
+  if (permiso === 'granted' || permiso === 'unsupported') return null;
+  if (esIPhone() && !esAppInstalada()) return <Hint icono="bell"><b>Para recibir avisos en iPhone,</b> abrí Me Anoto en Safari, tocá compartir y elegí "Agregar a pantalla de inicio". Después abrila desde el ícono.</Hint>;
+  if (permiso === 'denied') return <Hint icono="bell"><b>Bloqueaste los avisos.</b> Para recibirlos, activalos en los ajustes del navegador o de la app para este sitio.</Hint>;
+  return (
+    <Hint icono="bell" accion={<button className="chip on" onClick={async () => { const r = await activarPush(uid); setPermiso(estadoPermiso()); setFallo(!r.ok); }}>Activar</button>}>
+      <b>Activá los avisos</b> para enterarte de los partidos, los equipos y los lugares que se liberan.{fallo ? ' No pudimos activarlos: probá de nuevo.' : ''}
+    </Hint>
+  );
+}
 
 export default function Inicio() {
   const { uid, perfil, grupo, grupos, gid, elegirGrupo, partido, jugadores, esAdmin } = useSesion();
@@ -51,6 +67,7 @@ export default function Inicio() {
           </select>
         ) : <button className="chip sm" onClick={() => ir('grupo')}>+ Otro grupo</button>}
       </div>
+      <BannerAvisos />
       <div>
         <h2 className="t">Hola, {(perfil.apodo || perfil.nombre).split(' ')[0]}</h2>
         <p className="lead" style={{ marginTop: 2 }}>{partido && d ? faltan(d) + ' para el partido.' : 'Todavía no hay partido armado.'}</p>
