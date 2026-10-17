@@ -87,6 +87,21 @@ function Inscripcion() {
   const lleno = insc.length >= cupo;
   const cena = p.cena || [];
   const yoCena = cena.includes(uid);
+  const nom = id => nombreDe(id, jugadores, p);
+  const listaWA = encodeURIComponent([
+    `⚽ ${mayus(diaLargo(d))}, ${horaTxt(d)}`,
+    `📍 ${p.lugar} · ${p.formato}`,
+    '',
+    `Anotados (${insc.length}/${cupo}):`,
+    ...(insc.length ? insc.map((id, i) => `${i + 1}. ${nom(id)}${cena.includes(id) ? ' 🍽️' : ''}`) : ['Todavía no hay nadie.']),
+    ...(insc.length < cupo ? [`Faltan ${cupo - insc.length}.`] : ['Cupo completo.']),
+    ...(espera.length ? ['', `En espera: ${espera.map(nom).join(', ')}`] : []),
+    '',
+    `🍽️ Se quedan a comer (${cena.length}):`,
+    cena.length ? cena.map(nom).join(', ') : 'Nadie por ahora.',
+    '',
+    `Anotate en Me Anoto: ${location.origin}`
+  ].join('\n'));
   const mensajeWA = encodeURIComponent(`⚽ ${tituloFecha(d)} en ${p.lugar}. Vamos ${insc.length} de ${cupo}. Anotate en Me Anoto: ${location.origin}`);
 
   if (editando) return (
@@ -110,6 +125,7 @@ function Inscripcion() {
             <div className="todo-r" key={id} style={{ minHeight: 52, paddingBlock: 8 }}>
               <Avatar nombre={nombreDe(id, jugadores, p)} foto={jugadores[id] && jugadores[id].foto} yo={id === uid} />
               <span className="grow" style={{ fontWeight: 550 }}>{nombreDe(id, jugadores, p)}</span>
+              {cena.includes(id) ? <span title="Se queda a comer" aria-label="Se queda a comer" style={{ display: 'inline-flex', color: 'var(--primary)' }}><Icono n="food" style={{ width: 18, height: 18 }} /></span> : null}
               {id === uid ? <Pill t="tint">Vos</Pill> : id.startsWith('inv_') ? <Pill>Invitado</Pill> : null}
               {esAdmin ? <button className="iconbtn" style={{ width: 36, height: 36 }} aria-label={`Sacar a ${nombreDe(id, jugadores, p)}`} onClick={() => ejecutar(() => quitarInscripto(gid, p, id))}><Icono n="minus" /></button> : null}
             </div>
@@ -128,6 +144,12 @@ function Inscripcion() {
       <Card>
         <Fila icono="food" titulo="Tercer tiempo" sub={yoCena ? `Estás anotado. Somos ${cena.length} para comer.` : `¿Te quedás a comer? Somos ${cena.length}.`}
           derecha={<button className={`chip ${yoCena ? 'on' : ''}`} aria-pressed={yoCena} onClick={() => ejecutar(() => (yoCena ? salirCena(gid, p, uid) : sumarseCena(gid, p, uid)))}>{yoCena ? 'Me quedo' : 'Sumarme'}</button>} />
+        {cena.length ? (
+          <div style={{ padding: '0 16px 14px' }}>
+            <div className="cap" style={{ marginBottom: 6 }}>Se quedan a comer ({cena.length})</div>
+            <div className="chips">{cena.map(id => <span key={id} className={`chip ${id === uid ? 'on' : ''}`}>{nombreDe(id, jugadores, p)}</span>)}</div>
+          </div>
+        ) : null}
       </Card>
 
       <CardB>
@@ -145,7 +167,8 @@ function Inscripcion() {
         <Btn disabled={cargando || nomInv.trim().length < 2} onClick={() => ejecutar(async () => { await agregarInvitado(gid, p, { nombre: nomInv, nivel: nivelInv, registrados }); setNomInv(''); setNivelInv(5); })}><Icono n="plus" />Agregar invitado</Btn>
       </CardB>
 
-      <Btn onClick={() => window.open(`https://wa.me/?text=${mensajeWA}`, '_blank', 'noopener')}><Icono n="share" />Compartir por WhatsApp</Btn>
+      <Btn v="pri" onClick={() => window.open(`https://wa.me/?text=${listaWA}`, '_blank', 'noopener')}><Icono n="share" />Enviar la lista por WhatsApp</Btn>
+      <Btn onClick={() => window.open(`https://wa.me/?text=${mensajeWA}`, '_blank', 'noopener')}><Icono n="share" />Invitar a anotarse</Btn>
 
       {esAdmin ? (
         <Card>
