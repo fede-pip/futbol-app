@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { EmailAuthProvider, linkWithCredential, sendEmailVerification } from 'firebase/auth';
+import { EmailAuthProvider, linkWithCredential, sendEmailVerification, signOut } from 'firebase/auth';
 import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
+import { guardarEmailParaIngreso } from './Cuenta.jsx';
 import { Btn, Campo, Card, CardB, Icono, Lockup, Marca, Fila } from '../components/ui.jsx';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
 
@@ -19,7 +20,7 @@ export function CompletarPerfil({ uid, sugerido = '' }) {
   }
   return (
     <form className="scr" style={{ flex: 1 }} onSubmit={guardar}>
-      <div className="bar-top"><Lockup /></div>
+      <div className="bar-top"><Lockup /><button type="button" className="back" onClick={() => signOut(auth).catch(() => {})}>Salir</button></div>
       <div><h2 className="t">¿Cómo te llaman?</h2><p className="lead" style={{ marginTop: 4 }}>Es el nombre que van a ver tus compañeros.</p></div>
       <Campo label="Nombre y apellido" id="nombre" value={nombre} onChange={e => setNombre(e.target.value)} autoComplete="name" placeholder="Fede Pipkin" />
       {error ? <div className="error" role="alert">{error}</div> : null}
@@ -79,8 +80,11 @@ export function AgregarEmail({ nombre, onListo }) {
   const [clave, setClave] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [enUso, setEnUso] = useState(false);
+  async function salir() { try { await signOut(auth); } catch (e) { /* nada */ } }
+  async function entrarConEseEmail() { guardarEmailParaIngreso(email.trim()); await salir(); }
   async function guardar(e) {
-    e.preventDefault(); setError('');
+    e.preventDefault(); setError(''); setEnUso(false);
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Ese email no parece válido.');
     if (clave.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
     setCargando(true);
@@ -89,21 +93,28 @@ export function AgregarEmail({ nombre, onListo }) {
       sendEmailVerification(auth.currentUser).catch(() => {});
       onListo();
     } catch (err) {
-      setError(err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use'
-        ? 'Ese email ya tiene una cuenta. Usá otro, o ingresá con ese email y recuperá tu historial desde tu perfil.' : mensajeError(err));
+      if (err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use') setEnUso(true);
+      else setError(mensajeError(err));
     }
     setCargando(false);
   }
   return (
     <form className="scr" style={{ flex: 1 }} onSubmit={guardar} noValidate>
-      <div className="bar-top"><Lockup /></div>
+      <div className="bar-top"><Lockup /><button type="button" className="back" onClick={salir}>Salir</button></div>
       <div><h2 className="t">Hola{nombre ? `, ${nombre.split(' ')[0]}` : ''}</h2>
         <p className="lead" style={{ marginTop: 4 }}>A partir de ahora entrás con tu email, ya no con el DNI. Con ese email también vas a poder recuperar tu contraseña si la olvidás.</p></div>
       <Card><Fila icono="mail" titulo="Elegí un email que uses de verdad" sub="Te mandamos un mensaje para confirmarlo" /><Fila icono="key" titulo="Y una contraseña nueva" sub="Reemplaza a la clave de antes" /></Card>
       <Campo label="Tu email" id="nuevo-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vos@ejemplo.com" autoComplete="email" />
       <Campo label="Contraseña nueva" id="nueva-clave" type="password" value={clave} onChange={e => setClave(e.target.value)} placeholder="Al menos 8 caracteres" autoComplete="new-password" />
       {error ? <div className="error" role="alert">{error}</div> : null}
+      {enUso ? (
+        <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div><b>Ese email ya tiene una cuenta.</b><p className="muted" style={{ marginTop: 2 }}>Si es tuya, entrá con ese email. Después, desde el inicio, tocá "Ya jugaba antes" para recuperar tu historial con tu DNI. Si no, probá con otro email.</p></div>
+          <Btn type="button" v="pri" onClick={entrarConEseEmail}>Entrar con {email.trim()}</Btn>
+        </CardB>
+      ) : null}
       <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Guardando…' : 'Guardar y continuar'}</Btn>
+      <Btn type="button" v="ghost" onClick={salir}>Salir</Btn>
     </form>
   );
 }
