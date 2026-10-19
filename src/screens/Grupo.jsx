@@ -3,13 +3,38 @@ import { collection, doc, getDoc } from 'firebase/firestore';
 import { db, llamar, mensajeError } from '../lib/firebase.js';
 import { ATTRS, depurarInvitados, pl } from '../lib/logica.js';
 import { useColl } from '../data/hooks.js';
-import { actualizarGrupo, borrarInvitados, guardarNiveles, ponerAdmin, quitarMiembro, sacarAdmin } from '../data/acciones.js';
+import { actualizarGrupo, borrarInvitados, renombrarJugador, guardarNiveles, ponerAdmin, quitarMiembro, sacarAdmin } from '../data/acciones.js';
 import { Avatar, Btn, Card, CardB, Fila, Hint, Icono, Pill } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
 import { GrupoElegir } from './Inicio1.jsx';
 import { useToast } from '../components/ui.jsx';
+
+function EditorNombre({ gid, id, j, onCerrar }) {
+  const toast = useToast();
+  const [nombre, setNombre] = useState(j.nombre || '');
+  const [apodo, setApodo] = useState(j.apodo || '');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+  async function guardar(e) {
+    e.preventDefault(); setError('');
+    if (nombre.trim().length < 2) return setError('El nombre tiene que tener al menos 2 letras.');
+    setCargando(true);
+    try { await renombrarJugador(gid, id, { nombre, apodo }); toast('Nombre actualizado'); onCerrar(); }
+    catch (err) { setError(mensajeError(err)); }
+    setCargando(false);
+  }
+  return (
+    <form onSubmit={guardar} style={{ margin: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="field"><label htmlFor={`rn-${id}`}>Nombre</label><input id={`rn-${id}`} value={nombre} onChange={e => setNombre(e.target.value)} maxLength={60} autoComplete="off" /></div>
+      <div className="field"><label htmlFor={`ra-${id}`}>Apodo (opcional)</label><input id={`ra-${id}`} value={apodo} onChange={e => setApodo(e.target.value)} maxLength={30} autoComplete="off" /></div>
+      <p className="small">Cambia cómo se ve en este grupo. Si la persona edita su perfil, se actualiza con lo que ponga.</p>
+      {error ? <div className="error" role="alert">{error}</div> : null}
+      <div className="row"><Btn type="button" onClick={onCerrar}>Cancelar</Btn><Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Guardando…' : 'Guardar'}</Btn></div>
+    </form>
+  );
+}
 
 function EditorNiveles({ gid, id, nombre, onCerrar }) {
   const [vals, setVals] = useState(null);
@@ -130,11 +155,12 @@ export default function Grupo() {
                   {esAdmin && soyYo ? <button className="chip sm" onClick={() => { setAbierto(abierto === id ? null : id); setPanel('niveles'); }}>Mi nivel</button> : null}
                 </div>
                 {abierto === id && esAdmin ? (
-                  panel === 'niveles' ? <EditorNiveles gid={gid} id={id} nombre={j.nombre} onCerrar={() => { setAbierto(null); setPanel(''); }} /> : panel === 'expulsar' ? (
+                  panel === 'niveles' ? <EditorNiveles gid={gid} id={id} nombre={j.nombre} onCerrar={() => { setAbierto(null); setPanel(''); }} /> : panel === 'nombre' ? <EditorNombre gid={gid} id={id} j={j} onCerrar={() => { setAbierto(null); setPanel(''); }} /> : panel === 'expulsar' ? (
                     <div className="confirm" style={{ margin: '0 16px 14px' }}><b>¿Sacar a {j.nombre} del grupo?</b><span className="muted">Conserva su historial pero deja de ver el grupo.</span>
                       <div className="row"><Btn onClick={() => setPanel('')}>No</Btn><Btn v="pri" onClick={() => ejecutar(async () => { await quitarMiembro(gid, grupo, id); setAbierto(null); }, 'Jugador sacado')}>Sí, sacar</Btn></div></div>
                   ) : (
                     <div className="chips" style={{ padding: '0 16px 14px' }}>
+                      <button className="chip" onClick={() => setPanel('nombre')}>Editar nombre</button>
                       <button className="chip" onClick={() => setPanel('niveles')}>Cambiar nivel</button>
                       {!pendiente ? <button className="chip" onClick={() => ejecutar(() => (esAdm ? sacarAdmin(gid, id) : ponerAdmin(gid, id)), esAdm ? 'Ya no es admin' : 'Ahora es admin')}>{esAdm ? 'Quitar admin' : 'Hacer admin'}</button> : null}
                       {id !== grupo.creadorUid ? <button className="chip" onClick={() => setPanel('expulsar')}>Sacar del grupo</button> : null}

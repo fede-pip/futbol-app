@@ -91,7 +91,11 @@ service cloud.firestore {
       match /jugadores/{jid} {
         allow read: if esMiembro(gid);
         // Cada persona puede actualizar solo su nombre, apodo y foto visibles en el grupo.
-        allow update: if isSelf(jid) && soloCambia(['nombre', 'apodo', 'foto']);
+        // Un admin puede corregir el nombre y el apodo de cualquiera (solo en este grupo).
+        allow update: if (isSelf(jid) && soloCambia(['nombre', 'apodo', 'foto']))
+          || (esAdmin(gid) && soloCambia(['nombre', 'apodo']) && request.resource.data.nombre is string
+              && request.resource.data.nombre.size() >= 2 && request.resource.data.nombre.size() <= 60
+              && request.resource.data.apodo is string && request.resource.data.apodo.size() <= 30);
         allow create, delete: if false;
       }
 

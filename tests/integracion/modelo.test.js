@@ -125,6 +125,19 @@ describe('grupos y membresía', () => {
   });
 });
 
+describe('nombres en el grupo', () => {
+  it('un admin corrige el nombre de otro jugador; un miembro no puede hacerlo con otros', async () => {
+    await updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: 'Nombre Corregido', apodo: 'Beto' });
+    const j = (await getDoc(doc(B.db, 'grupos', gid, 'jugadores', B.uid))).data();
+    expect(j.nombre).toBe('Nombre Corregido');
+    await denegado(updateDoc(doc(B.db, 'grupos', gid, 'jugadores', A.uid), { nombre: 'Otro Nombre', apodo: '' }));
+  });
+  it('un admin no puede cambiar otros datos del jugador ni dejar el nombre vacío', async () => {
+    await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: 'Nombre Corregido', stats: { puntos: 999 } }));
+    await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: '', apodo: '' }));
+  });
+});
+
 describe('partido: inscripción y concurrencia', () => {
   it('solo un admin crea partidos', async () => {
     await denegado(setDoc(doc(B.db, 'grupos', gid, 'partidos', 'x'), partidoBase()));
