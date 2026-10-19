@@ -3,7 +3,7 @@ import { EmailAuthProvider, linkWithCredential, sendEmailVerification, signOut }
 import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
 import { guardarEmailParaIngreso } from './Cuenta.jsx';
-import { Btn, Campo, Card, CardB, Icono, Lockup, Marca, Fila } from '../components/ui.jsx';
+import { Btn, Campo, CampoClave, Card, CardB, Icono, Lockup, Marca, Fila } from '../components/ui.jsx';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
 
 // ---- Completar perfil (cuando entró con Google sin nombre o con un nombre vacío) ----
@@ -66,7 +66,7 @@ export function MigrarDni({ onListo, onOmitir }) {
         <Fila icono="check" titulo="Tus partidos y estadísticas se mantienen" sub="Nada se pierde" />
       </Card>
       <Campo label="Tu DNI" id="dni" inputMode="numeric" value={dni} onChange={e => setDni(e.target.value)} placeholder="38123456" autoComplete="off" />
-      <Campo label="Tu clave de antes" id="clave-vieja" type="password" value={clave} onChange={e => setClave(e.target.value)} placeholder="••••••" autoComplete="off" />
+      <CampoClave label="Tu clave de antes, o el código que te mandó el admin" id="clave-vieja" value={clave} onChange={e => setClave(e.target.value)} placeholder="Tu clave o el código de 6 números" autoComplete="off" ayuda="Si el admin del grupo te mandó un código por WhatsApp, escribí ese código acá." />
       {error ? <div className="error" role="alert">{error}</div> : null}
       <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Verificando…' : 'Recuperar mi historial'}</Btn>
       <Btn type="button" v="ghost" onClick={onOmitir}>No jugaba antes</Btn>
@@ -78,6 +78,7 @@ export function MigrarDni({ onListo, onOmitir }) {
 export function AgregarEmail({ nombre, onListo }) {
   const [email, setEmail] = useState('');
   const [clave, setClave] = useState('');
+  const [clave2, setClave2] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const [enUso, setEnUso] = useState(false);
@@ -87,6 +88,7 @@ export function AgregarEmail({ nombre, onListo }) {
     e.preventDefault(); setError(''); setEnUso(false);
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Ese email no parece válido.');
     if (clave.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+    if (clave !== clave2) return setError('Las dos contraseñas no son iguales. Revisalas con el botón Mostrar.');
     setCargando(true);
     try {
       await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(email.trim(), clave));
@@ -103,9 +105,10 @@ export function AgregarEmail({ nombre, onListo }) {
       <div className="bar-top"><Lockup /><button type="button" className="back" onClick={salir}>Salir</button></div>
       <div><h2 className="t">Hola{nombre ? `, ${nombre.split(' ')[0]}` : ''}</h2>
         <p className="lead" style={{ marginTop: 4 }}>A partir de ahora entrás con tu email, ya no con el DNI. Con ese email también vas a poder recuperar tu contraseña si la olvidás.</p></div>
-      <Card><Fila icono="mail" titulo="Elegí un email que uses de verdad" sub="Te mandamos un mensaje para confirmarlo" /><Fila icono="key" titulo="Y una contraseña nueva" sub="Reemplaza a la clave de antes" /></Card>
+      <Card><Fila icono="mail" titulo="Elegí un email que uses de verdad" sub="Te mandamos un mensaje para confirmarlo" /><Fila icono="key" titulo="Y una contraseña nueva, que elegís vos" sub="Reemplaza a la clave de antes y al código del admin" /></Card>
       <Campo label="Tu email" id="nuevo-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vos@ejemplo.com" autoComplete="email" />
-      <Campo label="Contraseña nueva" id="nueva-clave" type="password" value={clave} onChange={e => setClave(e.target.value)} placeholder="Al menos 8 caracteres" autoComplete="new-password" />
+      <CampoClave label="Elegí una contraseña nueva" id="nueva-clave" value={clave} onChange={e => setClave(e.target.value)} placeholder="Al menos 8 caracteres" autoComplete="new-password" ayuda="Es la que vas a usar de ahora en adelante con tu email. No es el código del admin." />
+      <CampoClave label="Repetí la contraseña" id="nueva-clave2" value={clave2} onChange={e => setClave2(e.target.value)} placeholder="La misma de arriba" autoComplete="new-password" />
       {error ? <div className="error" role="alert">{error}</div> : null}
       {enUso ? (
         <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

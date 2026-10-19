@@ -4,7 +4,7 @@ import {
 } from 'firebase/auth';
 import { auth, llamar, mensajeError, proveedorGoogle } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
-import { Btn, Campo, CardB, Icono, IconoGoogle, Marca } from '../components/ui.jsx';
+import { Btn, Campo, CampoClave, CardB, Icono, IconoGoogle, Marca } from '../components/ui.jsx';
 
 const CLAVE_EMAIL = 'meanoto_email_ingreso';
 const leerEmailGuardado = () => { try { const v = sessionStorage.getItem(CLAVE_EMAIL) || ''; sessionStorage.removeItem(CLAVE_EMAIL); return v; } catch (e) { return ''; } };
@@ -28,7 +28,7 @@ function IngresoDni({ onAtras, onEmail }) {
       <div className="bar-top"><button type="button" className="back" onClick={onAtras}><Icono n="back" />Volver</button><Marca /></div>
       <div><h2 className="t">Entrá con tu DNI</h2><p className="lead" style={{ marginTop: 4 }}>Usá el DNI y la clave con la que jugabas antes. Es la última vez: en el próximo paso elegís un email para entrar de ahora en adelante.</p></div>
       <Campo label="Tu DNI" id="dni-ing" inputMode="numeric" value={dni} onChange={e => setDni(e.target.value)} placeholder="38123456" autoComplete="off" />
-      <Campo label="Tu clave de antes" id="clave-ing" type="password" value={clave} onChange={e => setClave(e.target.value)} placeholder="••••••" autoComplete="off" />
+      <CampoClave label="Tu clave de antes, o el código que te mandó el admin" id="clave-ing" value={clave} onChange={e => setClave(e.target.value)} placeholder="Tu clave o el código de 6 números" autoComplete="off" ayuda="Si el admin del grupo te mandó un código por WhatsApp, escribí ese código acá." />
       {error ? <div className="error" role="alert">{error}</div> : null}
       <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Verificando…' : 'Entrar'}</Btn>
       <div className="sep">¿Algo no sale?</div>
@@ -47,6 +47,7 @@ export default function Cuenta({ onAtras }) {
   const [modo, setModo] = useState(guardado ? 'login' : 'registro');
   const [email, setEmail] = useState(guardado);
   const [clave, setClave] = useState('');
+  const [clave2, setClave2] = useState('');
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
@@ -69,6 +70,7 @@ export default function Cuenta({ onAtras }) {
     if (modo === 'registro') {
       if (nombre.trim().length < 2) return setError('Poné cómo te llaman en el grupo.');
       if (clave.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+      if (clave !== clave2) return setError('Las dos contraseñas no son iguales. Revisalas con el botón Mostrar.');
     }
     setCargando(true);
     try {
@@ -126,7 +128,8 @@ export default function Cuenta({ onAtras }) {
       </div>
       {modo === 'registro' ? <Campo label="Cómo te llaman en el grupo" id="nombre" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Fede Pipkin" autoComplete="name" /> : null}
       <Campo label="Email" id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vos@ejemplo.com" autoComplete="email" />
-      <Campo label="Contraseña" id="clave" type="password" value={clave} onChange={e => setClave(e.target.value)} placeholder={modo === 'registro' ? 'Al menos 8 caracteres' : 'Tu contraseña'} autoComplete={modo === 'registro' ? 'new-password' : 'current-password'} />
+      <CampoClave label={modo === 'registro' ? 'Elegí una contraseña' : 'Contraseña'} id="clave" value={clave} onChange={e => setClave(e.target.value)} placeholder={modo === 'registro' ? 'Al menos 8 caracteres' : 'Tu contraseña'} autoComplete={modo === 'registro' ? 'new-password' : 'current-password'} />
+      {modo === 'registro' ? <CampoClave label="Repetí la contraseña" id="clave2" value={clave2} onChange={e => setClave2(e.target.value)} placeholder="La misma de arriba" autoComplete="new-password" /> : null}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {aviso ? <div className="okmsg" role="status">{aviso}</div> : null}
       <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Un momento…' : modo === 'registro' ? 'Crear cuenta' : 'Ingresar'}</Btn>

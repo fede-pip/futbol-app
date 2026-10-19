@@ -3,7 +3,7 @@ import { collection } from 'firebase/firestore';
 import { db, mensajeError } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
 import {
-  agregarInvitado, anotarse, bajarse, cancelarPartido, crearPartido, editarPartido, quitarInscripto, salirCena, sumarseCena
+  agregarInvitado, anotarJugador, anotarse, bajarse, cancelarPartido, crearPartido, editarPartido, quitarInscripto, salirCena, sumarseCena
 } from '../data/acciones.js';
 import { FORMATOS, depurarInvitados } from '../lib/logica.js';
 import { aFecha, aInputFecha, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
@@ -56,7 +56,8 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
 }
 
 function Inscripcion() {
-  const { uid, gid, partido: p, jugadores, esAdmin } = useSesion();
+  const { uid, gid, grupo, partido: p, jugadores, esAdmin } = useSesion();
+  const [aAnotar, setAAnotar] = useState('');
   const toast = useToast();
   const guardados = useColl(collection(db, `grupos/${gid}/invitados`), gid) || [];
   const registrados = depurarInvitados(guardados, Object.values(jugadores).flatMap(j => [j.nombre, j.apodo])).utiles;
@@ -140,6 +141,26 @@ function Inscripcion() {
           : <Btn v="pri" disabled={cargando} onClick={() => ejecutar(async () => { await anotarse(gid, p, uid); toast(lleno ? 'Quedaste en la lista de espera.' : `¡Anotado! Nos vemos el ${diaSemana(d)}.`); })}>{lleno ? 'Sumarme a la lista de espera' : 'Me anoto'}</Btn>}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {espera.length ? <Card><Fila icono="clock" titulo={`Lista de espera: ${espera.length}`} sub="Si alguien se baja, sube el primero y le avisamos." /></Card> : null}
+
+      {esAdmin ? (
+        <CardB>
+          <h3 className="t" style={{ marginBottom: 4 }}>Anotar a un jugador</h3>
+          <p className="muted" style={{ marginBottom: 10 }}>Como admin podés anotar a cualquiera del grupo, por ejemplo si te avisó por WhatsApp.</p>
+          {(() => {
+            const faltan = (grupo.miembros || []).filter(id => !insc.includes(id) && (jugadores[id] || {}).nombre).sort((a, b) => nombreDe(a, jugadores, p).localeCompare(nombreDe(b, jugadores, p)));
+            return faltan.length ? (
+              <div className="row" style={{ gap: 8 }}>
+                <select className="select grow" aria-label="Jugador a anotar" value={aAnotar} onChange={e => setAAnotar(e.target.value)}>
+                  <option value="">Elegir jugador…</option>
+                  {faltan.map(id => <option key={id} value={id}>{nombreDe(id, jugadores, p)}{espera.includes(id) ? ' (en espera)' : ''}</option>)}
+                </select>
+                <Btn v="pri" disabled={cargando || !aAnotar} onClick={() => ejecutar(async () => { await anotarJugador(gid, p, aAnotar); toast(`${nombreDe(aAnotar, jugadores, p)} quedó anotado`); setAAnotar(''); })}>Anotar</Btn>
+              </div>
+            ) : <p className="muted">Ya están anotados todos los del grupo.</p>;
+          })()}
+          {lleno ? <p className="small" style={{ marginTop: 8 }}>El cupo está completo: igual lo podés anotar y quedan más de {cupo}.</p> : null}
+        </CardB>
+      ) : null}
 
       <Card>
         <Fila icono="food" titulo="Tercer tiempo" sub={yoCena ? `Estás anotado. Somos ${cena.length} para comer.` : `¿Te quedás a comer? Somos ${cena.length}.`}

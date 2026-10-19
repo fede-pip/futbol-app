@@ -74,7 +74,9 @@ export default function Inicio() {
       </div>
 
       {partido ? (
-        <section className="kpi pitch" aria-label="Próximo partido">
+        <section className="kpi pitch" aria-label="Próximo partido: tocá para ver quiénes están anotados" role="link" tabIndex={0} style={{ cursor: 'pointer' }}
+          onClick={e => { if (e.target.closest('a,button')) return; ir('partido', 'inscripcion'); }}
+          onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('a,button')) { e.preventDefault(); ir('partido', 'inscripcion'); } }}>
           <div className="lb">{votando ? 'Votación abierta' : 'Próximo partido'}</div>
           <div className="v">{d ? tituloFecha(d) : ''}</div>
           <div className="s"><span><Icono n="pin" style={{ width: 15, height: 15 }} /><a href={urlMapa(partido)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}>{partido.lugar}</a></span><span>{partido.formato}</span></div>

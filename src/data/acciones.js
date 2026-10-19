@@ -17,6 +17,9 @@ export const bajarse = (gid, p, uid) =>
   updateDoc(refPartido(gid, p.id), { inscriptos: arrayRemove(uid), listaEspera: arrayRemove(uid), cena: arrayRemove(uid) });
 export const sumarseCena = (gid, p, uid) => updateDoc(refPartido(gid, p.id), { cena: arrayUnion(uid) });
 export const salirCena = (gid, p, uid) => updateDoc(refPartido(gid, p.id), { cena: arrayRemove(uid) });
+// El admin anota a cualquier jugador del grupo (aunque el cupo esté completo; queda a criterio del admin).
+export const anotarJugador = (gid, p, id) =>
+  updateDoc(refPartido(gid, p.id), { inscriptos: arrayUnion(id), listaEspera: arrayRemove(id) });
 export const quitarInscripto = (gid, p, id) =>
   updateDoc(refPartido(gid, p.id), { inscriptos: arrayRemove(id), cena: arrayRemove(id) });
 

@@ -99,6 +99,21 @@ export function Campo({ label, id, className = '', ...p }) {
   return <div className="field"><label htmlFor={id}>{label}</label><input id={id} className={className} {...p} /></div>;
 }
 
+// Contraseña con botón para ver lo que se escribe (evita errores de tipeo, sobre todo en el celular).
+export function CampoClave({ label, id, ayuda, ...p }) {
+  const [ver, setVer] = useState(false);
+  return (
+    <div className="field"><label htmlFor={id}>{label}</label>
+      <div style={{ position: 'relative' }}>
+        <input id={id} type={ver ? 'text' : 'password'} style={{ paddingRight: 82 }} autoCapitalize="none" autoCorrect="off" spellCheck={false} {...p} />
+        <button type="button" onClick={() => setVer(v => !v)} aria-pressed={ver} aria-label={ver ? 'Ocultar lo escrito' : 'Mostrar lo escrito'}
+          style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'none', color: 'var(--primary)', font: 'inherit', fontWeight: 600, fontSize: 14, minHeight: 36, padding: '0 10px', cursor: 'pointer' }}>{ver ? 'Ocultar' : 'Mostrar'}</button>
+      </div>
+      {ayuda ? <small className="muted" style={{ marginTop: 2 }}>{ayuda}</small> : null}
+    </div>
+  );
+}
+
 export const Vacio = ({ titulo, texto, children }) => (
   <Card className="lista-vacia"><b>{titulo}</b>{texto}{children ? <div style={{ marginTop: 12 }}>{children}</div> : null}</Card>
 );
