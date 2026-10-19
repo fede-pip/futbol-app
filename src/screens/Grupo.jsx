@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db, llamar, mensajeError } from '../lib/firebase.js';
-import { ATTRS, depurarInvitados } from '../lib/logica.js';
+import { ATTRS, depurarInvitados, pl } from '../lib/logica.js';
 import { useColl } from '../data/hooks.js';
 import { actualizarGrupo, borrarInvitados, guardarNiveles, ponerAdmin, quitarMiembro, sacarAdmin } from '../data/acciones.js';
 import { Avatar, Btn, Card, CardB, Fila, Hint, Icono, Pill } from '../components/ui.jsx';
@@ -80,7 +80,7 @@ export default function Grupo() {
       </div>
       <section className="kpi pitch">
         <div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div>
-        <div className="s"><span>{grupo.miembros.length} jugadores</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}{grupo.pozo ? <span>Pozo: ${grupo.pozo}</span> : null}</div>
+        <div className="s"><span>{grupo.miembros.length} {pl(grupo.miembros.length, 'jugador', 'jugadores')}</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}{grupo.pozo ? <span>Pozo: ${grupo.pozo}</span> : null}</div>
         <div className="row" style={{ marginTop: 14, gap: 0 }}>
           {grupo.miembros.slice(0, 6).map((id, i) => <span key={id} style={{ marginLeft: i ? -8 : 0, border: '2px solid #0e4d31', borderRadius: '50%', display: 'inline-flex' }}><Avatar nombre={(jugadores[id] || {}).nombre} foto={(jugadores[id] || {}).foto} /></span>)}
           {grupo.miembros.length > 6 ? <span style={{ marginLeft: 10, fontSize: 13, color: '#c9f0dc' }}>+{grupo.miembros.length - 6}</span> : null}

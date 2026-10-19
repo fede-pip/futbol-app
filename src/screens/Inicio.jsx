@@ -1,3 +1,4 @@
+import { pl, quedanN } from '../lib/logica.js';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { urlMapa } from '../lib/mapas.js';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
@@ -84,7 +85,7 @@ export default function Inicio() {
             <Btn v="white" style={{ marginTop: 16 }} onClick={() => ir('partido', 'votar')}>Ir a votar</Btn>
           ) : (
             <>
-              <div className="row sp" style={{ margin: '16px 0 8px' }}><b className="num" style={{ fontSize: 15 }}>{n} de {cupo} anotados</b><span style={{ fontSize: 13, color: '#c9f0dc' }}>{lleno ? 'Completo' : `Quedan ${cupo - n}`}</span></div>
+              <div className="row sp" style={{ margin: '16px 0 8px' }}><b className="num" style={{ fontSize: 15 }}>{n} de {cupo} {pl(n, 'anotado', 'anotados')}</b><span style={{ fontSize: 13, color: '#c9f0dc' }}>{lleno ? 'Completo' : quedanN(cupo - n)}</span></div>
               <Meter pct={cupo ? (n / cupo) * 100 : 0} />
               {anotado
                 ? <Btn v="glass" style={{ marginTop: 14 }} disabled={cargando} onClick={() => accion(() => bajarse(gid, partido, uid))}><Icono n="check" />Estás anotado · Me bajo</Btn>
@@ -110,7 +111,7 @@ export default function Inicio() {
         <Card>
           <div className="card-h"><h3 className="t">Qué sigue</h3></div>
           <div style={{ paddingTop: 6 }}>
-            <Fila icono={anotado ? 'check' : 'cal'} hecho={anotado} titulo="Anotarte al partido" sub={anotado ? 'Listo, ya estás en la lista' : lleno ? 'El cupo está completo' : `Quedan ${cupo - n} lugares`} />
+            <Fila icono={anotado ? 'check' : 'cal'} hecho={anotado} titulo="Anotarte al partido" sub={anotado ? 'Listo, ya estás en la lista' : lleno ? 'El cupo está completo' : `${quedanN(cupo - n)} ${pl(cupo - n, 'lugar', 'lugares')}`} />
             <Fila icono="users" titulo="Ver los equipos" sub={partido.equipos && partido.equipos.publicado ? 'Ya están publicados' : 'Se publican antes del partido'} onClick={() => ir('partido', 'equipos')} derecha={<span className="go">Ver</span>} />
             <Fila icono="vote" titulo="Votar a tus compañeros" sub={votando ? 'Está abierta' : 'Se abre cuando termina el partido'} onClick={() => ir('partido', 'votar')} derecha={votando ? <Pill t="warn">Abierta</Pill> : null} />
           </div>

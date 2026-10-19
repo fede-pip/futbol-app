@@ -54,8 +54,16 @@ export const PLANTILLAS = [
 ];
 
 // Reemplaza {variables}. Si falta un dato se deja la llave vacía (nunca "{nombre}" a la vista).
+// Cuando el número es 1, el texto tiene que decir "Queda 1 lugar", no "Quedan 1 lugares".
+const SINGULAR = { lugares: 'lugar', jugadores: 'jugador', personas: 'persona', partidos: 'partido', goles: 'gol', victorias: 'victoria', anotados: 'anotado', puntos: 'punto', días: 'día', dias: 'día', horas: 'hora', votos: 'voto', compañeros: 'compañero' };
+export const arreglarPlural = t => (t || '')
+  .replace(/\b(Quedan|Faltan|quedan|faltan) 1\b(?! ?\d)/g, (m, v) => `${v.slice(0, -1)} 1`)
+  .replace(/\b([Vv])otaron 1\b(?! ?\d)/g, (m, c) => `${c}otó 1`)
+  .replace(/\b([Ss])omos 1\b(?! ?\d)/g, (m, c) => `${c === 'S' ? 'Hay' : 'hay'} 1`)
+  .replace(/\b1 (lugares|jugadores|personas|partidos|goles|victorias|anotados|puntos|días|dias|horas|votos|compañeros)\b/g, (m, n) => `1 ${SINGULAR[n]}`)
+  .replace(/\b1 victoria seguidas\b/g, '1 victoria seguida');
 export const llenar = (t, vars = MUESTRA, vacio = false) =>
-  (t || '').replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : (vacio ? '' : m));
+  arreglarPlural((t || '').replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : (vacio ? '' : m)));
 
 export const catalogoPorId = Object.fromEntries(CAT_DEF.map(c => [c.id, c]));
 export const quienTxt = a => a.map(k => AUD[k][0]).join(' y ').toLowerCase().replace(/^./, c => c.toUpperCase());

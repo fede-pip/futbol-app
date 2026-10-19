@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   ATTRS, calcProm, calcPuntos, calcRacha, fmtNombre, balancear,
-  asignarVotaciones, depurarInvitados, horasRestantes, reemplazarVars, nuevoAtributo,
+  asignarVotaciones, depurarInvitados, faltanN, quedanN, pl, horasRestantes, reemplazarVars, nuevoAtributo,
 } from './logica.js';
+import { arreglarPlural, llenar } from './catalogo.js';
 
 const attrsTodos = n => Object.fromEntries(ATTRS.map(a => [a.key, n]));
 
@@ -149,6 +150,32 @@ describe('nuevoAtributo', () => {
   });
   it('sin votos no cambia', () => {
     expect(nuevoAtributo(7, 0, 0)).toBe(7);
+  });
+});
+
+describe('singular y plural en los textos', () => {
+  it('con 1 usa el singular, con otros números deja el plural', () => {
+    expect(arreglarPlural('Quedan 1 lugares')).toBe('Queda 1 lugar');
+    expect(arreglarPlural('Quedan 3 lugares')).toBe('Quedan 3 lugares');
+    expect(arreglarPlural('Faltan 1 para completar')).toBe('Falta 1 para completar');
+    expect(arreglarPlural('Quedan 1 h para votar')).toBe('Queda 1 h para votar');
+    expect(arreglarPlural('Ya somos 1.')).toBe('Ya hay 1.');
+    expect(arreglarPlural('Votaron 1 de 12')).toBe('Votó 1 de 12');
+    expect(arreglarPlural('Llevás 1 victorias seguidas')).toBe('Llevás 1 victoria seguida');
+  });
+  it('no toca los números que terminan en 1 ni los que empiezan con 1', () => {
+    expect(arreglarPlural('Quedan 11 lugares')).toBe('Quedan 11 lugares');
+    expect(arreglarPlural('Faltan 10 goles')).toBe('Faltan 10 goles');
+    expect(arreglarPlural('Tenés 21 puntos')).toBe('Tenés 21 puntos');
+  });
+  it('llenar() aplica la corrección después de completar las variables', () => {
+    expect(llenar('Quedan {restantes} lugares el {dia}.', { restantes: 1, dia: 'lunes' })).toBe('Queda 1 lugar el lunes.');
+    expect(llenar('Faltan {faltan} para completar', { faltan: 2 })).toBe('Faltan 2 para completar');
+  });
+  it('los ayudantes de las pantallas', () => {
+    expect(faltanN(1)).toBe('Falta 1'); expect(faltanN(4)).toBe('Faltan 4');
+    expect(quedanN(1)).toBe('Queda 1'); expect(quedanN(0)).toBe('Quedan 0');
+    expect(pl(1, 'gol', 'goles')).toBe('gol'); expect(pl(2, 'gol', 'goles')).toBe('goles');
   });
 });
 

@@ -121,7 +121,7 @@ export function AvisosAdmin() {
           {confirma ? (
             <div className="confirm"><b>¿Enviar ahora?</b><span className="muted">Sale en este momento y no se puede deshacer.</span>
               <div className="row"><Btn onClick={() => setConfirma(false)}>Cancelar</Btn><Btn v="pri" disabled={cargando} onClick={enviar}>{cargando ? 'Enviando…' : 'Enviar'}</Btn></div></div>
-          ) : <Btn v="pri" disabled={vacio} onClick={() => setConfirma(true)}><Icono n="send" />Enviar{alcance ? ` a unas ${alcance} personas` : ''}</Btn>}
+          ) : <Btn v="pri" disabled={vacio} onClick={() => setConfirma(true)}><Icono n="send" />Enviar{alcance ? alcance === 1 ? ' a 1 persona' : ` a unas ${alcance} personas` : ''}</Btn>}
         </>
       ) : null}
 

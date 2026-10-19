@@ -1,3 +1,4 @@
+import { pl } from '../lib/logica.js';
 import { useState } from 'react';
 import { mensajeError } from '../lib/firebase.js';
 import { finalizarPartido, guardarEvento, guardarMarcador } from '../data/acciones.js';
@@ -58,7 +59,7 @@ export default function Goles() {
       <Card>
         <div className="card-h"><h3 className="t">Quién metió los goles</h3><span className={`pill ${falta === 0 ? 'ok' : 'warn'} num`}>{asignados} de {total}</span></div>
         <div style={{ padding: '10px 16px 0' }}><Meter claro pct={total ? (asignados / total) * 100 : 0} color={falta === 0 ? 'var(--ok)' : undefined} />
-          <p className="small" style={{ marginTop: 8 }} role="status">{falta === 0 ? 'Coincide con el resultado.' : falta > 0 ? `Faltan asignar ${falta} ${falta === 1 ? 'gol' : 'goles'}.` : `Sobran ${-falta} ${-falta === 1 ? 'gol' : 'goles'} respecto del resultado.`}</p></div>
+          <p className="small" style={{ marginTop: 8 }} role="status">{falta === 0 ? 'Coincide con el resultado.' : falta > 0 ? `${pl(falta, 'Falta', 'Faltan')} asignar ${falta} ${pl(falta, 'gol', 'goles')}.` : `${pl(-falta, 'Sobra', 'Sobran')} ${-falta} ${pl(-falta, 'gol', 'goles')} respecto del resultado.`}</p></div>
         <div style={{ paddingTop: 8 }}>
           {eq && eq.publicado ? (
             <>

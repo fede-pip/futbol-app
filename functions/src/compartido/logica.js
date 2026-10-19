@@ -183,3 +183,9 @@ export function depurarInvitados(registrados, nombresDelGrupo) {
   }
   return { utiles, sobrantes };
 }
+
+// Singular o plural según la cantidad: pl(1, 'lugar', 'lugares') -> 'lugar'.
+export const pl = (n, uno, varios) => (Number(n) === 1 ? uno : varios);
+// "Falta 1" / "Faltan 3" y "Queda 1" / "Quedan 3".
+export const faltanN = n => `${pl(n, 'Falta', 'Faltan')} ${n}`;
+export const quedanN = n => `${pl(n, 'Queda', 'Quedan')} ${n}`;

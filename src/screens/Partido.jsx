@@ -5,7 +5,7 @@ import { useColl } from '../data/hooks.js';
 import {
   agregarInvitado, anotarJugador, anotarse, bajarse, cancelarPartido, crearPartido, editarPartido, quitarInscripto, salirCena, sumarseCena
 } from '../data/acciones.js';
-import { FORMATOS, depurarInvitados } from '../lib/logica.js';
+import { FORMATOS, depurarInvitados, faltanN, pl } from '../lib/logica.js';
 import { aFecha, aInputFecha, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
 import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
@@ -96,10 +96,10 @@ function Inscripcion() {
     '',
     `Anotados (${insc.length}/${cupo}):`,
     ...(insc.length ? insc.map((id, i) => `${i + 1}. ${nom(id)}${cena.includes(id) ? ' 🍽️' : ''}`) : ['Todavía no hay nadie.']),
-    ...(insc.length < cupo ? [`Faltan ${cupo - insc.length}.`] : ['Cupo completo.']),
+    ...(insc.length < cupo ? [`${faltanN(cupo - insc.length)}.`] : ['Cupo completo.']),
     ...(espera.length ? ['', `En espera: ${espera.map(nom).join(', ')}`] : []),
     '',
-    `🍽️ Se quedan a comer (${cena.length}):`,
+    `🍽️ ${pl(cena.length, 'Se queda', 'Se quedan')} a comer (${cena.length}):`,
     cena.length ? cena.map(nom).join(', ') : 'Nadie por ahora.',
     '',
     `Anotate en Me Anoto: ${location.origin}`
@@ -173,11 +173,11 @@ function Inscripcion() {
       {espera.length ? <Card><Fila icono="clock" titulo={`Lista de espera: ${espera.length}`} sub="Si alguien se baja, sube el primero y le avisamos." /></Card> : null}
 
       <Card>
-        <Fila icono="food" titulo="Tercer tiempo" sub={yoCena ? `Estás anotado. Somos ${cena.length} para comer.` : `¿Te quedás a comer? Somos ${cena.length}.`}
+        <Fila icono="food" titulo="Tercer tiempo" sub={yoCena ? `Estás anotado. ${cena.length === 1 ? 'Sos el único' : `Somos ${cena.length}`} para comer.` : `¿Te quedás a comer? ${cena.length === 0 ? 'Todavía no hay nadie.' : cena.length === 1 ? 'Hay 1 persona.' : `Somos ${cena.length}.`}`}
           derecha={<button className={`chip ${yoCena ? 'on' : ''}`} aria-pressed={yoCena} onClick={() => ejecutar(() => (yoCena ? salirCena(gid, p, uid) : sumarseCena(gid, p, uid)))}>{yoCena ? 'Me quedo' : 'Sumarme'}</button>} />
         {cena.length ? (
           <div style={{ padding: '0 16px 14px' }}>
-            <div className="cap" style={{ marginBottom: 6 }}>Se quedan a comer ({cena.length})</div>
+            <div className="cap" style={{ marginBottom: 6 }}>{pl(cena.length, 'Se queda', 'Se quedan')} a comer ({cena.length})</div>
             <div className="chips">{cena.map(id => <span key={id} className={`chip ${id === uid ? 'on' : ''}`}>{nombreDe(id, jugadores, p)}</span>)}</div>
           </div>
         ) : null}

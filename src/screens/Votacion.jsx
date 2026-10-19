@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { collection } from 'firebase/firestore';
 import { db, llamar, mensajeError } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
-import { ATTRS } from '../lib/logica.js';
+import { ATTRS, quedanN } from '../lib/logica.js';
 import { aFecha } from '../lib/fechas.js';
 import { Avatar, Btn, Card, CardB, Fila, Icono, Meter, Pill, Vacio } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
@@ -61,7 +61,7 @@ export default function Votacion() {
     <Card>
       <div className="card-h"><h3 className="t">Quiénes votaron</h3><Pill t="info" className="num">{yaVotaron.length} de {jug.length}</Pill></div>
       <div style={{ padding: '10px 16px 0' }}><Meter claro pct={jug.length ? (yaVotaron.length / jug.length) * 100 : 0} />
-        <p className="small" style={{ marginTop: 8 }}>{vencido ? 'Se terminó el plazo para votar.' : `Quedan ${horas} h para votar. Los votos son anónimos.`}</p></div>
+        <p className="small" style={{ marginTop: 8 }}>{vencido ? 'Se terminó el plazo para votar.' : `${quedanN(horas)} h para votar. Los votos son anónimos.`}</p></div>
       <div style={{ paddingTop: 6 }}>
         {jug.map(id => (
           <div className="todo-r" key={id} style={{ minHeight: 48, paddingBlock: 6 }}>
