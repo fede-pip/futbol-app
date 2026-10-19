@@ -1,6 +1,6 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
-import { db, Timestamp, HttpsError, REGION, requireAuth, requireAdmin, crearCodigoUnico, lotes } from './util.js';
+import { db, Timestamp, HttpsError, REGION, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
 import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido } from './puro.js';
 import { AUD } from './compartido/catalogo.js';
 import { disparar, entregar, audiencia, ONESIGNAL_API_KEY } from './avisos.js';
@@ -114,6 +114,26 @@ async function completarVinculo(uid, dni, ld) {
   const grupos = await reasignarJugador(`l_${dni}`, uid);
   return { nombre: ld.nombre, grupos };
 }
+
+// Para el dueño de la plataforma: pasa a mano el historial de una cuenta anterior (DNI) a una cuenta con email
+// que la persona ya creó. Sirve cuando no recuerda su clave de antes y no puede hacerlo ella misma.
+export const vincularManual = onCall(opts, async req => {
+  const quien = requireSuper(req);
+  const dni = String(req.data?.dni || '').replace(/\D/g, '');
+  const email = String(req.data?.email || '').trim().toLowerCase();
+  if (dni.length < 6 || dni.length > 9 || !/^\S+@\S+\.\S+$/.test(email)) throw new HttpsError('invalid-argument', 'Completá el DNI y un email válido.');
+  const l = await db.doc(`app8_users/${dni}`).get();
+  if (!l.exists) throw new HttpsError('not-found', 'No hay una cuenta anterior con ese DNI.');
+  const ld = l.data();
+  let u;
+  try { u = await getAuth().getUserByEmail(email); } catch { throw new HttpsError('not-found', 'No hay una cuenta con ese email. Que la persona la cree primero.'); }
+  if (ld.nuevoUid && ld.nuevoUid !== u.uid) throw new HttpsError('already-exists', 'Esa cuenta anterior ya se pasó a otra cuenta.');
+  const previo = (await db.doc(`privado/${u.uid}`).get()).data()?.legacyDni;
+  if (previo && previo !== dni) throw new HttpsError('already-exists', 'Esa cuenta con email ya tiene otro historial vinculado.');
+  const r = await completarVinculo(u.uid, dni, ld);
+  console.log(`vincularManual: DNI ${dni.slice(0, 2)}***${dni.slice(-2)} -> ${u.uid} por ${quien}`);
+  return { nombre: ld.nombre || 'Jugador', grupos: r.grupos };
+});
 
 // Quien ya entraba con Google en la versión anterior tiene su cuenta vinculada (app8_uid_map):
 // la reconocemos y solo le pedimos que confirme que es él o ella.
