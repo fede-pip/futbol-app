@@ -57,7 +57,8 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
 
 function Inscripcion() {
   const { uid, gid, grupo, partido: p, jugadores, esAdmin } = useSesion();
-  const [aAnotar, setAAnotar] = useState('');
+  const [anotando, setAnotando] = useState(false);
+  const [buscar, setBuscar] = useState('');
   const toast = useToast();
   const guardados = useColl(collection(db, `grupos/${gid}/invitados`), gid) || [];
   const registrados = depurarInvitados(guardados, Object.values(jugadores).flatMap(j => [j.nombre, j.apodo])).utiles;
@@ -118,7 +119,36 @@ function Inscripcion() {
     <>
       <div><h2 className="t">{mayus(diaLargo(d))}, {horaTxt(d)}</h2><p className="lead" style={{ marginTop: 2 }}>{p.lugar} · {p.formato} · <a className="link" href={urlMapa(p)} target="_blank" rel="noopener noreferrer">Cómo llegar</a></p></div>
       <Card>
-        <div className="card-h"><h3 className="t">Anotados</h3><b className="num">{insc.length}/{cupo}</b></div>
+        <div className="card-h"><h3 className="t">Anotados</h3>
+          <div className="row" style={{ gap: 10 }}>
+            {esAdmin ? <button className={`chip sm ${anotando ? 'on' : ''}`} aria-expanded={anotando} onClick={() => { setAnotando(v => !v); setBuscar(''); }}>{anotando ? 'Cerrar' : '+ Anotar a alguien'}</button> : null}
+            <b className="num">{insc.length}/{cupo}</b>
+          </div>
+        </div>
+        {esAdmin && anotando ? (() => {
+          const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+          const faltan = (grupo.miembros || []).filter(id => !insc.includes(id) && (jugadores[id] || {}).nombre)
+            .filter(id => !buscar.trim() || norm(nombreDe(id, jugadores, p)).includes(norm(buscar)))
+            .sort((a, b) => nombreDe(a, jugadores, p).localeCompare(nombreDe(b, jugadores, p)));
+          const todos = (grupo.miembros || []).filter(id => !insc.includes(id) && (jugadores[id] || {}).nombre).length;
+          return (
+            <div style={{ padding: '12px 16px 8px', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+              <div className="cap" style={{ marginBottom: 8 }}>Tocá a quien querés anotar{lleno ? ` (el cupo está completo, igual se puede)` : ''}</div>
+              {todos > 6 ? <input className="select" style={{ width: '100%', marginBottom: 6 }} type="search" aria-label="Buscar jugador" placeholder="Buscar por nombre" value={buscar} onChange={e => setBuscar(e.target.value)} /> : null}
+              {faltan.length === 0 ? <div className="lista-vacia">{todos === 0 ? 'Ya están anotados todos los del grupo.' : 'Nadie coincide con esa búsqueda.'}</div> : null}
+              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                {faltan.map(id => (
+                  <button key={id} type="button" className="todo-r" disabled={cargando} style={{ minHeight: 52, paddingBlock: 8, width: '100%', textAlign: 'left', background: 'none', border: 0, cursor: 'pointer', font: 'inherit' }}
+                    onClick={() => ejecutar(async () => { await anotarJugador(gid, p, id); toast(`${nombreDe(id, jugadores, p)} quedó anotado`); })}>
+                    <Avatar nombre={nombreDe(id, jugadores, p)} foto={jugadores[id] && jugadores[id].foto} />
+                    <span className="grow" style={{ fontWeight: 550 }}>{nombreDe(id, jugadores, p)}{espera.includes(id) ? <small style={{ color: 'var(--text-3)', fontWeight: 400 }}> · en espera</small> : null}</span>
+                    <span className="chip sm on" aria-hidden="true">Anotar</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })() : null}
         <div style={{ padding: '10px 16px 4px' }}><Meter pct={(insc.length / cupo) * 100} claro /></div>
         <div style={{ paddingTop: 4 }}>
           {insc.length === 0 ? <div className="lista-vacia">Nadie anotado todavía. ¡Sé el primero!</div> : null}
@@ -141,26 +171,6 @@ function Inscripcion() {
           : <Btn v="pri" disabled={cargando} onClick={() => ejecutar(async () => { await anotarse(gid, p, uid); toast(lleno ? 'Quedaste en la lista de espera.' : `¡Anotado! Nos vemos el ${diaSemana(d)}.`); })}>{lleno ? 'Sumarme a la lista de espera' : 'Me anoto'}</Btn>}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {espera.length ? <Card><Fila icono="clock" titulo={`Lista de espera: ${espera.length}`} sub="Si alguien se baja, sube el primero y le avisamos." /></Card> : null}
-
-      {esAdmin ? (
-        <CardB>
-          <h3 className="t" style={{ marginBottom: 4 }}>Anotar a un jugador</h3>
-          <p className="muted" style={{ marginBottom: 10 }}>Como admin podés anotar a cualquiera del grupo, por ejemplo si te avisó por WhatsApp.</p>
-          {(() => {
-            const faltan = (grupo.miembros || []).filter(id => !insc.includes(id) && (jugadores[id] || {}).nombre).sort((a, b) => nombreDe(a, jugadores, p).localeCompare(nombreDe(b, jugadores, p)));
-            return faltan.length ? (
-              <div className="row" style={{ gap: 8 }}>
-                <select className="select grow" aria-label="Jugador a anotar" value={aAnotar} onChange={e => setAAnotar(e.target.value)}>
-                  <option value="">Elegir jugador…</option>
-                  {faltan.map(id => <option key={id} value={id}>{nombreDe(id, jugadores, p)}{espera.includes(id) ? ' (en espera)' : ''}</option>)}
-                </select>
-                <Btn v="pri" disabled={cargando || !aAnotar} onClick={() => ejecutar(async () => { await anotarJugador(gid, p, aAnotar); toast(`${nombreDe(aAnotar, jugadores, p)} quedó anotado`); setAAnotar(''); })}>Anotar</Btn>
-              </div>
-            ) : <p className="muted">Ya están anotados todos los del grupo.</p>;
-          })()}
-          {lleno ? <p className="small" style={{ marginTop: 8 }}>El cupo está completo: igual lo podés anotar y quedan más de {cupo}.</p> : null}
-        </CardB>
-      ) : null}
 
       <Card>
         <Fila icono="food" titulo="Tercer tiempo" sub={yoCena ? `Estás anotado. Somos ${cena.length} para comer.` : `¿Te quedás a comer? Somos ${cena.length}.`}
