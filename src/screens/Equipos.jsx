@@ -29,6 +29,9 @@ export default function Equipos() {
     return v || 5;
   };
   const suma = ids => ids.reduce((s, id) => s + nivelDe(id), 0);
+  const tieneNivel = id => id.startsWith('inv_') || !!(niveles[id] && niveles[id].atributos && calcProm(niveles[id].atributos) > 0);
+  const num = n => Number(n).toFixed(1).replace('.', ',');
+  const sinNivel = insc.filter(id => !tieneNivel(id));
 
   function generar() {
     const lista = insc.map(id => ({ id, atributos: Object.fromEntries(ATTRS.map(a => [a.key, nivelDe(id)])) }));
@@ -52,10 +55,12 @@ export default function Equipos() {
   const Col = ({ ids, clave, nombre, cls }) => (
     <div className={`team ${cls}`}>
       <h4>{nombre}<span>{ids.length}</span></h4>
+      {esAdmin ? <div className="small" style={{ margin: '-2px 0 6px', fontWeight: 600 }}>Promedio {num(suma(ids) / (ids.length || 1))} · Suma {num(suma(ids))}</div> : null}
       <ul>
-        {ids.map(id => (
+        {(esAdmin ? [...ids].sort((a, b) => nivelDe(b) - nivelDe(a)) : ids).map(id => (
           <li key={id} className="row" style={{ gap: 6 }}>
             <span className="grow">{corto(nombreDe(id, jugadores, p))}</span>
+            {esAdmin ? <span className="num" title={tieneNivel(id) ? 'Nivel' : 'Sin nivel cargado: se asume 5'} style={{ fontSize: 13, fontWeight: 650, color: tieneNivel(id) ? 'inherit' : 'var(--warn)', opacity: tieneNivel(id) ? .85 : 1 }}>{num(nivelDe(id))}{tieneNivel(id) ? '' : '*'}</span> : null}
             {esAdmin && !publicado ? <button className="chip sm" style={{ minHeight: 30 }} onClick={() => mover(id, clave)} aria-label={`Pasar a ${nombreDe(id, jugadores, p)} al otro equipo`}><Icono n="arrow" style={{ width: 14, height: 14 }} /></button> : null}
           </li>
         ))}
@@ -72,13 +77,16 @@ export default function Equipos() {
     <>
       <div><h2 className="t">{publicado ? '¡Ya están los equipos!' : 'Equipos (borrador)'}</h2>
         <p className="lead" style={{ marginTop: 2 }}>{publicado ? 'Nos vemos en la cancha.' : 'Solo vos los ves. Publicalos cuando estén listos.'}</p></div>
+      {esAdmin && sinNivel.length ? (
+        <div className="hint" role="status"><span className="hi"><Icono n="info" /></span><div className="grow"><b>{sinNivel.length === 1 ? '1 jugador no tiene nivel cargado' : `${sinNivel.length} jugadores no tienen nivel cargado`}.</b> Para esos se asume 5 (aparecen con *), y el armado pierde precisión. Cargalo en Grupo, tocando al jugador y eligiendo "Cambiar nivel".<div className="small" style={{ marginTop: 4 }}>{sinNivel.map(id => nombreDe(id, jugadores, p)).join(', ')}</div></div></div>
+      ) : null}
       <div className="teams"><Col ids={equipos.oscuro} clave="o" nombre="Oscuro" cls="o" /><Col ids={equipos.blanco} clave="b" nombre="Blanco" cls="b" /></div>
       {esAdmin ? (
         <CardB>
           <div className="row sp"><h3 className="t">Qué tan parejo quedó</h3><Pill t="tint"><Icono n="shield" />Solo admin</Pill></div>
           <div className="row sp" style={{ margin: '12px 0 8px' }}><b className="num" style={{ fontSize: 28, letterSpacing: '-.035em' }}>{dif.toFixed(1).replace('.', ',')}</b><Pill t={parejo ? 'ok' : 'warn'}>{parejo ? 'Muy parejo' : 'Podría mejorar'}</Pill></div>
           <Meter claro pct={Math.max(0, 100 - dif * 40)} />
-          <p className="small" style={{ marginTop: 8 }}>Diferencia de nivel promedio entre equipos. Los jugadores no ven esto.</p>
+          <p className="small" style={{ marginTop: 8 }}>Diferencia entre el promedio de Oscuro ({num(suma(equipos.oscuro) / (equipos.oscuro.length || 1))}) y el de Blanco ({num(suma(equipos.blanco) / (equipos.blanco.length || 1))}). Los jugadores no ven los niveles.</p>
         </CardB>
       ) : null}
       {error ? <div className="error" role="alert">{error}</div> : null}
