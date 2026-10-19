@@ -1,6 +1,6 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
-import { db, Timestamp, HttpsError, REGION, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
+import { db, Timestamp, HttpsError, REGION, URL_APP, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
 import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido } from './puro.js';
 import { AUD } from './compartido/catalogo.js';
 import { disparar, entregar, audiencia, ONESIGNAL_API_KEY } from './avisos.js';
@@ -115,24 +115,37 @@ async function completarVinculo(uid, dni, ld) {
   return { nombre: ld.nombre, grupos };
 }
 
-// Para el dueño de la plataforma: pasa a mano el historial de una cuenta anterior (DNI) a una cuenta con email
-// que la persona ya creó. Sirve cuando no recuerda su clave de antes y no puede hacerlo ella misma.
+// Para el dueño de la plataforma: deja a una persona con su historial anterior (DNI) y un acceso con email, sin pedirle
+// la clave de antes. Si ya creó una cuenta con ese email, se la une. Si no, se le crea el acceso y se devuelve un enlace
+// para que elija su contraseña (se lo manda el dueño por WhatsApp).
 export const vincularManual = onCall(opts, async req => {
   const quien = requireSuper(req);
   const dni = String(req.data?.dni || '').replace(/\D/g, '');
   const email = String(req.data?.email || '').trim().toLowerCase();
   if (dni.length < 6 || dni.length > 9 || !/^\S+@\S+\.\S+$/.test(email)) throw new HttpsError('invalid-argument', 'Completá el DNI y un email válido.');
   const l = await db.doc(`app8_users/${dni}`).get();
-  if (!l.exists) throw new HttpsError('not-found', 'No hay una cuenta anterior con ese DNI.');
+  if (!l.exists) throw new HttpsError('not-found', `No encontramos una cuenta anterior con el DNI ${dni}.`);
   const ld = l.data();
-  let u;
-  try { u = await getAuth().getUserByEmail(email); } catch { throw new HttpsError('not-found', 'No hay una cuenta con ese email. Que la persona la cree primero.'); }
+  const auth = getAuth();
+  let u = null, creado = false;
+  try { u = await auth.getUserByEmail(email); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
+  if (!u) {
+    // No hay cuenta con ese email: se le crea el acceso (o se completa el que ya tenía por DNI, sin email).
+    const uidDni = `d${dni}`;
+    let existente = null;
+    try { existente = await auth.getUser(uidDni); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
+    if (existente && existente.email) throw new HttpsError('already-exists', `Esa persona ya tiene un acceso con el email ${existente.email}.`);
+    u = existente ? await auth.updateUser(uidDni, { email, emailVerified: false })
+      : await auth.createUser({ uid: uidDni, email, displayName: ld.nombre || 'Jugador' });
+    creado = true;
+  }
   if (ld.nuevoUid && ld.nuevoUid !== u.uid) throw new HttpsError('already-exists', 'Esa cuenta anterior ya se pasó a otra cuenta.');
   const previo = (await db.doc(`privado/${u.uid}`).get()).data()?.legacyDni;
   if (previo && previo !== dni) throw new HttpsError('already-exists', 'Esa cuenta con email ya tiene otro historial vinculado.');
   const r = await completarVinculo(u.uid, dni, ld);
-  console.log(`vincularManual: DNI ${dni.slice(0, 2)}***${dni.slice(-2)} -> ${u.uid} por ${quien}`);
-  return { nombre: ld.nombre || 'Jugador', grupos: r.grupos };
+  const enlace = creado ? await auth.generatePasswordResetLink(email, { url: URL_APP }) : null;
+  console.log(`vincularManual: DNI ${dni.slice(0, 2)}***${dni.slice(-2)} -> ${u.uid} (${creado ? 'acceso creado' : 'cuenta existente'}) por ${quien}`);
+  return { nombre: ld.nombre || 'Jugador', grupos: r.grupos, creado, enlace };
 });
 
 // Quien ya entraba con Google en la versión anterior tiene su cuenta vinculada (app8_uid_map):

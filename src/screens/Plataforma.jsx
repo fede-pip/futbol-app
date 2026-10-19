@@ -37,7 +37,7 @@ function AyudaAcceso() {
   }
   async function vincular() {
     setError(''); setRes(null); setCargando(true);
-    try { const r = await llamar('vincularManual', { dni: dniDe(sel.id), email: emailV }); setRes({ vinculado: true, nombre: sel.nombre, email: emailV.trim(), grupos: r.grupos }); setSel(null); setEmailV(''); }
+    try { const r = await llamar('vincularManual', { dni: dniDe(sel.id), email: emailV }); setRes({ vinculado: true, nombre: sel.nombre, email: emailV.trim(), grupos: r.grupos, creado: r.creado, enlace: r.enlace }); setSel(null); setEmailV(''); }
     catch (e) { setError(mensajeError(e)); }
     setCargando(false);
   }
@@ -53,8 +53,8 @@ function AyudaAcceso() {
         <div className="confirm">
           <b>{sel.nombre}</b>
           <span className="muted">Todavía no entró con su email. Elegí cómo ayudarlo.</span>
-          <div className="field"><label htmlFor="vinc-email">Si ya creó su cuenta, escribí su email para unirla a su historial</label><input id="vinc-email" type="email" value={emailV} onChange={e => setEmailV(e.target.value)} placeholder="email@ejemplo.com" autoComplete="off" /></div>
-          <Btn v="pri" disabled={cargando || !/^\S+@\S+\.\S+$/.test(emailV.trim())} onClick={vincular}>Unir con ese email</Btn>
+          <div className="field"><label htmlFor="vinc-email">Escribí el email con el que va a entrar. Si ya tiene cuenta, la unimos a su historial; si no, le creamos el acceso y te damos un enlace para que elija su contraseña</label><input id="vinc-email" type="email" value={emailV} onChange={e => setEmailV(e.target.value)} placeholder="email@ejemplo.com" autoComplete="off" /></div>
+          <Btn v="pri" disabled={cargando || !/^\S+@\S+\.\S+$/.test(emailV.trim())} onClick={vincular}>Crear su acceso con ese email</Btn>
           <Btn disabled={cargando} onClick={() => { const x = sel; setSel(null); generar(x.id, x.nombre); }}>Mejor darle una clave temporal</Btn>
           <Btn v="ghost" onClick={() => setSel(null)}>Cancelar</Btn>
         </div>
@@ -65,8 +65,14 @@ function AyudaAcceso() {
         <div className="confirm">
           {res.vinculado ? (
             <>
-              <b>Listo: {res.nombre} quedó unido con {res.email}</b>
-              <span className="muted">Que cierre la app, la abra de nuevo y entre con ese email. Su historial y sus grupos ya están en esa cuenta.</span>
+              <b>Listo: {res.nombre} quedó con acceso por {res.email}</b>
+              <span className="muted">{res.creado ? 'Mandale el enlace para que elija su contraseña. Después entra con ese email y ya tiene su historial y sus grupos.' : 'Que cierre la app, la abra de nuevo y entre con ese email. Su historial y sus grupos ya están en esa cuenta.'}</span>
+              {res.enlace ? (
+                <div className="row" style={{ gap: 8 }}>
+                  <Btn onClick={async () => { try { await navigator.clipboard.writeText(res.enlace); toast('Enlace copiado'); } catch (e) { toast('No se pudo copiar'); } }}>Copiar enlace</Btn>
+                  <Btn v="pri" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Hola ${res.nombre.split(' ')[0]}! Entrá a este enlace para elegir tu contraseña de Me Anoto (es solo para vos): ${res.enlace}`)}`, '_blank', 'noopener')}>WhatsApp</Btn>
+                </div>
+              ) : null}
             </>
           ) : res.temporal ? (
             <>
