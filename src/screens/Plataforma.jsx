@@ -48,14 +48,14 @@ function AyudaAcceso() {
       <p className="muted">Buscá a la persona y generá un enlace para que elija una contraseña nueva, sin esperar el mail. Mandáselo solo a ella por WhatsApp.</p>
       <div className="field"><label htmlFor="ayuda-q">Nombre</label><input id="ayuda-q" value={q} onChange={e => { setQ(e.target.value); setRes(null); }} placeholder="Nico" autoComplete="off" /></div>
       {lista.length === 0 ? <p className="small">{Object.keys(jugadores || {}).length ? 'No encontramos a nadie con ese nombre en el grupo que estás viendo.' : 'No hay jugadores para mostrar: elegí un grupo en Inicio y volvé acá.'}</p> : null}
-      {lista.map(([id, j]) => <Fila key={id} icono="user" titulo={j.nombre} onClick={() => (id.startsWith('l_') ? (setSel({ id, nombre: j.nombre }), setRes(null), setError('')) : generar(id, j.nombre))} sub={id.startsWith('l_') ? 'Todavía no entró con su email' : (j.apodo || '')} derecha={<Pill t="tint">{id.startsWith('l_') ? 'Clave temporal' : 'Ayudar a entrar'}</Pill>} />)}
+      {lista.map(([id, j]) => <Fila key={id} icono="user" titulo={j.nombre} onClick={() => ((id.startsWith('l_') || /^d\d+$/.test(id)) ? (setSel({ id, nombre: j.nombre }), setRes(null), setError('')) : generar(id, j.nombre))} sub={id.startsWith('l_') || /^d\d+$/.test(id) ? 'Entraba con DNI' : (j.apodo || '')} derecha={<Pill t="tint">Ayudar a entrar</Pill>} />)}
       {sel ? (
         <div className="confirm">
           <b>{sel.nombre}</b>
-          <span className="muted">Todavía no entró con su email. Elegí cómo ayudarlo.</span>
+          <span className="muted">Entraba con DNI. Elegí cómo ayudarlo.</span>
           <div className="field"><label htmlFor="vinc-email">Escribí el email con el que va a entrar. Si ya tiene cuenta, la unimos a su historial; si no, le creamos el acceso y te damos un enlace para que elija su contraseña</label><input id="vinc-email" type="email" value={emailV} onChange={e => setEmailV(e.target.value)} placeholder="email@ejemplo.com" autoComplete="off" /></div>
           <Btn v="pri" disabled={cargando || !/^\S+@\S+\.\S+$/.test(emailV.trim())} onClick={vincular}>Crear su acceso con ese email</Btn>
-          <Btn disabled={cargando} onClick={() => { const x = sel; setSel(null); generar(x.id, x.nombre); }}>Mejor darle una clave temporal</Btn>
+          <Btn disabled={cargando} onClick={() => { const x = sel; setSel(null); generar(x.id, x.nombre); }}>Darle un enlace o una clave temporal</Btn>
           <Btn v="ghost" onClick={() => setSel(null)}>Cancelar</Btn>
         </div>
       ) : null}
@@ -66,7 +66,7 @@ function AyudaAcceso() {
           {res.vinculado ? (
             <>
               <b>Listo: {res.nombre} quedó con acceso por {res.email}</b>
-              <span className="muted">{res.creado ? 'Mandale el enlace para que elija su contraseña. Después entra con ese email y ya tiene su historial y sus grupos.' : 'Que cierre la app, la abra de nuevo y entre con ese email. Su historial y sus grupos ya están en esa cuenta.'}</span>
+              <span className="muted">{res.creado ? 'Mandale el enlace para que elija su contraseña. Después entra con ese email y ya tiene su historial y sus grupos.' : 'Ese email ya tenía cuenta y ahora tiene su historial. Si no recuerda la contraseña, mandale el enlace para elegir una nueva y que entre con ese email.'}</span>
               {res.enlace ? (
                 <div className="row" style={{ gap: 8 }}>
                   <Btn onClick={async () => { try { await navigator.clipboard.writeText(res.enlace); toast('Enlace copiado'); } catch (e) { toast('No se pudo copiar'); } }}>Copiar enlace</Btn>

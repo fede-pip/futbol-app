@@ -139,13 +139,24 @@ export const vincularManual = onCall(opts, async req => {
       : await auth.createUser({ uid: uidDni, email, displayName: ld.nombre || 'Jugador' });
     creado = true;
   }
-  if (ld.nuevoUid && ld.nuevoUid !== u.uid) throw new HttpsError('already-exists', 'Esa cuenta anterior ya se pasó a otra cuenta.');
+  // Si ya había entrado con el DNI (cuenta sin email), su historial está en esa cuenta: se pasa a esta.
+  let desde = null;
+  if (ld.nuevoUid && ld.nuevoUid !== u.uid) {
+    const du = await auth.getUser(ld.nuevoUid).catch(() => null);
+    if (!du || du.email) throw new HttpsError('already-exists', 'Esa cuenta anterior ya se pasó a otra cuenta con email.');
+    desde = ld.nuevoUid;
+  }
   const previo = (await db.doc(`privado/${u.uid}`).get()).data()?.legacyDni;
   if (previo && previo !== dni) throw new HttpsError('already-exists', 'Esa cuenta con email ya tiene otro historial vinculado.');
   const r = await completarVinculo(u.uid, dni, ld);
-  const enlace = creado ? await auth.generatePasswordResetLink(email, { url: URL_APP }) : null;
+  let grupos = r.grupos;
+  if (desde) {
+    grupos = await reasignarJugador(desde, u.uid);
+    await auth.updateUser(desde, { disabled: true }).catch(() => {}); // la cuenta por DNI queda sin uso
+  }
+  const enlace = await auth.generatePasswordResetLink(email, { url: URL_APP });
   console.log(`vincularManual: DNI ${dni.slice(0, 2)}***${dni.slice(-2)} -> ${u.uid} (${creado ? 'acceso creado' : 'cuenta existente'}) por ${quien}`);
-  return { nombre: ld.nombre || 'Jugador', grupos: r.grupos, creado, enlace };
+  return { nombre: ld.nombre || 'Jugador', grupos, creado, enlace };
 });
 
 // Quien ya entraba con Google en la versión anterior tiene su cuenta vinculada (app8_uid_map):
