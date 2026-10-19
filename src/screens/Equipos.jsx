@@ -4,7 +4,7 @@ import { db, mensajeError } from '../lib/firebase.js';
 import { aMapa, useColl } from '../data/hooks.js';
 import { borrarEquipos, guardarEquipos } from '../data/acciones.js';
 import { ATTRS, balancear, calcProm } from '../lib/logica.js';
-import { aFecha, titulo as tituloFecha } from '../lib/fechas.js';
+import { aFecha, diaLargo, hora as horaTxt, mayus } from '../lib/fechas.js';
 import { Btn, Card, CardB, Icono, Meter, Pill, Vacio } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 
@@ -71,7 +71,20 @@ export default function Equipos() {
   const dif = Math.abs(suma(equipos.oscuro) / (equipos.oscuro.length || 1) - suma(equipos.blanco) / (equipos.blanco.length || 1));
   const parejo = dif < 0.5;
   const d = aFecha(p.fechaHora);
-  const texto = [`⚽ ${tituloFecha(d)}`, '', 'Oscuro', ...equipos.oscuro.map((id, i) => `${i + 1}. ${nombreDe(id, jugadores, p)}`), '', 'Blanco', ...equipos.blanco.map((id, i) => `${i + 1}. ${nombreDe(id, jugadores, p)}`)].join('\n');
+  const lista = ids => ids.map((id, i) => `${i + 1}. ${nombreDe(id, jugadores, p)}`);
+  const texto = [
+    `⚽ *EQUIPOS · ${mayus(diaLargo(d))}, ${horaTxt(d)}*`,
+    `📍 ${p.lugar}${p.formato ? ` · ${p.formato}` : ''}`,
+    '',
+    `⚫ *OSCURO* (camiseta oscura)`,
+    ...lista(equipos.oscuro),
+    '',
+    `⚪ *BLANCO* (camiseta blanca)`,
+    ...lista(equipos.blanco),
+    '',
+    '💪 ¡Nos vemos en la cancha!',
+    `📲 Anotate, mirá los equipos y votá en Me Anoto: ${location.origin}`
+  ].join('\n');
 
   return (
     <>

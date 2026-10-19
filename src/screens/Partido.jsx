@@ -91,20 +91,21 @@ function Inscripcion() {
   const yoCena = cena.includes(uid);
   const nom = id => nombreDe(id, jugadores, p);
   const listaWA = encodeURIComponent([
-    `⚽ ${mayus(diaLargo(d))}, ${horaTxt(d)}`,
-    `📍 ${p.lugar} · ${p.formato}`,
+    `⚽ *${mayus(diaLargo(d)).toUpperCase()}, ${horaTxt(d)}*`,
+    `📍 ${p.lugar}${p.formato ? ` · ${p.formato}` : ''}`,
     '',
-    `Anotados (${insc.length}/${cupo}):`,
+    `✅ *ANOTADOS (${insc.length}/${cupo})*`,
     ...(insc.length ? insc.map((id, i) => `${i + 1}. ${nom(id)}${cena.includes(id) ? ' 🍽️' : ''}`) : ['Todavía no hay nadie.']),
-    ...(insc.length < cupo ? [`${faltanN(cupo - insc.length)}.`] : ['Cupo completo.']),
-    ...(espera.length ? ['', `En espera: ${espera.map(nom).join(', ')}`] : []),
     '',
-    `🍽️ ${pl(cena.length, 'Se queda', 'Se quedan')} a comer (${cena.length}):`,
+    insc.length < cupo ? `🔔 *${faltanN(cupo - insc.length)}*` : '🔒 *Cupo completo*',
+    ...(espera.length ? ['', `⏳ *EN ESPERA*`, ...espera.map((id, i) => `${i + 1}. ${nom(id)}`)] : []),
+    '',
+    `🍽️ *${pl(cena.length, 'SE QUEDA', 'SE QUEDAN')} A COMER (${cena.length})*`,
     cena.length ? cena.map(nom).join(', ') : 'Nadie por ahora.',
     '',
-    `Anotate en Me Anoto: ${location.origin}`
+    `📲 Anotate en Me Anoto: ${location.origin}`
   ].join('\n'));
-  const mensajeWA = encodeURIComponent(`⚽ ${tituloFecha(d)} en ${p.lugar}. Vamos ${insc.length} de ${cupo}. Anotate en Me Anoto: ${location.origin}`);
+  const mensajeWA = encodeURIComponent(`⚽ *${mayus(diaLargo(d))}, ${horaTxt(d)}*\n📍 ${p.lugar}\n\n${insc.length >= cupo ? '🔒 Cupo completo, pero podés quedar en la lista de espera.' : `🔔 ${faltanN(cupo - insc.length)}. ¡Anotate!`}\n📲 ${location.origin}`);
 
   if (editando) return (
     <>
