@@ -106,8 +106,11 @@ async function reasignarJugador(desde, hacia) {
 async function completarVinculo(uid, dni, ld) {
   const lref = db.doc(`app8_users/${dni}`);
   const uref = db.doc(`usuarios/${uid}`);
-  if (!(await uref.get()).exists) {
+  const actual = await uref.get();
+  if (!actual.exists) {
     await uref.set({ nombre: ld.nombre || 'Jugador', apodo: ld.apodo || '', foto: ld.foto || '', creadoEn: Timestamp.now() });
+  } else if (!actual.data().foto && ld.foto && String(ld.foto).length <= 30000) {
+    await uref.update({ foto: ld.foto }); // trae la foto de la versión anterior si todavía no tiene una
   }
   await db.doc(`privado/${uid}`).set({ legacyDni: dni, onboarding: { anterior: true } }, { merge: true });
   await lref.update({ nuevoUid: uid, vinculadoEn: Timestamp.now() });

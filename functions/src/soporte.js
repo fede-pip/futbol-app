@@ -37,3 +37,32 @@ export const claveTemporalDni = onCall({ region: REGION, cors: true }, async req
   console.log(`claveTemporalDni: reiniciada para el DNI ${dni.slice(0, 2)}***${dni.slice(-2)} por ${req.auth.uid}`);
   return { nombre: ld.nombre || 'Jugador', clave };
 });
+
+// Recupera las fotos de la versión anterior (guardadas en app8_users/{dni}.foto) para quienes ya pasaron a una cuenta
+// nueva y no la tienen en su perfil ni en sus grupos. Sin "aplicar" solo cuenta cuántas se podrían recuperar.
+export const recuperarFotos = onCall({ region: REGION, cors: true, timeoutSeconds: 300 }, async req => {
+  const quien = requireSuper(req);
+  const aplicar = !!req.data?.aplicar;
+  const snap = await db.collection('app8_users').get();
+  let conFoto = 0, aRecuperar = 0;
+  const nombres = [];
+  for (const d of snap.docs) {
+    const u = d.data();
+    const foto = typeof u.foto === 'string' ? u.foto.trim() : '';
+    if (!foto || !u.nuevoUid || foto.length > 30000) continue;
+    conFoto++;
+    const uid = u.nuevoUid;
+    const us = await db.doc(`usuarios/${uid}`).get();
+    let falta = false;
+    if (us.exists && !us.data().foto) { falta = true; if (aplicar) await us.ref.update({ foto }); }
+    const gs = await db.collection('grupos').where('miembros', 'array-contains', uid).get();
+    for (const g of gs.docs) {
+      const jr = g.ref.collection('jugadores').doc(uid);
+      const j = await jr.get();
+      if (j.exists && !j.data().foto) { falta = true; if (aplicar) await jr.update({ foto }); }
+    }
+    if (falta) { aRecuperar++; nombres.push(u.nombre || 'Jugador'); }
+  }
+  console.log(`recuperarFotos: ${aplicar ? 'aplicado' : 'simulación'}, con foto ${conFoto}, a recuperar ${aRecuperar}, por ${quien}`);
+  return { aplicado: aplicar, conFoto, aRecuperar, nombres };
+});

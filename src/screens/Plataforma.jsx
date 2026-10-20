@@ -95,6 +95,32 @@ function AyudaAcceso() {
   );
 }
 
+function RecuperarFotos() {
+  const [r, setR] = useState(null);
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+  async function correr(aplicar) {
+    setError(''); setCargando(true);
+    try { setR(await llamar('recuperarFotos', { aplicar })); } catch (e) { setError(mensajeError(e)); }
+    setCargando(false);
+  }
+  return (
+    <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <h3 className="t">Fotos de la versión anterior</h3>
+      <p className="muted">Trae las fotos que cada jugador tenía antes a su perfil y a sus grupos, solo donde hoy no tienen ninguna. No pisa fotos nuevas.</p>
+      <Btn disabled={cargando} onClick={() => correr(false)}>{cargando && !r ? 'Mirando…' : 'Ver cuántas se pueden recuperar'}</Btn>
+      {error ? <div className="error" role="alert">{error}</div> : null}
+      {r ? (
+        <div className="confirm">
+          <b>{r.aplicado ? `Listo: se recuperaron ${r.aRecuperar} ${r.aRecuperar === 1 ? 'foto' : 'fotos'}` : `Se pueden recuperar ${r.aRecuperar} ${r.aRecuperar === 1 ? 'foto' : 'fotos'}`}</b>
+          <span className="muted">De {r.conFoto} {r.conFoto === 1 ? 'jugador' : 'jugadores'} con foto en la versión anterior.{r.nombres && r.nombres.length ? ` ${r.nombres.join(', ')}.` : ''}</span>
+          {!r.aplicado && r.aRecuperar ? <Btn v="pri" disabled={cargando} onClick={() => correr(true)}>Recuperar ahora</Btn> : null}
+        </div>
+      ) : null}
+    </CardB>
+  );
+}
+
 export default function Plataforma() {
   const { user } = useSesion();
   const { ir } = useNav();
@@ -115,6 +141,7 @@ export default function Plataforma() {
       <BarraSuperior atras onAtras={() => ir('inicio')} />
       <div><h2 className="t">Plataforma</h2><p className="lead" style={{ marginTop: 2 }}>Datos de la versión anterior · {esProduccion ? 'PRODUCCIÓN' : 'pruebas'}</p></div>
       <AyudaAcceso />
+      <RecuperarFotos />
       <Hint>Primero mirá qué se migraría. Migrar crea los grupos nuevos con cada jugador como perfil pendiente; no borra nada de lo anterior y no pisa grupos ya migrados.</Hint>
       <Btn disabled={cargando} onClick={() => correr({ dryRun: true })}>{cargando ? 'Mirando…' : 'Ver qué se migraría'}</Btn>
       {!esProduccion ? <Btn disabled={cargando} onClick={() => correr({ dryRun: true, sembrar: true, forzar: true })}>Sembrar datos anteriores de prueba</Btn> : null}

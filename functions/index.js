@@ -5,4 +5,4 @@ export { alCrearPartido, alActualizarPartido } from './src/triggers.js';
 export { programados, resumenSemanal } from './src/programados.js';
 export { migrarDatosAnteriores } from './src/migracion.js';
 export { tomarEnVivo, soltarEnVivo, registrarGol, deshacerGol } from './src/envivo.js';
-export { enlaceDeAcceso, claveTemporalDni } from './src/soporte.js';
+export { enlaceDeAcceso, claveTemporalDni, recuperarFotos } from './src/soporte.js';
