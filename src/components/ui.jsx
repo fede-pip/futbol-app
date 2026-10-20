@@ -1,3 +1,4 @@
+import { urlFoto } from '../lib/foto.js';
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 
 const IC = {
@@ -54,8 +55,11 @@ export const Pill = ({ t = '', children, ...p }) => <span className={`pill ${t}`
 
 const variante = n => (n === 'yo' ? 'me' : 'v' + (((n || 'x').charCodeAt(0) + (n || 'x').length) % 4));
 export function Avatar({ nombre = '', foto, yo, lg }) {
+  const [rota, setRota] = useState('');
+  const src = urlFoto(foto);
   const ini = nombre.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?';
-  if (foto) return <span className={`av ${lg ? 'lg' : ''}`} style={{ overflow: 'hidden' }}><img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></span>;
+  // Si la imagen no carga (enlace viejo o caído), se muestran las iniciales.
+  if (src && rota !== src) return <span className={`av ${lg ? 'lg' : ''}`} style={{ overflow: 'hidden' }}><img src={src} alt="" referrerPolicy="no-referrer" onError={() => setRota(src)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></span>;
   return <span className={`av ${yo ? 'me' : variante(nombre)} ${lg ? 'lg' : ''}`} aria-hidden="true">{ini}</span>;
 }
 

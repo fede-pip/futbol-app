@@ -18,13 +18,15 @@ export default function Perfil() {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const yo = jugadores[uid];
+  // La foto puede estar en el grupo (migrada de la versión anterior) y no en el perfil: se usa la que haya.
+  const fotoActual = perfil.foto || (yo && yo.foto) || '';
   const tend = yo && yo.stats && yo.stats.partidos > 0 ? yo.tendencia || {} : null;
 
   async function guardar(e) {
     e.preventDefault(); setError('');
     if (nombre.trim().length < 2) return setError('El nombre es muy corto.');
     setCargando(true);
-    try { await guardarPerfil(uid, { nombre, apodo, foto: perfil.foto || '' }, (grupos || []).map(g => g.id)); toast('Perfil actualizado'); }
+    try { await guardarPerfil(uid, { nombre, apodo, foto: fotoActual }, (grupos || []).map(g => g.id)); toast('Perfil actualizado'); }
     catch (err) { setError(mensajeError(err)); }
     setCargando(false);
   }
@@ -35,7 +37,7 @@ export default function Perfil() {
       <div><h2 className="t" style={{ fontSize: 22 }}>{perfil.nombre}</h2><div className="muted">{user.email}</div></div>
       <Card><CardB style={{ border: 0, boxShadow: 'none' }}>
         <div className="cap" style={{ marginBottom: 8 }}>Tu foto</div>
-        <SelectorFoto nombre={perfil.nombre} foto={perfil.foto} deshabilitado={cargando}
+        <SelectorFoto nombre={perfil.nombre} foto={fotoActual} deshabilitado={cargando}
           onError={setError}
           onCambio={async foto => { setError(''); setCargando(true); try { await guardarPerfil(uid, { nombre: perfil.nombre, apodo: perfil.apodo || '', foto }, (grupos || []).map(g => g.id)); toast(foto ? 'Foto actualizada' : 'Foto quitada'); } catch (err) { setError(mensajeError(err)); } setCargando(false); }} />
         <p className="small" style={{ marginTop: 8 }}>La foto se ve en todos tus grupos. Se achica sola, no hace falta que la recortes.</p>

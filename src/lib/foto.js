@@ -1,3 +1,14 @@
+// Las fotos de la versión anterior eran enlaces; los de Google Drive hay que pasarlos a una dirección de imagen directa.
+export function urlFoto(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('data:')) return url;
+  const m = url.match(/\/file\/d\/([^/]+)/);
+  if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+  const m2 = url.match(/drive\.google\.com\/.*[?&]id=([^&]+)/);
+  if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
+  return url;
+}
+
 // Foto de perfil: se achica en el celular a un cuadrado de 128 px (unos 6 KB) y se guarda en el perfil.
 // Así no hace falta un servicio de archivos aparte, y no sube costos.
 export function fotoDesdeArchivo(archivo, lado = 128) {
