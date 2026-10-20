@@ -92,8 +92,8 @@ export async function crearPerfil(uid, { nombre, foto = '' }) {
   await setDoc(doc(db, 'usuarios', uid), { nombre: nombre.trim(), apodo: '', foto, creadoEn: Timestamp.now() });
 }
 // Un admin corrige cómo se ve el nombre de alguien en este grupo (la persona puede volver a cambiarlo desde su perfil).
-export const renombrarJugador = (gid, id, { nombre, apodo }) =>
-  updateDoc(doc(db, `grupos/${gid}/jugadores/${id}`), { nombre: nombre.trim(), apodo: (apodo || '').trim() });
+export const renombrarJugador = (gid, id, { nombre, apodo, foto }) =>
+  updateDoc(doc(db, `grupos/${gid}/jugadores/${id}`), { nombre: nombre.trim(), apodo: (apodo || '').trim(), ...(foto !== undefined ? { foto } : {}) });
 export const guardarPrefs = (uid, prefs) => setDoc(doc(db, 'privado', uid), { prefs }, { merge: true });
 export const marcarOnboarding = (uid, clave) => setDoc(doc(db, 'privado', uid), { onboarding: { [clave]: true } }, { merge: true });
 export const marcarLeido = (uid, id) => updateDoc(doc(db, `privado/${uid}/avisos/${id}`), { leido: true });

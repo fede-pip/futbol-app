@@ -99,6 +99,28 @@ export function Campo({ label, id, className = '', ...p }) {
   return <div className="field"><label htmlFor={id}>{label}</label><input id={id} className={className} {...p} /></div>;
 }
 
+// Elegir o quitar la foto: se achica en el celular antes de guardarla.
+export function SelectorFoto({ nombre, foto, onCambio, onError, deshabilitado }) {
+  async function elegir(e) {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try { const { fotoDesdeArchivo } = await import('../lib/foto.js'); onCambio(await fotoDesdeArchivo(f)); }
+    catch (err) { if (onError) onError(err.message); }
+  }
+  return (
+    <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+      <Avatar nombre={nombre} foto={foto} lg />
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <label className="chip on" style={{ cursor: deshabilitado ? 'default' : 'pointer', opacity: deshabilitado ? .6 : 1 }}>
+          {foto ? 'Cambiar foto' : 'Subir foto'}
+          <input type="file" accept="image/*" onChange={elegir} disabled={deshabilitado} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }} aria-label="Elegir una foto" />
+        </label>
+        {foto ? <button type="button" className="chip" disabled={deshabilitado} onClick={() => onCambio('')}>Quitar</button> : null}
+      </div>
+    </div>
+  );
+}
+
 // Contraseña con botón para ver lo que se escribe (evita errores de tipeo, sobre todo en el celular).
 export function CampoClave({ label, id, ayuda, ...p }) {
   const [ver, setVer] = useState(false);

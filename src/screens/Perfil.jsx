@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth';
 import { auth, mensajeError } from '../lib/firebase.js';
 import { guardarPerfil } from '../data/acciones.js';
 import { ATTRS } from '../lib/logica.js';
-import { Avatar, Btn, Campo, Card, CardB, Fila, Icono, Pill, useToast } from '../components/ui.jsx';
+import { Avatar, Btn, Campo, Card, CardB, Fila, Icono, Pill, SelectorFoto, useToast } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { esSuper } from './Plataforma.jsx';
@@ -32,7 +32,14 @@ export default function Perfil() {
   return (
     <div className="scr">
       <BarraSuperior atras onAtras={() => ir('grupo')} />
-      <div className="row"><Avatar nombre={perfil.nombre} foto={perfil.foto} yo lg /><div><h2 className="t" style={{ fontSize: 22 }}>{perfil.nombre}</h2><div className="muted">{user.email}</div></div></div>
+      <div><h2 className="t" style={{ fontSize: 22 }}>{perfil.nombre}</h2><div className="muted">{user.email}</div></div>
+      <Card><CardB style={{ border: 0, boxShadow: 'none' }}>
+        <div className="cap" style={{ marginBottom: 8 }}>Tu foto</div>
+        <SelectorFoto nombre={perfil.nombre} foto={perfil.foto} deshabilitado={cargando}
+          onError={setError}
+          onCambio={async foto => { setError(''); setCargando(true); try { await guardarPerfil(uid, { nombre: perfil.nombre, apodo: perfil.apodo || '', foto }, (grupos || []).map(g => g.id)); toast(foto ? 'Foto actualizada' : 'Foto quitada'); } catch (err) { setError(mensajeError(err)); } setCargando(false); }} />
+        <p className="small" style={{ marginTop: 8 }}>La foto se ve en todos tus grupos. Se achica sola, no hace falta que la recortes.</p>
+      </CardB></Card>
       <form className="card card-b" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} onSubmit={guardar}>
         <Campo label="Nombre" id="pf-nombre" value={nombre} onChange={e => setNombre(e.target.value)} maxLength={80} />
         <Campo label="Apodo (opcional)" id="pf-apodo" value={apodo} onChange={e => setApodo(e.target.value)} placeholder="El Flaco" maxLength={30} />

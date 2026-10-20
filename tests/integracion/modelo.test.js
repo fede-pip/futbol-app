@@ -132,6 +132,14 @@ describe('nombres en el grupo', () => {
     expect(j.nombre).toBe('Nombre Corregido');
     await denegado(updateDoc(doc(B.db, 'grupos', gid, 'jugadores', A.uid), { nombre: 'Otro Nombre', apodo: '' }));
   });
+  it('la foto es una imagen chica: un admin y la propia persona pueden cambiarla, pero no una enorme', async () => {
+    const chica = 'data:image/jpeg;base64,' + 'A'.repeat(500);
+    await updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: 'Nombre Corregido', apodo: 'Beto', foto: chica });
+    await updateDoc(doc(B.db, 'usuarios', B.uid), { foto: chica });
+    const enorme = 'data:image/jpeg;base64,' + 'A'.repeat(40000);
+    await denegado(updateDoc(doc(B.db, 'usuarios', B.uid), { foto: enorme }));
+    await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: 'Nombre Corregido', apodo: 'Beto', foto: enorme }));
+  });
   it('un admin no puede cambiar otros datos del jugador ni dejar el nombre vacío', async () => {
     await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: 'Nombre Corregido', stats: { puntos: 999 } }));
     await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: '', apodo: '' }));
