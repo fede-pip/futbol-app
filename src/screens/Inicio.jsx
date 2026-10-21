@@ -11,6 +11,7 @@ import { Btn, Card, CardB, Fila, Hint, Icono, Meter, Pill, Vacio, useToast } fro
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
+import { DetallePartido, ResumenVotacion } from '../components/Resumenes.jsx';
 import { mensajeError } from '../lib/firebase.js';
 
 const iniciales = n => (n || '').split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
@@ -36,6 +37,7 @@ export default function Inicio() {
   const toast = useToast();
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [verUltimo, setVerUltimo] = useState(false);
   const ultimo = useColl(query(collection(db, `grupos/${gid}/partidos`), where('estado', '==', 'cerrado'), orderBy('fechaHora', 'desc'), limit(1)), gid);
   const yo = jugadores[uid];
 
@@ -124,6 +126,9 @@ export default function Inicio() {
           <CardB style={{ paddingTop: 12, border: 0, boxShadow: 'none' }}>
             <div className="row sp"><span className="pill eq-o">Oscuro</span><b className="num" style={{ fontSize: 28, letterSpacing: '-.035em' }}>{r.golesO} – {r.golesB}</b><span className="pill eq-b">Blanco</span></div>
             {u.mvps && u.mvps.length ? <div className="row" style={{ marginTop: 12, justifyContent: 'center', gap: 8 }}><span className="pill warn"><Icono n="star" />MVP</span><span style={{ fontWeight: 550 }}>{u.mvps.map(id => nombreDe(id, jugadores, u)).join(' y ')}</span></div> : null}
+            <button className="chip sm" style={{ marginTop: 12 }} aria-expanded={verUltimo} onClick={() => setVerUltimo(v => !v)}>{verUltimo ? 'Ocultar detalle' : 'Ver goles y equipos'}</button>
+            {verUltimo ? <div style={{ marginTop: 12 }}><DetallePartido p={u} jugadores={jugadores} /></div> : null}
+            {u.cambiosVotacion && u.cambiosVotacion[uid] ? <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}><div className="cap" style={{ marginBottom: 8 }}>Cómo te votaron</div><ResumenVotacion cambios={u.cambiosVotacion[uid]} /></div> : null}
           </CardB>
         </Card>
       ) : null}

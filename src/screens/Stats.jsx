@@ -6,12 +6,16 @@ import { aFecha, diaCorto, mayus } from '../lib/fechas.js';
 import { Avatar, Card, CardB, Hint, Icono, Pill, Vacio } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
+import { useNav } from '../app/nav.jsx';
+import { DetallePartido, ResumenVotacion } from '../components/Resumenes.jsx';
 
 const corto = n => { const p = (n || '').split(' ').filter(Boolean); return p.length > 1 ? `${p[0][0]}. ${p.slice(1).join(' ')}` : n; };
 
 export default function Stats() {
   const { uid, gid, grupo, jugadores } = useSesion();
-  const [vista, setVista] = useState('puntos');
+  const { param } = useNav();
+  const [vista, setVista] = useState(param === 'partidos' ? 'partidos' : 'puntos');
+  const [abierto, setAbierto] = useState(null);
   const cerrados = useColl(query(collection(db, `grupos/${gid}/partidos`), where('estado', '==', 'cerrado'), orderBy('fechaHora', 'desc'), limit(40)), gid);
 
   const filas = grupo.miembros.map(id => ({ id, ...(jugadores[id] || {}) })).filter(j => j.nombre);
@@ -45,6 +49,13 @@ export default function Stats() {
                   <div className="row sp"><b>{mayus(diaCorto(aFecha(p.fechaHora)))}</b><span className="small">{p.lugar}</span></div>
                   <div className="row sp" style={{ marginTop: 10 }}><span className="pill eq-o">Oscuro</span><b className="num" style={{ fontSize: 24, letterSpacing: '-.03em' }}>{r.golesO ?? 0} – {r.golesB ?? 0}</b><span className="pill eq-b">Blanco</span></div>
                   {p.mvps && p.mvps.length ? <div className="row" style={{ marginTop: 10, justifyContent: 'center', gap: 8 }}><Pill t="warn"><Icono n="star" />MVP</Pill><span style={{ fontWeight: 550 }}>{p.mvps.map(id => nombreDe(id, jugadores, p)).join(' y ')}</span></div> : null}
+                  <button className="chip sm" style={{ marginTop: 12 }} aria-expanded={abierto === p.id} onClick={() => setAbierto(abierto === p.id ? null : p.id)}>{abierto === p.id ? 'Ocultar detalle' : 'Ver goles y equipos'}</button>
+                  {abierto === p.id ? (
+                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <DetallePartido p={p} jugadores={jugadores} />
+                      {p.cambiosVotacion && p.cambiosVotacion[uid] ? <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}><div className="cap" style={{ marginBottom: 8 }}>Cómo te votaron</div><ResumenVotacion cambios={p.cambiosVotacion[uid]} /></div> : null}
+                    </div>
+                  ) : null}
                 </CardB>
               </Card>
             );

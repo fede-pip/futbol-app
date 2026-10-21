@@ -83,6 +83,7 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
     const antes = ranking(Object.entries(jug).map(([id, j]) => ({ id, puntos: j.stats?.puntos || 0, goles: j.stats?.goles || 0 })));
     const despues = { ...jug };
     const cambios = [];
+    const cambiosVotacion = {}; // por jugador: flechitas por atributo y el resultado general (solo el sentido, sin números)
     jugadoresIds.forEach((id, i) => {
       const jd = jug[id] || { stats: statsVacias(), racha: '' };
       const nv = niveles[i].exists ? niveles[i].data() : { atributos: {}, previos: {} };
@@ -97,6 +98,7 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
       const actuales = { ...(nv.atributos || {}) };
       const nuevos = { ...actuales };
       const tendencia = {};
+      let deltaTotal = 0;
       for (const a of ATTRS) {
         const n = notas[id]?.[a.key];
         if (n && n.cant > 0) {
@@ -104,14 +106,16 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
           const nuevo = nuevoAtributo(antesV, n.suma, n.cant);
           nuevos[a.key] = nuevo;
           tendencia[a.key] = Math.sign(+(nuevo - antesV).toFixed(2));
+          deltaTotal += nuevo - antesV;
         } else tendencia[a.key] = 0;
       }
+      cambiosVotacion[id] = { attrs: tendencia, general: Math.sign(+deltaTotal.toFixed(2)) };
       tx.set(gref.collection('jugadores').doc(id), { stats, racha, tendencia }, { merge: true });
       tx.set(gref.collection('niveles').doc(id), { atributos: nuevos, previos: actuales }, { merge: true });
       despues[id] = { ...jd, stats, racha };
       cambios.push({ id, racha, stats });
     });
-    tx.update(pref, { estado: 'cerrado', resultado: { texto, golesO, golesB }, mvps, fechaCierre: Timestamp.now() });
+    tx.update(pref, { estado: 'cerrado', resultado: { texto, golesO, golesB }, mvps, cambiosVotacion, fechaCierre: Timestamp.now() });
     if (gs.data().partidoActivo === pid) tx.update(gref, { partidoActivo: null });
     if (as.exists) tx.delete(aref);
 
