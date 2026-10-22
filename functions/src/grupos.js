@@ -1,12 +1,29 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
-import { db, Timestamp, HttpsError, REGION, URL_APP, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
-import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido } from './puro.js';
+import { db, Timestamp, FieldValue, HttpsError, REGION, URL_APP, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
+import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido, esPendiente } from './puro.js';
 import { AUD } from './compartido/catalogo.js';
 import { disparar, entregar, audiencia, ONESIGNAL_API_KEY } from './avisos.js';
 
-const opts = { region: REGION, cors: true };
+const opts = { region: REGION, cors: true, maxInstances: 20 };
 const MAX_GRUPOS = 10;
+const HORA = 3600000;
+
+// Intentos fallidos por hora: se cuentan en un documento aparte (cerrado al cliente).
+async function leerIntentos(ref) {
+  const i = (await ref.get()).data() || { n: 0, desde: Date.now() };
+  return { n: i.n, desde: i.desde, vigente: Date.now() - i.desde < HORA };
+}
+const sumarFallo = (ref, i) => ref.set({ n: i.vigente ? i.n + 1 : 1, desde: i.vigente ? i.desde : Date.now() });
+
+// El ingreso y la vinculación por DNI son para la transición desde la versión anterior: el dueño los cierra cuando terminó.
+async function dniAbierto() {
+  const c = await db.doc('config/ingreso').get();
+  return !(c.exists && c.data().dniCerrado === true);
+}
+async function exigirDniAbierto() {
+  if (!(await dniAbierto())) throw new HttpsError('failed-precondition', 'El ingreso con DNI ya no está disponible. Entrá con tu email o con Google, o pedile ayuda al admin del grupo.');
+}
 
 export const crearGrupo = onCall(opts, async req => {
   const uid = requireAuth(req);
@@ -45,8 +62,14 @@ export const unirsePorCodigo = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] },
   const uid = requireAuth(req);
   const codigo = String(req.data?.codigo || '').trim().toUpperCase().replace(/\s/g, '');
   if (!/^[A-Z0-9-]{5,12}$/.test(codigo)) throw new HttpsError('invalid-argument', 'Ese código no es válido.');
+  const iCod = db.doc(`intentosCodigo/${uid}`);
+  const ic = await leerIntentos(iCod);
+  if (ic.vigente && ic.n >= 10) throw new HttpsError('resource-exhausted', 'Demasiados intentos con códigos. Probá de nuevo en una hora.');
   const c = await db.doc(`codigos/${codigo}`).get();
-  if (!c.exists) throw new HttpsError('not-found', 'No encontramos ese código. Revisá que esté bien escrito.');
+  if (!c.exists) {
+    await sumarFallo(iCod, ic);
+    throw new HttpsError('not-found', 'No encontramos ese código. Revisá que esté bien escrito.');
+  }
   const gid = c.data().gid;
   const gref = db.doc(`grupos/${gid}`);
   const uref = db.doc(`usuarios/${uid}`);
@@ -199,21 +222,23 @@ export const vincularCuentaAnterior = onCall(opts, async req => {
   const clave = String(req.data?.clave || '');
   if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
 
-  // Máximo 5 intentos fallidos por hora y por persona.
-  const iref = db.doc(`intentosVinculo/${uid}`);
-  const ahora = Date.now();
-  const i = (await iref.get()).data() || { n: 0, desde: ahora };
-  const vigente = ahora - i.desde < 3600000;
-  if (vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Probá de nuevo en una hora.');
+  await exigirDniAbierto();
+
+  // Máximo 5 intentos fallidos por hora por DNI (el mismo contador que el ingreso con DNI, sin importar desde qué cuenta se pruebe)
+  // y 10 por hora por cuenta, para que crear cuentas nuevas no dé intentos nuevos.
+  const iDni = db.doc(`intentosDni/${dni}`), iUid = db.doc(`intentosVinculo/${uid}`);
+  const [idni, iuid] = await Promise.all([leerIntentos(iDni), leerIntentos(iUid)]);
+  if (idni.vigente && idni.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos con ese DNI. Probá de nuevo en una hora.');
+  if (iuid.vigente && iuid.n >= 10) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Probá de nuevo en una hora.');
 
   const l = await db.doc(`app8_users/${dni}`).get();
   const ld = l.exists ? l.data() : null;
   if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
-    await iref.set({ n: vigente ? i.n + 1 : 1, desde: vigente ? i.desde : ahora });
+    await Promise.all([sumarFallo(iDni, idni), sumarFallo(iUid, iuid)]);
     throw new HttpsError('permission-denied', 'El DNI o la clave no coinciden.');
   }
   if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('already-exists', 'Esa cuenta ya se pasó a otro usuario.');
-  await iref.delete().catch(() => {});
+  await Promise.all([iDni.delete().catch(() => {}), iUid.delete().catch(() => {})]);
   return completarVinculo(uid, dni, ld);
 });
 
@@ -225,19 +250,18 @@ export const ingresarConDni = onCall(opts, async req => {
   const dni = String(req.data?.dni || '').replace(/\D/g, '');
   const clave = String(req.data?.clave || '');
   if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
+  await exigirDniAbierto();
 
   // Máximo 5 intentos fallidos por hora por DNI.
   const iref = db.doc(`intentosDni/${dni}`);
-  const ahora = Date.now();
-  const i = (await iref.get()).data() || { n: 0, desde: ahora };
-  const vigente = ahora - i.desde < 3600000;
-  if (vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos con ese DNI. Probá de nuevo en una hora.');
+  const i = await leerIntentos(iref);
+  if (i.vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos con ese DNI. Probá de nuevo en una hora.');
 
   const lref = db.doc(`app8_users/${dni}`);
   const l = await lref.get();
   const ld = l.exists ? l.data() : null;
   if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
-    await iref.set({ n: vigente ? i.n + 1 : 1, desde: vigente ? i.desde : ahora });
+    await sumarFallo(iref, i);
     throw new HttpsError('permission-denied', 'El DNI o la clave no coinciden.');
   }
 
@@ -273,4 +297,70 @@ export const enviarAvisoManual = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] 
   const vars = partido ? varsPartido(g, partido) : { comunidad: g.nombre };
   const r = await entregar(gid, g, { tipo: 'manual', titulo, cuerpo, uids, ctx: { ...ctx, vars }, auto: false });
   return r;
+});
+
+
+// Qué formas de ingreso están abiertas (la usa la pantalla de ingreso; no necesita sesión).
+export const estadoIngreso = onCall(opts, async () => ({ dni: await dniAbierto() }));
+
+// El dueño cierra o reabre el ingreso con DNI cuando termina la transición desde la versión anterior.
+export const configurarIngreso = onCall(opts, async req => {
+  const quien = requireSuper(req);
+  const dniCerrado = !!req.data?.dniCerrado;
+  await db.doc('config/ingreso').set({ dniCerrado, actualizado: Timestamp.now(), por: quien }, { merge: true });
+  console.log(`configurarIngreso: dniCerrado=${dniCerrado} por ${quien}`);
+  return { dni: !dniCerrado };
+});
+
+// Borra un grupo con todo lo que tiene (partidos, jugadores, niveles, invitados) y su código. Solo el creador.
+async function borrarGrupoCompleto(gref, g) {
+  if (g.codigo) await db.doc(`codigos/${g.codigo}`).delete().catch(() => {});
+  await db.recursiveDelete(gref);
+}
+export const borrarGrupo = onCall(opts, async req => {
+  const uid = requireAuth(req);
+  const gid = String(req.data?.gid || '');
+  if (!gid) throw new HttpsError('invalid-argument', 'Falta el grupo.');
+  if (req.data?.confirmar !== 'BORRAR') throw new HttpsError('invalid-argument', 'Escribí BORRAR para confirmar.');
+  const gref = db.doc(`grupos/${gid}`);
+  const gs = await gref.get();
+  if (!gs.exists) throw new HttpsError('not-found', 'El grupo no existe.');
+  const g = gs.data();
+  if (g.creadorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien creó el grupo puede borrarlo.');
+  await borrarGrupoCompleto(gref, g);
+  console.log(`borrarGrupo: ${gid} por ${uid}`);
+  return { ok: true };
+});
+
+// Borra la cuenta de quien la pide: su perfil, sus datos privados y su acceso. En los grupos deja el historial
+// sin su nombre; si era creador y hay más gente, el rol pasa a otra persona; si quedaba solo, se borra el grupo.
+export const borrarMiCuenta = onCall({ ...opts, timeoutSeconds: 300 }, async req => {
+  const uid = requireAuth(req);
+  if (req.data?.confirmar !== 'BORRAR') throw new HttpsError('invalid-argument', 'Escribí BORRAR para confirmar.');
+  const gs = await db.collection('grupos').where('miembros', 'array-contains', uid).get();
+  for (const gd of gs.docs) {
+    const g = gd.data();
+    const otros = (g.miembros || []).filter(m => m !== uid);
+    if (g.creadorUid === uid && otros.length === 0) { await borrarGrupoCompleto(gd.ref, g); continue; }
+    if (g.creadorUid === uid && otros.every(m => esPendiente(m))) {
+      throw new HttpsError('failed-precondition', `Sos quien creó "${g.nombre}" y los demás todavía no entraron con su cuenta. Borrá el grupo desde Grupo, o esperá a que otra persona entre, y después borrá tu cuenta.`);
+    }
+    const admins = (g.admins || []).filter(a => a !== uid);
+    let creadorUid = g.creadorUid;
+    if (creadorUid === uid) {
+      creadorUid = admins.find(a => !esPendiente(a)) || otros.find(m => !esPendiente(m));
+      if (!admins.includes(creadorUid)) admins.push(creadorUid);
+    }
+    await gd.ref.update({ miembros: otros, admins, creadorUid });
+    // Se quita de lo que está abierto y el historial queda a nombre de "Jugador anterior".
+    const abiertos = await gd.ref.collection('partidos').where('estado', '==', 'abierto').get();
+    for (const pd of abiertos.docs) await pd.ref.update({ inscriptos: FieldValue.arrayRemove(uid), cena: FieldValue.arrayRemove(uid), listaEspera: FieldValue.arrayRemove(uid) });
+    await gd.ref.collection('jugadores').doc(uid).set({ nombre: 'Jugador anterior', apodo: '', foto: '' }, { merge: true });
+    await gd.ref.collection('niveles').doc(uid).delete().catch(() => {});
+  }
+  await Promise.all([`intentosVinculo/${uid}`, `intentosCodigo/${uid}`, `usuarios/${uid}`].map(r => db.doc(r).delete().catch(() => {})));
+  await db.recursiveDelete(db.doc(`privado/${uid}`));
+  try { await getAuth().deleteUser(uid); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
+  console.log(`borrarMiCuenta: ${uid}`);
+  return { ok: true };
 });

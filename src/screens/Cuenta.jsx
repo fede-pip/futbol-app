@@ -4,6 +4,7 @@ import {
 } from 'firebase/auth';
 import { auth, llamar, mensajeError, proveedorGoogle } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
+import { useDniAbierto } from '../lib/ingreso.js';
 import { Btn, Campo, CampoClave, CardB, Icono, IconoGoogle, Marca } from '../components/ui.jsx';
 
 const CLAVE_EMAIL = 'meanoto_email_ingreso';
@@ -42,6 +43,7 @@ function IngresoDni({ onAtras, onEmail }) {
 }
 
 export default function Cuenta({ onAtras }) {
+  const dniAbierto = useDniAbierto();
   const [guardado] = useState(leerEmailGuardado);
   const [vista, setVista] = useState(guardado ? 'email' : 'inicio'); // inicio | email | dni
   const [modo, setModo] = useState(guardado ? 'login' : 'registro');
@@ -108,7 +110,7 @@ export default function Cuenta({ onAtras }) {
       {error ? <div className="error" role="alert">{error}</div> : null}
       <Btn type="button" onClick={conGoogle} disabled={cargando}><IconoGoogle />Seguir con Google</Btn>
       <button type="button" className="choice" onClick={() => setVista('email')}><span className="ti"><Icono n="mail" /></span><div className="grow"><b>Con mi email y contraseña</b><span>Para entrar si ya tenés cuenta, o crearla si sos nuevo.</span></div><Icono n="chev" /></button>
-      <button type="button" className="choice" onClick={() => setVista('dni')}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Jugaba antes con mi DNI</b><span>Con tu DNI y tu clave de siempre. Después elegís un email.</span></div><Icono n="chev" /></button>
+      {dniAbierto ? <button type="button" className="choice" onClick={() => setVista('dni')}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Jugaba antes con mi DNI</b><span>Con tu DNI y tu clave de siempre. Después elegís un email.</span></div><Icono n="chev" /></button> : null}
     </div>
   );
 
@@ -139,7 +141,7 @@ export default function Cuenta({ onAtras }) {
           <div className="sep">¿Entrabas de otra forma?</div>
           <div className="row" style={{ gap: 8 }}>
             <Btn type="button" onClick={conGoogle} disabled={cargando}><IconoGoogle />Google</Btn>
-            <Btn type="button" onClick={() => setVista('dni')}><Icono n="refresh" />Con mi DNI</Btn>
+            {dniAbierto ? <Btn type="button" onClick={() => setVista('dni')}><Icono n="refresh" />Con mi DNI</Btn> : null}
           </div>
         </>
       ) : null}

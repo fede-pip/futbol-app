@@ -4,7 +4,7 @@ import { ATTRS, nuevoAtributo } from './compartido/logica.js';
 import { esInvitado, esUid, statsVacias, calcularMvps, resultadoJugador, puntosDe, agregarRacha, rachaGanadora, ranking } from './puro.js';
 import { disparar, ONESIGNAL_API_KEY } from './avisos.js';
 
-const opts = { region: REGION, cors: true };
+const opts = { region: REGION, cors: true, maxInstances: 20 };
 
 // Registra los votos de una persona. El servidor guarda solo totales: nadie (ni el admin)
 // puede saber quién votó qué.

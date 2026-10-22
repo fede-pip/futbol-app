@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -61,7 +62,7 @@ export async function lotes(ops) {
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0, O, 1, I
 export function codigoAleatorio() {
   let s = '';
-  for (let i = 0; i < 7; i++) s += ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
+  for (let i = 0; i < 7; i++) s += ALFABETO[randomInt(ALFABETO.length)];
   return `${s.slice(0, 3)}-${s.slice(3)}`;
 }
 

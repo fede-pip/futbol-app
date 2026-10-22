@@ -28,24 +28,43 @@ service cloud.firestore {
         && nuevos.toSet().difference(viejos.toSet()).size() == 0
         && viejos.toSet().difference(nuevos.toSet()).hasOnly([request.auth.uid]);
     }
+    // Los invitados de un partido: un miembro puede sumar uno nuevo (con nombre y nivel acotados) y nunca tocar los que ya estaban.
+    // El invitado nuevo es el último que se agregó a la lista de inscriptos.
+    function invitadosValidos(nuevos, viejos, inscriptosNuevos) {
+      return nuevos == viejos
+        || (nuevos.diff(viejos).changedKeys().size() == 0
+            && nuevos.diff(viejos).removedKeys().size() == 0
+            && inscriptosNuevos[inscriptosNuevos.size() - 1].matches('inv_.*')
+            && nuevos.diff(viejos).addedKeys() == [inscriptosNuevos[inscriptosNuevos.size() - 1]].toSet()
+            && nuevos.size() <= 8
+            && nuevos[inscriptosNuevos[inscriptosNuevos.size() - 1]].keys().hasOnly(['nombre', 'nivel'])
+            && nuevos[inscriptosNuevos[inscriptosNuevos.size() - 1]].nombre is string
+            && nuevos[inscriptosNuevos[inscriptosNuevos.size() - 1]].nombre.size() <= 60
+            && nuevos[inscriptosNuevos[inscriptosNuevos.size() - 1]].nivel is number
+            && nuevos[inscriptosNuevos[inscriptosNuevos.size() - 1]].nivel >= 1
+            && nuevos[inscriptosNuevos[inscriptosNuevos.size() - 1]].nivel <= 10);
+    }
     function cambioPropio(nuevos, viejos) {
       return nuevos == viejos || agregaUno(nuevos, viejos) || quitaYo(nuevos, viejos);
     }
 
-    // La foto de perfil es una imagen chica guardada como texto (máx. ~30 KB).
-    function fotoValida(d) {
-      return !('foto' in d) || (d.foto is string && d.foto.size() <= 30000);
+    // La foto de perfil es una imagen chica incrustada (máx. ~30 KB). No se aceptan direcciones externas nuevas
+    // (se podrían usar para ver la IP de quienes miran); la que ya estaba guardada puede quedar como está.
+    function fotoValida(n, v) {
+      return !('foto' in n) || (n.foto is string && n.foto.size() <= 30000
+        && (n.foto == '' || n.foto.matches('data:image/jpeg;base64,.*') || ('foto' in v && n.foto == v.foto)));
     }
 
     // ---------- Perfil público ----------
     match /usuarios/{uid} {
-      allow read: if signedIn();
+      // Los nombres de los demás se ven en grupos/{gid}/jugadores, solo entre miembros del mismo grupo.
+      allow read: if isSelf(uid);
       allow create: if isSelf(uid)
         && request.resource.data.keys().hasOnly(['nombre', 'apodo', 'foto', 'creadoEn'])
         && textoValido(request.resource.data.nombre, 80);
       allow update: if isSelf(uid) && soloCambia(['nombre', 'apodo', 'foto'])
         && textoValido(request.resource.data.nombre, 80)
-        && fotoValida(request.resource.data);
+        && fotoValida(request.resource.data, resource.data);
       allow delete: if false;
     }
 
@@ -82,6 +101,7 @@ service cloud.firestore {
         (request.auth.uid in resource.data.admins
           && request.resource.data.creadorUid == resource.data.creadorUid
           && resource.data.creadorUid in request.resource.data.admins
+          && (request.resource.data.admins == resource.data.admins || request.auth.uid == resource.data.creadorUid)
           && request.resource.data.miembros.toSet().difference(resource.data.miembros.toSet()).size() == 0)
         ||
         // Cualquier miembro (que no sea el creador) puede salirse del grupo.
@@ -91,15 +111,16 @@ service cloud.firestore {
           && request.resource.data.miembros.toSet() == resource.data.miembros.toSet().difference([request.auth.uid].toSet())
           && request.resource.data.admins.toSet() == resource.data.admins.toSet().difference([request.auth.uid].toSet()))
       );
-      allow delete: if signedIn() && request.auth.uid == resource.data.creadorUid;
+      // Borrar un grupo lo hace la función borrarGrupo, que limpia también partidos, jugadores y niveles.
+      allow delete: if false;
 
       // Datos visibles de cada jugador del grupo (estadísticas, racha, tendencia).
       match /jugadores/{jid} {
         allow read: if esMiembro(gid);
         // Cada persona puede actualizar solo su nombre, apodo y foto visibles en el grupo.
         // Un admin puede corregir el nombre, el apodo y la foto de cualquiera (solo en este grupo).
-        allow update: if (isSelf(jid) && soloCambia(['nombre', 'apodo', 'foto']) && fotoValida(request.resource.data))
-          || (esAdmin(gid) && soloCambia(['nombre', 'apodo', 'foto']) && fotoValida(request.resource.data) && request.resource.data.nombre is string
+        allow update: if (isSelf(jid) && soloCambia(['nombre', 'apodo', 'foto']) && fotoValida(request.resource.data, resource.data))
+          || (esAdmin(gid) && soloCambia(['nombre', 'apodo', 'foto']) && fotoValida(request.resource.data, resource.data) && request.resource.data.nombre is string
               && request.resource.data.nombre.size() >= 2 && request.resource.data.nombre.size() <= 60
               && request.resource.data.apodo is string && request.resource.data.apodo.size() <= 30);
         allow create, delete: if false;
@@ -131,6 +152,7 @@ service cloud.firestore {
               && cambioPropio(request.resource.data.inscriptos, resource.data.inscriptos)
               && cambioPropio(request.resource.data.cena, resource.data.cena)
               && cambioPropio(request.resource.data.listaEspera, resource.data.listaEspera)
+              && invitadosValidos(request.resource.data.get('invitados', {}), resource.data.get('invitados', {}), request.resource.data.inscriptos)
               && request.resource.data.inscriptos.size() <= resource.data.cupo)
         );
         allow delete: if esAdmin(gid) && resource.data.estado != 'cerrado';

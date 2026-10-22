@@ -7,6 +7,7 @@ import { crearPerfil, marcarOnboarding } from '../data/acciones.js';
 import { registrarSiHayPermiso } from '../lib/push.js';
 import Bienvenida from '../screens/Bienvenida.jsx';
 import Cuenta from '../screens/Cuenta.jsx';
+import { useDniAbierto } from '../lib/ingreso.js';
 import { AgregarEmail, CompletarPerfil, GrupoElegir, MigrarDni, PermisoAvisos, PreguntaAnterior } from '../screens/Inicio1.jsx';
 import Inicio from '../screens/Inicio.jsx';
 import Partido from '../screens/Partido.jsx';
@@ -38,6 +39,7 @@ function Contenido() {
   const nav = useNav();
   const [bienvenidaVista, setBienvenidaVista] = useState(() => !!leer('app8_bienvenida'));
   const [viendoDni, setViendoDni] = useState(false);
+  const dniAbierto = useDniAbierto();
   const [paso, setPaso] = useState(0); // fuerza re-render tras cambios locales
 
   // Quien entra con Google ya trae nombre: su perfil se crea solo.
@@ -63,7 +65,7 @@ function Contenido() {
     const seguir = () => { setViendoDni(false); marcarOnboarding(s.uid, 'anterior'); };
     return viendoDni ? <MigrarDni onListo={seguir} onOmitir={() => setViendoDni(false)} /> : <PreguntaAnterior onListo={seguir} onDni={() => setViendoDni(true)} />;
   }
-  if (!s.grupos.length) return <GrupoElegir uid={s.uid} superAdmin={esSuper(s.user)} onAnterior={() => setViendoDni(true)} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
+  if (!s.grupos.length) return <GrupoElegir uid={s.uid} superAdmin={esSuper(s.user)} onAnterior={dniAbierto ? () => setViendoDni(true) : undefined} onListo={gid => { s.elegirGrupo(gid); setPaso(paso + 1); }} />;
   if (!(s.priv && s.priv.onboarding && s.priv.onboarding.avisos)) return <PermisoAvisos uid={s.uid} onListo={() => marcarOnboarding(s.uid, 'avisos')} />;
   return <Rutas />;
 }

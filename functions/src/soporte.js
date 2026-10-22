@@ -6,7 +6,7 @@ import { hashPwdLegacy } from './puro.js';
 
 // Ayuda a alguien que no puede entrar: genera el enlace para elegir una contraseña nueva, sin depender de que le llegue el mail.
 // Solo lo usa el dueño de la plataforma, que se lo manda a la persona por WhatsApp.
-export const enlaceDeAcceso = onCall({ region: REGION, cors: true }, async req => {
+export const enlaceDeAcceso = onCall({ region: REGION, cors: true, maxInstances: 5 }, async req => {
   requireSuper(req);
   const uid = String(req.data?.uid || '');
   if (!uid) throw new HttpsError('invalid-argument', 'Falta la persona.');
@@ -22,7 +22,7 @@ export const enlaceDeAcceso = onCall({ region: REGION, cors: true }, async req =
 
 // Para quien jugaba con DNI, todavía no pasó a email y no se acuerda de su clave de antes:
 // se le pone una clave temporal en su cuenta anterior. Con ella hace el ingreso con DNI de siempre y elige su email y contraseña.
-export const claveTemporalDni = onCall({ region: REGION, cors: true }, async req => {
+export const claveTemporalDni = onCall({ region: REGION, cors: true, maxInstances: 5 }, async req => {
   requireSuper(req);
   const dni = String(req.data?.dni || '').replace(/\D/g, '');
   if (dni.length < 6 || dni.length > 9) throw new HttpsError('invalid-argument', 'DNI inválido.');

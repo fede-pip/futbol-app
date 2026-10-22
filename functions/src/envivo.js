@@ -4,7 +4,8 @@ import { db, FieldValue, Timestamp, HttpsError, REGION, requireMiembro } from '.
 // Modo "partido en vivo": una sola persona lleva la carga de goles mientras se juega.
 // Todo pasa por acá (también lo va a usar una futura app de reloj): el servidor decide quién es el
 // cargador, a qué equipo va cada gol y deja un registro para poder deshacer sin errores.
-const opts = { region: REGION, cors: true };
+const opts = { region: REGION, cors: true, maxInstances: 20 };
+const MAX_GOLES = 60; // tope por partido: evita marcadores inflados
 const SIN_ACTIVIDAD_MS = 20 * 60e3; // si el cargador desaparece 20 minutos, otro puede tomar la posta
 const ANTES_MS = 3 * 3600e3, DESPUES_MS = 12 * 3600e3;
 
@@ -28,6 +29,7 @@ export const tomarEnVivo = onCall(opts, async req => {
     const { pref, p } = await cargarPartido(tx, gref, req.data?.pid);
     const ahora = Date.now(), f = p.fechaHora?.toMillis?.() || 0;
     if (ahora < f - ANTES_MS || ahora > f + DESPUES_MS) throw new HttpsError('failed-precondition', 'El modo en vivo se abre 3 horas antes del partido.');
+    if (!(p.inscriptos || []).includes(uid) && !(g.admins || []).includes(uid)) throw new HttpsError('permission-denied', 'Solo quienes están anotados o los admins pueden cargar el partido en vivo.');
     const v = p.vivo;
     const vencido = v && ahora - (v.ultimaAccion?.toMillis?.() || 0) > SIN_ACTIVIDAD_MS;
     if (v && v.uid !== uid && !vencido && !forzar) {
@@ -69,6 +71,7 @@ export const registrarGol = onCall(opts, async req => {
     if (!propio) throw new HttpsError('failed-precondition', 'Primero hay que publicar los equipos.');
     const lado = enContra ? otro(propio) : propio;
     const m = { oscuro: p.marcador?.oscuro || 0, blanco: p.marcador?.blanco || 0 };
+    if (m.oscuro + m.blanco >= MAX_GOLES) throw new HttpsError('resource-exhausted', 'Ya se cargaron muchos goles en este partido. Si es correcto, que el admin lo ajuste.');
     m[lado] += 1;
     const clave = enContra ? 'enContra' : 'goles';
     const actual = p.eventos?.[jugadorId]?.[clave] || 0;

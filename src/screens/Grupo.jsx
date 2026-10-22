@@ -77,6 +77,8 @@ export default function Grupo() {
   const [error, setError] = useState('');
   const [confirmaSalir, setConfirmaSalir] = useState(false);
   const [sumando, setSumando] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+  const [confBorrar, setConfBorrar] = useState('');
   const [limpiando, setLimpiando] = useState(false);
   const guardados = useColl(esAdmin ? collection(db, `grupos/${gid}/invitados`) : null, gid) || [];
   const { utiles: invitadosUtiles, sobrantes: invitadosSobrantes } = depurarInvitados(guardados, Object.values(jugadores).flatMap(j => [j.nombre, j.apodo]));
@@ -202,6 +204,14 @@ export default function Grupo() {
       </div>
 
       <Card><Fila icono="user" titulo="Mi perfil" sub="Nombre, apodo y cuenta" onClick={() => ir('perfil')} derecha={<Icono n="chev" />} /></Card>
+      {esCreador ? (
+        borrando ? (
+          <div className="confirm"><b>¿Borrar "{grupo.nombre}"?</b><span className="muted">Se borran el grupo, todos sus partidos, estadísticas y jugadores para todos. No se puede deshacer.</span>
+            <div className="field"><label htmlFor="bg-conf">Para confirmar, escribí BORRAR</label><input id="bg-conf" value={confBorrar} onChange={e => setConfBorrar(e.target.value)} autoComplete="off" autoCapitalize="characters" /></div>
+            <div className="row"><Btn onClick={() => { setBorrando(false); setConfBorrar(''); }}>Cancelar</Btn>
+              <Btn v="pri" disabled={confBorrar.trim().toUpperCase() !== 'BORRAR'} onClick={() => ejecutar(async () => { await llamar('borrarGrupo', { gid, confirmar: 'BORRAR' }); toast('Grupo borrado'); ir('inicio'); })}>Borrar el grupo</Btn></div></div>
+        ) : <Btn v="ghost" onClick={() => setBorrando(true)}><Icono n="trash" />Borrar el grupo</Btn>
+      ) : null}
       {!esCreador ? (
         confirmaSalir ? (
           <div className="confirm"><b>¿Salir de {grupo.nombre}?</b><span className="muted">Para volver vas a necesitar el código.</span>

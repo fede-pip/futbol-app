@@ -3,6 +3,7 @@ import { EmailAuthProvider, linkWithCredential, sendEmailVerification, signOut }
 import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
 import { guardarEmailParaIngreso } from './Cuenta.jsx';
+import { useDniAbierto } from '../lib/ingreso.js';
 import { Btn, Campo, CampoClave, Card, CardB, Icono, Lockup, Marca, Fila } from '../components/ui.jsx';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
 
@@ -124,10 +125,13 @@ export function AgregarEmail({ nombre, onListo }) {
 
 // ---- Primera vez: ¿ya jugabas en la versión anterior? ----
 export function PreguntaAnterior({ onListo, onDni }) {
+  const dniAbierto = useDniAbierto();
   const [hallada, setHallada] = useState(undefined); // undefined: buscando
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   useEffect(() => { llamar('buscarCuentaAnterior').then(setHallada).catch(() => setHallada({ encontrada: false })); }, []);
+  // Con el ingreso por DNI cerrado, quien no tiene una cuenta de Google anterior sigue directo.
+  useEffect(() => { if (hallada && !hallada.encontrada && !dniAbierto) onListo(); }, [hallada, dniAbierto]);
 
   async function confirmar() {
     setError(''); setCargando(true);

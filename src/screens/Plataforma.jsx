@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { esProduccion, llamar, mensajeError } from '../lib/firebase.js';
 import { Btn, Card, CardB, Fila, Hint, Pill, useToast } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
+import { olvidarEstadoIngreso } from '../lib/ingreso.js';
 import { BarraSuperior } from '../app/Shell.jsx';
 
 export const SUPER_EMAILS = ['fede@inmetricswetrust.com', 'hola@inmetricswetrust.com'];
@@ -95,6 +96,30 @@ function AyudaAcceso() {
   );
 }
 
+function IngresoDni() {
+  const [abierto, setAbierto] = useState(null);
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+  const [confirma, setConfirma] = useState(false);
+  useEffect(() => { llamar('estadoIngreso').then(r => setAbierto(!!r.dni)).catch(() => {}); }, []);
+  async function cambiar(cerrar) {
+    setError(''); setCargando(true);
+    try { const r = await llamar('configurarIngreso', { dniCerrado: cerrar }); setAbierto(!!r.dni); olvidarEstadoIngreso(); setConfirma(false); } catch (e) { setError(mensajeError(e)); }
+    setCargando(false);
+  }
+  return (
+    <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="row sp"><h3 className="t">Ingreso con DNI</h3><Pill t={abierto === false ? 'ok' : 'warn'}>{abierto === null ? '…' : abierto ? 'Abierto' : 'Cerrado'}</Pill></div>
+      <p className="muted">Sirve para que los jugadores de la versión anterior recuperen su historial con la clave de antes. Es el punto más débil de la seguridad: conviene cerrarlo cuando ya pasaron todos. Si lo cerrás, quienes falten los ayudás desde acá con "Ayudar a alguien a entrar".</p>
+      {error ? <div className="error" role="alert">{error}</div> : null}
+      {abierto === true ? (confirma
+        ? <div className="confirm"><b>¿Cerrar el ingreso con DNI?</b><span className="muted">Nadie más va a poder entrar ni vincularse con DNI y clave. Se puede reabrir cuando quieras.</span><div className="row"><Btn onClick={() => setConfirma(false)}>No</Btn><Btn v="pri" disabled={cargando} onClick={() => cambiar(true)}>Sí, cerrarlo</Btn></div></div>
+        : <Btn onClick={() => setConfirma(true)}>Cerrar el ingreso con DNI</Btn>) : null}
+      {abierto === false ? <Btn disabled={cargando} onClick={() => cambiar(false)}>Reabrir el ingreso con DNI</Btn> : null}
+    </CardB>
+  );
+}
+
 function RecuperarFotos() {
   const [r, setR] = useState(null);
   const [error, setError] = useState('');
@@ -142,6 +167,7 @@ export default function Plataforma() {
       <div><h2 className="t">Plataforma</h2><p className="lead" style={{ marginTop: 2 }}>Datos de la versión anterior · {esProduccion ? 'PRODUCCIÓN' : 'pruebas'}</p></div>
       <AyudaAcceso />
       <RecuperarFotos />
+      <IngresoDni />
       <Hint>Primero mirá qué se migraría. Migrar crea los grupos nuevos con cada jugador como perfil pendiente; no borra nada de lo anterior y no pisa grupos ya migrados.</Hint>
       <Btn disabled={cargando} onClick={() => correr({ dryRun: true })}>{cargando ? 'Mirando…' : 'Ver qué se migraría'}</Btn>
       {!esProduccion ? <Btn disabled={cargando} onClick={() => correr({ dryRun: true, sembrar: true, forzar: true })}>Sembrar datos anteriores de prueba</Btn> : null}

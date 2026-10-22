@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { auth, mensajeError } from '../lib/firebase.js';
+import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { guardarPerfil } from '../data/acciones.js';
 import { ATTRS } from '../lib/logica.js';
 import { Avatar, Btn, Campo, Card, CardB, Fila, Icono, Pill, SelectorFoto, useToast } from '../components/ui.jsx';
@@ -8,6 +8,39 @@ import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { esSuper } from './Plataforma.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
+
+function BorrarCuenta() {
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState('');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+  async function borrar() {
+    setError(''); setCargando(true);
+    try { await llamar('borrarMiCuenta', { confirmar: 'BORRAR' }); try { await signOut(auth); } catch (e) { /* la cuenta ya no existe */ } }
+    catch (e) { setError(mensajeError(e)); setCargando(false); }
+  }
+  return (
+    <Card>
+      <CardB style={{ border: 0, boxShadow: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <h3 className="t">Borrar mi cuenta</h3>
+        {!abierto ? (
+          <>
+            <p className="muted">Se borran tu perfil, tu foto y tu acceso. En los grupos tus partidos quedan como "Jugador anterior".</p>
+            <Btn v="ghost" onClick={() => setAbierto(true)}><Icono n="trash" />Borrar mi cuenta</Btn>
+          </>
+        ) : (
+          <div className="confirm">
+            <b>Esto no se puede deshacer</b>
+            <span className="muted">Se borran tu perfil, tu foto, tus datos privados y tu acceso a la app. Si sos quien creó un grupo, el rol pasa a otra persona; si estabas solo, se borra el grupo.</span>
+            <div className="field"><label htmlFor="borrar-conf">Para confirmar, escribí BORRAR</label><input id="borrar-conf" value={texto} onChange={e => setTexto(e.target.value)} autoComplete="off" autoCapitalize="characters" /></div>
+            {error ? <div className="error" role="alert">{error}</div> : null}
+            <div className="row"><Btn onClick={() => { setAbierto(false); setTexto(''); setError(''); }}>Cancelar</Btn><Btn v="pri" disabled={cargando || texto.trim().toUpperCase() !== 'BORRAR'} onClick={borrar}>{cargando ? 'Borrando…' : 'Borrar para siempre'}</Btn></div>
+          </div>
+        )}
+      </CardB>
+    </Card>
+  );
+}
 
 export default function Perfil() {
   const { user, uid, perfil, priv, grupos, jugadores, gid } = useSesion();
@@ -74,6 +107,7 @@ export default function Perfil() {
       <Card><Fila icono="bell" titulo="Mis avisos" sub="Qué querés recibir en el celular" onClick={() => ir('misAvisos')} derecha={<Icono n="chev" />} /></Card>
       {esSuper(user) ? <Card><Fila icono="shield" titulo="Plataforma" sub="Migración de la versión anterior" onClick={() => ir('plataforma')} derecha={<Icono n="chev" />} /></Card> : null}
       <Btn onClick={() => signOut(auth)}><Icono n="logout" />Cerrar sesión</Btn>
+      <BorrarCuenta />
     </div>
   );
 }

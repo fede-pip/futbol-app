@@ -1,0 +1,57 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Graduate&family=Archivo:wght@400;600;800;900&display=swap">
+<style>
+*{box-sizing:border-box;margin:0}
+body{width:1080px;background:#f1f6f2;font-family:'Archivo',sans-serif;color:#10211a}
+.top{background:#0b3d27;color:#fff;padding:56px 56px 48px;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 54px,rgba(0,0,0,.05) 54px 108px)}
+.marca{font-family:'Graduate';letter-spacing:.08em;color:#c9f25b;font-size:30px;display:flex;align-items:center;gap:16px}
+.marca img{width:64px;height:64px;border-radius:16px}
+h1{font-family:'Graduate';font-weight:400;font-size:66px;line-height:1.05;margin-top:26px}
+.top p{font-size:28px;color:#cfe6d8;margin-top:14px;line-height:1.35}
+.pasos{padding:36px 56px 0;display:flex;flex-direction:column;gap:22px}
+.paso{background:#fff;border:2px solid #d3e0d6;border-radius:28px;padding:28px;display:grid;grid-template-columns:70px 1fr 330px;gap:24px;align-items:center}
+.n{width:64px;height:64px;border-radius:50%;background:#0f7a4a;color:#fff;font-family:'Graduate';font-size:36px;display:grid;place-items:center}
+.txt b{font-size:31px;line-height:1.2;display:block}
+.txt span{font-size:23px;color:#46594e;line-height:1.35;display:block;margin-top:8px}
+.txt em{font-style:normal;background:#c9f25b;color:#0b3d27;font-weight:800;padding:1px 10px;border-radius:8px}
+.tel{background:#0b3d27;border-radius:30px;padding:14px;width:330px}
+.pant{background:#f1f6f2;border-radius:20px;padding:20px 18px;display:flex;flex-direction:column;gap:10px;min-height:230px}
+.pant h4{font-family:'Archivo';font-weight:800;font-size:22px}
+.campo{background:#fff;border:2px solid #cfdbd2;border-radius:12px;padding:10px 12px;font-size:17px;color:#46594e}
+.campo small{display:block;font-size:12px;color:#6d8074;margin-bottom:2px}
+.btn{background:#0f7a4a;color:#fff;border-radius:12px;padding:12px;text-align:center;font-weight:800;font-size:18px}
+.btn.o{background:#fff;color:#10211a;border:2px solid #cfdbd2;font-weight:600}
+.opc{background:#fff;border:2px solid #cfdbd2;border-radius:12px;padding:12px;font-weight:800;font-size:17px}
+.opc.on{border-color:#0f7a4a;box-shadow:0 0 0 3px #cfe9d9}
+.opc span{display:block;font-weight:400;font-size:13px;color:#46594e;margin-top:2px}
+.ayuda{margin:30px 56px 0;background:#fff;border:2px solid #d3e0d6;border-radius:28px;padding:30px 34px}
+.ayuda h2{font-family:'Graduate';font-weight:400;font-size:40px;margin-bottom:14px}
+.caso{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:14px 0;border-top:2px solid #e7efe8;font-size:24px;line-height:1.35}
+.caso i{font-style:normal;width:40px;height:40px;border-radius:50%;background:#fcefd0;color:#9a6100;font-weight:900;display:grid;place-items:center;font-size:22px}
+.caso b{color:#0b3d27}
+.aviso{margin:30px 56px 44px;background:#0f7a4a;color:#fff;border-radius:28px;padding:28px 34px;font-size:26px;line-height:1.35}
+.aviso b{color:#c9f25b}
+</style></head><body>
+<div class="top">
+  <div class="marca"><img src="../icono-redondeado.svg" alt="">ME ANOTO</div>
+  <h1>Recuperá tu cuenta con tu DNI</h1>
+  <p>Para quienes jugaban antes con DNI y clave. Tu historial de partidos, goles y MVP se mantiene.</p>
+</div>
+<div class="pasos">
+  <div class="paso"><div class="n">1</div><div class="txt"><b>Entrá a meanoto.com.ar y tocá "Ya tengo cuenta"</b><span>Después elegí <em>Jugaba antes con mi DNI</em>.</span></div>
+    <div class="tel"><div class="pant"><h4>Entrá a Me Anoto</h4><div class="opc">Seguir con Google</div><div class="opc">Con mi email y contraseña</div><div class="opc on">Jugaba antes con mi DNI<span>Con tu DNI y tu clave de siempre</span></div></div></div></div>
+  <div class="paso"><div class="n">2</div><div class="txt"><b>Poné tu DNI y tu clave</b><span>Tu clave de antes. Si el admin te pasó un <em>código de 6 números</em> por WhatsApp, escribí ese código. Con el botón "Mostrar" ves lo que escribís.</span></div>
+    <div class="tel"><div class="pant"><h4>Entrá con tu DNI</h4><div class="campo"><small>Tu DNI</small>38123456</div><div class="campo"><small>Clave de antes o código del admin</small>482915</div><div class="btn">Entrar</div></div></div></div>
+  <div class="paso"><div class="n">3</div><div class="txt"><b>Elegí tu email y tu contraseña nueva</b><span>Un email que uses de verdad. La contraseña la elegís <em>vos</em> (mínimo 8 caracteres) y la repetís. Esa es la que usás de ahora en adelante.</span></div>
+    <div class="tel"><div class="pant"><h4>Hola, Martín</h4><div class="campo"><small>Tu email</small>vos@ejemplo.com</div><div class="campo"><small>Elegí una contraseña nueva</small>••••••••••</div><div class="campo"><small>Repetí la contraseña</small>••••••••••</div><div class="btn">Guardar y continuar</div></div></div></div>
+  <div class="paso"><div class="n">4</div><div class="txt"><b>Listo: ya tenés tu historial</b><span>La próxima vez entrás con <em>"Con mi email y contraseña"</em>. El DNI ya no hace falta.</span></div>
+    <div class="tel"><div class="pant"><h4>Entrá con tu email</h4><div class="campo"><small>Email</small>vos@ejemplo.com</div><div class="campo"><small>Contraseña</small>••••••••••</div><div class="btn">Ingresar</div></div></div></div>
+</div>
+<div class="ayuda">
+  <h2>¿Algo no sale?</h2>
+  <div class="caso"><i>?</i><div><b>No me acuerdo de la clave.</b> Pedile al admin de tu grupo un código temporal. Te lo manda por WhatsApp y lo usás en el paso 2.</div></div>
+  <div class="caso"><i>?</i><div><b>Dice que el email ya tiene una cuenta.</b> Avisale al admin: te manda un enlace por WhatsApp para elegir tu contraseña, y tu historial queda en esa cuenta.</div></div>
+  <div class="caso"><i>?</i><div><b>Ya elegí un email antes.</b> Entonces el DNI ya no sirve: entrá con tu email. Si no recordás la contraseña, tocá "Olvidé mi contraseña".</div></div>
+</div>
+<div class="aviso"><b>Ojo:</b> el código del admin es solo para entrar la primera vez. La contraseña nueva del paso 3 la inventás vos.</div>
+</body></html>

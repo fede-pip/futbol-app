@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithCustomToken, linkWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection, Timestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection, deleteDoc, deleteField, Timestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const env = Object.fromEntries(readFileSync('.env.development.local', 'utf8').split('\n')
@@ -143,6 +143,50 @@ describe('nombres en el grupo', () => {
   it('un admin no puede cambiar otros datos del jugador ni dejar el nombre vacío', async () => {
     await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: 'Nombre Corregido', stats: { puntos: 999 } }));
     await denegado(updateDoc(doc(A.db, 'grupos', gid, 'jugadores', B.uid), { nombre: '', apodo: '' }));
+  });
+});
+
+describe('endurecimiento (auditoría de seguridad)', () => {
+  it('los perfiles públicos solo los lee su dueño', async () => {
+    await getDoc(doc(B.db, 'usuarios', B.uid));
+    await denegado(getDoc(doc(B.db, 'usuarios', A.uid)));
+    await denegado(getDocs(collection(B.db, 'usuarios')));
+  });
+  it('solo el creador cambia la lista de admins', async () => {
+    await updateDoc(doc(A.db, 'grupos', gid), { admins: [A.uid, B.uid] }); // el creador nombra a B
+    await denegado(updateDoc(doc(B.db, 'grupos', gid), { admins: [A.uid, B.uid, C.uid] })); // B no es el creador
+    await updateDoc(doc(A.db, 'grupos', gid), { admins: [A.uid] });
+  });
+  it('la foto no puede ser un enlace externo, pero sí una imagen incrustada', async () => {
+    await denegado(updateDoc(doc(B.db, 'usuarios', B.uid), { foto: 'https://ejemplo.invalid/pixel.png' }));
+    await denegado(updateDoc(doc(B.db, 'grupos', gid, 'jugadores', B.uid), { foto: 'https://ejemplo.invalid/pixel.png' }));
+    await updateDoc(doc(B.db, 'usuarios', B.uid), { foto: 'data:image/jpeg;base64,/9j/4AAQ' });
+  });
+  it('los invitados del partido: uno nuevo y acotado, sin tocar los demás', async () => {
+    const vid = 'inv-' + corrida;
+    await setDoc(doc(A.db, 'grupos', gid, 'partidos', vid), { ...partidoBase(), cupo: 12, inscriptos: [A.uid] });
+    const ref = doc(B.db, 'grupos', gid, 'partidos', vid);
+    await denegado(updateDoc(ref, { inscriptos: [A.uid, 'inv_x1'], invitados: { inv_x1: { nombre: 'X', nivel: 99 } } })); // nivel fuera de rango
+    await denegado(updateDoc(ref, { inscriptos: [A.uid, 'inv_x1'], invitados: { inv_x1: { nombre: 'X', nivel: 5, extra: 1 } } })); // campo extra
+    await denegado(updateDoc(ref, { inscriptos: [A.uid, 'inv_x1'], invitados: { inv_otro: { nombre: 'Y', nivel: 5 } } })); // no es el invitado agregado
+    await updateDoc(ref, { inscriptos: [A.uid, 'inv_x1'], invitados: { inv_x1: { nombre: 'Invitado', nivel: 6 } } });
+    await denegado(updateDoc(ref, { 'invitados.inv_x1.nivel': 10 })); // no puede cambiar uno existente
+    await denegado(updateDoc(ref, { 'invitados.inv_x1': deleteField() }));
+  });
+  it('un grupo solo se borra con la función, y solo lo borra quien lo creó', async () => {
+    await denegado(deleteDoc(doc(A.db, 'grupos', gid)));
+    const { gid: g2 } = await A.call('crearGrupo', { nombre: 'Para borrar ' + corrida });
+    await falla(B.call('borrarGrupo', { gid: g2, confirmar: 'BORRAR' }), 'permission-denied');
+    await falla(A.call('borrarGrupo', { gid: g2, confirmar: 'no' }), 'invalid-argument');
+    await A.call('borrarGrupo', { gid: g2, confirmar: 'BORRAR' });
+    await falla(A.call('borrarGrupo', { gid: g2, confirmar: 'BORRAR' }), 'not-found');
+  });
+  it('borrar la cuenta: pide confirmación y después ya no se puede entrar', async () => {
+    const X = await conPerfil('Borrable');
+    await falla(X.call('borrarMiCuenta', {}), 'invalid-argument');
+    await X.call('crearGrupo', { nombre: 'Solo ' + corrida });
+    await X.call('borrarMiCuenta', { confirmar: 'BORRAR' });
+    await expect(signInWithEmailAndPassword(getAuth(initializeApp(config, `x-${corrida}`)), X.mail, 'prueba-123456')).rejects.toBeTruthy();
   });
 });
 
@@ -416,6 +460,27 @@ describe('cuentas de la versión anterior', () => {
     const F = await conPerfil('Fer');
     for (let i = 0; i < 5; i++) await falla(F.call('vincularCuentaAnterior', { dni: '30000003', clave: 'mal' + i }), 'permission-denied');
     await falla(F.call('vincularCuentaAnterior', { dni: '30000003', clave: 'clave123' }), 'resource-exhausted');
+  });
+
+  it('los intentos con clave se cuentan por DNI aunque se prueben desde cuentas distintas', async () => {
+    const F1 = await conPerfil('Fer1'), F2 = await conPerfil('Fer2'), F3 = await conPerfil('Fer3');
+    for (let i = 0; i < 3; i++) await falla(F1.call('vincularCuentaAnterior', { dni: '30000004', clave: 'x' + i }), 'permission-denied');
+    for (let i = 0; i < 2; i++) await falla(F2.call('vincularCuentaAnterior', { dni: '30000004', clave: 'y' + i }), 'permission-denied');
+    await falla(F3.call('vincularCuentaAnterior', { dni: '30000004', clave: 'clave123' }), 'resource-exhausted'); // aunque la clave sea la correcta
+  });
+
+  it('el dueño cierra y reabre el ingreso con DNI; los demás no pueden', async () => {
+    const anon = initializeApp(config, `ing-${corrida}`);
+    const llamarAnon = (n, d) => httpsCallable(getFunctions(anon, 'southamerica-east1'), n)(d).then(r => r.data);
+    expect((await llamarAnon('estadoIngreso', {})).dni).toBe(true);
+    await falla(D.call('configurarIngreso', { dniCerrado: true }), 'permission-denied');
+    await S.call('configurarIngreso', { dniCerrado: true });
+    try {
+      expect((await llamarAnon('estadoIngreso', {})).dni).toBe(false);
+      await expect(llamarAnon('ingresarConDni', { dni: '30000005', clave: 'clave123' })).rejects.toMatchObject({ code: 'functions/failed-precondition' });
+      await falla(D.call('vincularCuentaAnterior', { dni: '30000006', clave: 'clave123' }), 'failed-precondition');
+    } finally { await S.call('configurarIngreso', { dniCerrado: false }); }
+    expect((await llamarAnon('estadoIngreso', {})).dni).toBe(true);
   });
 
   it('quien jugaba con DNI entra con DNI y clave, agrega su email y después solo entra con el email', async () => {
