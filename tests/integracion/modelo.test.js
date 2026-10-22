@@ -542,7 +542,7 @@ describe('avisos por tiempo y lista de espera', () => {
     execSync(`gcloud scheduler jobs run firebase-schedule-programados-southamerica-east1 --location=southamerica-east1 --project=${PROYECTO}`);
     const faltan = await esperarAviso(Q, 'faltan_jugadores');
     expect(faltan, 'Quique (no anotado) recibe "faltan jugadores"').toBeTruthy();
-    expect(faltan.titulo).toMatch(/Faltan 1 para completar/);
+    expect(faltan.titulo).toMatch(/Falta 1 para completar/);
     const rec = await esperarAviso(P, 'recordatorio_24h');
     expect(rec, 'Paula (anotada) recibe el recordatorio').toBeTruthy();
     expect(rec.cuerpo).not.toMatch(/[{}]/);

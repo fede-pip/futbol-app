@@ -139,6 +139,7 @@ export async function sembrarDatosAnteriores() {
   const nombres = ['Fede Pipkin', 'Nico Ferrari', 'Juani Roca', 'Tomás Vega', 'Agus Dal Maso', 'Lucho Ibarra', 'Mati Sosa', 'Pablo Quiroga'];
   const dnis = nombres.map((_, i) => String(30000001 + i));
   const batch = db.batch();
+  dnis.forEach(d => batch.delete(db.doc(`intentosDni/${d}`))); // para repetir los ensayos sin quedar bloqueado por intentos anteriores
   nombres.forEach((n, i) => {
     const attrs = Object.fromEntries(ATTRS.map(a => [a.key, 4 + ((i + a.key.length) % 5)]));
     batch.set(db.doc(`app8_users/${dnis[i]}`), {
