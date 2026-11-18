@@ -4,7 +4,7 @@ import { db, llamar, mensajeError } from '../lib/firebase.js';
 import { ATTRS, depurarInvitados, pl } from '../lib/logica.js';
 import { useColl } from '../data/hooks.js';
 import { actualizarGrupo, borrarInvitados, renombrarJugador, guardarNiveles, ponerAdmin, quitarMiembro, sacarAdmin } from '../data/acciones.js';
-import { Avatar, Btn, Card, CardB, Fila, Hint, Icono, Pill, SelectorFoto } from '../components/ui.jsx';
+import { Avatar, AvatarGrupo, Btn, Card, CardB, Fila, Hint, Icono, Pill, SelectorFoto } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
@@ -75,6 +75,7 @@ export default function Grupo() {
   const [nombre, setNombre] = useState(grupo.nombre);
   const [precio, setPrecio] = useState(grupo.precioCancha || 0);
   const [pozo, setPozo] = useState(grupo.pozo || 0);
+  const [fotoG, setFotoG] = useState(grupo.foto || '');
   const [error, setError] = useState('');
   const [confirmaSalir, setConfirmaSalir] = useState(false);
   const [sumando, setSumando] = useState(false);
@@ -110,7 +111,7 @@ export default function Grupo() {
       </div>
       {esAdmin ? <PedidosVinculo gid={gid} /> : null}
       <section className="kpi pitch">
-        <div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div>
+        <div className="row" style={{ gap: 12 }}><AvatarGrupo nombre={grupo.nombre} foto={grupo.foto} style={{ width: 52, height: 52, fontSize: 18 }} /><div><div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div></div></div>
         <div className="s"><span>{grupo.miembros.length} {pl(grupo.miembros.length, 'jugador', 'jugadores')}</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}{grupo.pozo ? <span>Pozo: ${grupo.pozo}</span> : null}</div>
         <div className="row" style={{ marginTop: 14, gap: 0 }}>
           {grupo.miembros.slice(0, 6).map((id, i) => <span key={id} style={{ marginLeft: i ? -8 : 0, border: '2px solid #0e4d31', borderRadius: '50%', display: 'inline-flex' }}><Avatar nombre={(jugadores[id] || {}).nombre} foto={(jugadores[id] || {}).foto} /></span>)}
@@ -132,13 +133,14 @@ export default function Grupo() {
           <Card>
             {editando ? (
               <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SelectorFoto nombre={nombre} foto={fotoG} onCambio={setFotoG} onError={setError} />
                 <div className="field"><label htmlFor="g-nombre">Nombre del grupo</label><input id="g-nombre" value={nombre} onChange={e => setNombre(e.target.value)} maxLength={60} /></div>
                 <div className="field"><label htmlFor="g-precio">Precio por persona ($)</label><input id="g-precio" type="number" inputMode="numeric" min="0" value={precio} onChange={e => setPrecio(e.target.value)} /></div>
                 <div className="field"><label htmlFor="g-pozo">Pozo acumulado ($)</label><input id="g-pozo" type="number" inputMode="numeric" min="0" value={pozo} onChange={e => setPozo(e.target.value)} /></div>
                 <div className="row"><Btn onClick={() => setEditando(false)}>Cancelar</Btn>
-                  <Btn v="pri" onClick={() => ejecutar(async () => { await actualizarGrupo(gid, { nombre: nombre.trim(), precioCancha: Number(precio) || 0, pozo: Number(pozo) || 0 }); setEditando(false); }, 'Cambios guardados')}>Guardar</Btn></div>
+                  <Btn v="pri" onClick={() => ejecutar(async () => { await actualizarGrupo(gid, { nombre: nombre.trim(), precioCancha: Number(precio) || 0, pozo: Number(pozo) || 0, ...(fotoG !== (grupo.foto || '') ? { foto: fotoG } : {}) }); setEditando(false); }, 'Cambios guardados')}>Guardar</Btn></div>
               </div>
-            ) : <Fila icono="edit" titulo="Nombre, precio y pozo" sub={`${grupo.nombre}${grupo.precioCancha ? ` · $${grupo.precioCancha} por persona` : ''}${grupo.pozo ? ` · pozo $${grupo.pozo}` : ''}`} onClick={() => setEditando(true)} derecha={<Icono n="chev" />} />}
+            ) : <Fila icono="edit" titulo="Foto, nombre, precio y pozo" sub={`${grupo.nombre}${grupo.precioCancha ? ` · $${grupo.precioCancha} por persona` : ''}${grupo.pozo ? ` · pozo $${grupo.pozo}` : ''}`} onClick={() => setEditando(true)} derecha={<Icono n="chev" />} />}
           </Card>
         </>
       ) : null}

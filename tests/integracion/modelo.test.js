@@ -118,6 +118,16 @@ describe('grupos y membresía', () => {
     await updateDoc(doc(B.db, 'grupos', gid, 'jugadores', B.uid), { apodo: 'Beto el crack' });
   });
 
+  it('la foto del grupo: el admin sube una imagen chica; no se aceptan enlaces externos ni la sube un miembro', async () => {
+    const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+    await updateDoc(doc(A.db, 'grupos', gid), { foto: jpeg });
+    expect((await getDoc(doc(A.db, 'grupos', gid))).data().foto).toBe(jpeg);
+    await denegado(updateDoc(doc(A.db, 'grupos', gid), { foto: 'https://ejemplo.com/x.jpg' }));
+    await denegado(updateDoc(doc(A.db, 'grupos', gid), { foto: 'data:image/jpeg;base64,' + 'A'.repeat(30000) }));
+    await denegado(updateDoc(doc(B.db, 'grupos', gid), { foto: jpeg }));
+    await updateDoc(doc(A.db, 'grupos', gid), { foto: '' });
+  });
+
   it('el admin no puede sumar miembros por su cuenta, pero sí editar el grupo', async () => {
     await denegado(updateDoc(doc(A.db, 'grupos', gid), { miembros: [A.uid, B.uid, C.uid] }));
     await updateDoc(doc(A.db, 'grupos', gid), { precioCancha: 4500 });
@@ -328,27 +338,30 @@ describe('partido en vivo', () => {
 describe('votación y cierre', () => {
   it('el admin finaliza el partido y abre la votación', async () => {
     await updateDoc(doc(A.db, 'grupos', gid, 'partidos', pid), {
-      inscriptos: [A.uid, B.uid, 'inv_t1', 'inv_t2'],
-      equipos: { oscuro: [A.uid, 'inv_t1'], blanco: [B.uid, 'inv_t2'], publicado: true },
+      inscriptos: [A.uid, B.uid, 'f1', 'f2', 'inv_t1', 'inv_t2'],
+      equipos: { oscuro: [A.uid, 'f1', 'inv_t1'], blanco: [B.uid, 'f2', 'inv_t2'], publicado: true },
       marcador: { oscuro: 3, blanco: 1 }, eventos: { [A.uid]: { goles: 2, amarillas: 0 }, [B.uid]: { goles: 1, amarillas: 1 } },
-      asignaciones: { [A.uid]: [B.uid], [B.uid]: [A.uid] },
+      asignaciones: { [A.uid]: [{ j: [B.uid, 'f1', 'f2'] }], [B.uid]: [{ j: [A.uid, 'f1', 'f2'] }] },
       estado: 'votando', fechaFin: Timestamp.now()
     });
   });
 
-  const notas = id => ({ [id]: Object.fromEntries(ATTRS.map(a => [a, 1])) });
+  // Una terna ordenada para cada atributo: `mas` es el que más, `menos` el que menos.
+  const orden = (mas, menos) => ({ 0: Object.fromEntries(ATTRS.map(a => [a, { mas, menos }])) });
+  const vacia = () => ({ 0: Object.fromEntries(ATTRS.map(a => [a, null])) });
 
-  it('no se puede votar sin ser parte, ni a quien no te tocó, ni sin completar', async () => {
-    await falla(C.call('votar', { gid, pid, notas: notas(A.uid), mvp: A.uid }), 'permission-denied');
-    await falla(B.call('votar', { gid, pid, notas: notas(B.uid), mvp: A.uid }), 'permission-denied');
-    await falla(B.call('votar', { gid, pid, notas: { [A.uid]: { velocidad: 1 } }, mvp: A.uid }), 'invalid-argument');
-    await falla(B.call('votar', { gid, pid, notas: notas(A.uid), mvp: B.uid }), 'invalid-argument');
-    await falla(B.call('votar', { gid, pid, notas: { [A.uid]: Object.fromEntries(ATTRS.map(a => [a, 7])) }, mvp: A.uid }), 'invalid-argument');
+  it('no se puede votar sin ser parte, a quien no te tocó, ni con votos incompletos o mal armados', async () => {
+    await falla(C.call('votar', { gid, pid, notas: orden(A.uid, 'f1'), mvp: A.uid }), 'permission-denied');
+    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, 'f1'), mvp: B.uid }), 'invalid-argument');
+    await falla(B.call('votar', { gid, pid, notas: orden(C.uid, 'f1'), mvp: A.uid }), 'invalid-argument'); // C no está en su terna
+    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, A.uid), mvp: A.uid }), 'invalid-argument'); // más = menos
+    await falla(B.call('votar', { gid, pid, notas: { 0: { velocidad: { mas: A.uid, menos: 'f1' } } }, mvp: A.uid }), 'invalid-argument'); // faltan atributos
+    await falla(B.call('votar', { gid, pid, notas: {}, mvp: A.uid }), 'invalid-argument');
   });
 
   it('votar registra el voto una sola vez y es anónimo', async () => {
-    await B.call('votar', { gid, pid, notas: notas(A.uid), mvp: A.uid });
-    await falla(B.call('votar', { gid, pid, notas: notas(A.uid), mvp: A.uid }), 'already-exists');
+    await B.call('votar', { gid, pid, notas: orden(A.uid, 'f2'), mvp: A.uid });
+    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, 'f2'), mvp: A.uid }), 'already-exists');
     const votos = await getDocs(collection(A.db, 'grupos', gid, 'partidos', pid, 'votos'));
     expect(votos.docs.map(d => d.id)).toEqual([B.uid]);
     expect(Object.keys(votos.docs[0].data())).toEqual(['ts']); // no guarda qué votó
@@ -357,7 +370,8 @@ describe('votación y cierre', () => {
   });
 
   it('solo el admin cierra la votación', async () => {
-    await A.call('votar', { gid, pid, notas: notas(B.uid), mvp: B.uid });
+    await A.call('votar', { gid, pid, notas: { 0: { ...vacia()[0], velocidad: { mas: B.uid, menos: 'f2' } } }, mvp: B.uid }); // en el resto "no los vi"
+
     await falla(B.call('cerrarVotacion', { gid, pid }), 'permission-denied');
   });
 
@@ -374,10 +388,14 @@ describe('votación y cierre', () => {
     expect(ja.racha).toBe('G');
     expect(jb.stats).toMatchObject({ partidos: 1, goles: 1, amarillas: 1, perdidos: 1, puntos: 0 });
     expect(jb.racha).toBe('P');
+    // Alicia fue la "más" para Beto y Beto la "más" para Alicia; Fulano 2 quedó último en ambas.
     expect(ja.tendencia.velocidad).toBe(1);
 
-    const na = (await getDoc(doc(A.db, 'grupos', gid, 'niveles', A.uid))).data();
-    expect(na.atributos.velocidad).toBe(5.25); // 5 (base) + 0.25
+    const nv = async id => (await getDoc(doc(A.db, 'grupos', gid, 'niveles', id))).data().atributos.velocidad;
+    const [na, nb, n1, n2] = [await nv(A.uid), await nv(B.uid), await nv('f1'), await nv('f2')];
+    expect(na).toBeGreaterThan(5); expect(nb).toBeGreaterThan(5);
+    expect(n2).toBeLessThan(5);
+    expect(na + nb + n1 + n2).toBeCloseTo(20, 1); // suma cero: el promedio del grupo no se infla
     const g = (await getDoc(doc(A.db, 'grupos', gid))).data();
     expect(g.partidoActivo).toBeNull();
   });

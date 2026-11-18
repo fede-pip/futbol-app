@@ -132,12 +132,28 @@ export function balancear(lista) {
   // Mezclar display para no revelar ranking
   return {oscuro:shuffle(mejorO), blanco:shuffle(mejorB)};
 }
-export function asignarVotaciones(inscriptos) {
-  const jugadores = inscriptos.filter(id=>!id.startsWith("inv_"));
+// Reparte "ternas": cada votante recibe `cuantas` grupos de 3 compañeros (sin repetirse entre sí
+// si alcanza la gente) y, en cada atributo, ordena a los tres: el que más, el del medio y el que menos.
+// Se reparte parejo para que todos aparezcan en una cantidad parecida de ternas.
+// Devuelve { uid: [{ j:[a,b,c] }, ...] } (Firestore no admite arreglos anidados).
+export function asignarVotaciones(inscriptos, cuantas = 2) {
+  const jugadores = inscriptos.filter(id => !id.startsWith('inv_'));
   const asig = {};
-  jugadores.forEach(dni => {
-    const otros = jugadores.filter(d=>d!==dni);
-    asig[dni] = [...otros].sort(()=>Math.random()-.5).slice(0,Math.min(3,otros.length));
+  const veces = Object.fromEntries(jugadores.map(id => [id, 0]));
+  [...jugadores].sort(() => Math.random() - .5).forEach(votante => {
+    const otros = jugadores.filter(d => d !== votante);
+    if (otros.length < 3) { asig[votante] = []; return; }
+    const usados = new Set();
+    const ternas = [];
+    for (let t = 0; t < cuantas; t++) {
+      const libres = otros.filter(d => !usados.has(d));
+      const base = libres.length >= 3 ? libres : otros;
+      const orden = [...base].sort((x, y) => (veces[x] - veces[y]) || (Math.random() - .5));
+      const terna = orden.slice(0, 3);
+      terna.forEach(d => { usados.add(d); veces[d] += 1; });
+      ternas.push({ j: terna });
+    }
+    asig[votante] = ternas;
   });
   return asig;
 }
@@ -157,13 +173,33 @@ export function reemplazarVars(texto, vars) {
   return t;
 }
 
-// Nuevo valor de un atributo tras la votación de un partido.
-// Cada voto es -1 / 0 / +1; el cambio máximo por partido es ±0.25 y el valor queda entre 1 y 10.
-export function nuevoAtributo(actual, suma, cant) {
-  if (!cant) return actual;
-  const prom = suma / cant;
-  const delta = Math.min(0.25, Math.max(-0.25, prom * 0.25));
-  return Math.min(10, Math.max(1, +((actual || 5) + delta).toFixed(2)));
+// Valor máximo/mínimo de un atributo y cuánto pesa cada comparación.
+export const NIVEL_MIN = 1, NIVEL_MAX = 10, K_COMPARACION = 0.06, ESCALA_ELO = 2;
+
+// Cada voto es una terna ordenada: { mas, medio, menos }. Se convierte en 3 comparaciones.
+export function paresDeTerna({ mas, medio, menos }) {
+  return [{ g: mas, p: medio }, { g: mas, p: menos }, { g: medio, p: menos }];
+}
+
+// Actualiza el nivel de UN atributo comparando jugadores entre sí (estilo Elo).
+// `actuales`: { id: nivel }, `pares`: [{ g: ganador, p: perdedor }].
+// Ganarle a alguien más fuerte suma mucho; ganarle a alguien más débil casi nada. Cada comparación
+// suma lo mismo que resta, así que el promedio del grupo no se mueve y nadie "se infla" hasta 10.
+export function actualizarNiveles(actuales, pares) {
+  const delta = {};
+  for (const { g, p } of pares) {
+    const rg = actuales[g] || 5, rp = actuales[p] || 5;
+    const esperado = 1 / (1 + Math.exp(-(rg - rp) / ESCALA_ELO));
+    const d = K_COMPARACION * (1 - esperado) * 2;
+    delta[g] = (delta[g] || 0) + d;
+    delta[p] = (delta[p] || 0) - d;
+  }
+  const nuevos = {};
+  for (const id of Object.keys(delta)) {
+    const base = actuales[id] || 5;
+    nuevos[id] = Math.min(NIVEL_MAX, Math.max(NIVEL_MIN, +(base + delta[id]).toFixed(2)));
+  }
+  return nuevos;
 }
 
 export function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }

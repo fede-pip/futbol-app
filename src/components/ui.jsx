@@ -63,6 +63,15 @@ export function Avatar({ nombre = '', foto, yo, lg }) {
   return <span className={`av ${yo ? 'me' : variante(nombre)} ${lg ? 'lg' : ''}`} aria-hidden="true">{ini}</span>;
 }
 
+// Escudito del grupo: la foto que subió el admin o, si no hay, las iniciales del nombre.
+export function AvatarGrupo({ nombre = '', foto, style }) {
+  const [rota, setRota] = useState('');
+  const src = urlFoto(foto);
+  const ini = nombre.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?';
+  if (src && rota !== src) return <span className="gav" style={{ overflow: 'hidden', ...style }}><img src={src} alt="" referrerPolicy="no-referrer" onError={() => setRota(src)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></span>;
+  return <span className="gav" aria-hidden="true" style={style}>{ini}</span>;
+}
+
 export const Meter = ({ pct = 0, claro, color }) => (
   <div className={`meter ${claro ? 'l' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, pct))}%`, ...(color ? { background: color } : {}) }} /></div>
 );

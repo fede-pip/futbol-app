@@ -1,6 +1,6 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { db, FieldValue, Timestamp, HttpsError, REGION, requireMiembro, requireAdmin } from './util.js';
-import { ATTRS, nuevoAtributo } from './compartido/logica.js';
+import { ATTRS, actualizarNiveles, paresDeTerna } from './compartido/logica.js';
 import { esInvitado, esUid, statsVacias, calcularMvps, resultadoJugador, puntosDe, agregarRacha, rachaGanadora, ranking } from './puro.js';
 import { disparar, ONESIGNAL_API_KEY } from './avisos.js';
 
@@ -25,22 +25,39 @@ export const votar = onCall(opts, async req => {
     if (p.fechaFin && Date.now() > p.fechaFin.toMillis() + 24 * 3600e3) throw new HttpsError('failed-precondition', 'Se terminó el plazo para votar.');
     if (!(p.inscriptos || []).includes(uid)) throw new HttpsError('permission-denied', 'Solo votan quienes jugaron.');
     if (vs.exists) throw new HttpsError('already-exists', 'Ya enviaste tus votos.');
-    const asignados = (p.asignaciones || {})[uid] || [];
-    for (const id of Object.keys(notas)) if (!asignados.includes(id)) throw new HttpsError('permission-denied', 'No te tocaba votar a esa persona.');
-    for (const id of asignados) {
-      const n = notas[id];
-      if (!n) throw new HttpsError('invalid-argument', 'Faltan votos de un compañero.');
-      for (const a of ATTRS) if (![-1, 0, 1].includes(n[a.key])) throw new HttpsError('invalid-argument', 'Faltan votos de un atributo.');
+    const ternas = (p.asignaciones || {})[uid] || [];
+    if (!ternas.length) throw new HttpsError('failed-precondition', 'No tenés compañeros asignados para votar.');
+    // Por cada terna y cada atributo: quién fue el que más, el que menos (el del medio queda implícito)
+    // o nada si no los vio. El servidor verifica que sean justo los tres que le tocaban.
+    for (let t = 0; t < ternas.length; t++) {
+      const trio = ternas[t].j;
+      const nt = notas[String(t)];
+      if (!nt || typeof nt !== 'object') throw new HttpsError('invalid-argument', 'Faltan votos de un grupo de compañeros.');
+      for (const a of ATTRS) {
+        const v = nt[a.key];
+        if (v === null) continue;
+        if (!v || !trio.includes(v.mas) || !trio.includes(v.menos) || v.mas === v.menos) throw new HttpsError('invalid-argument', 'Voto inválido en ' + a.label + '.');
+      }
     }
     if (!mvp || mvp === uid || !(p.inscriptos || []).includes(mvp)) throw new HttpsError('invalid-argument', 'Elegí un MVP entre tus compañeros.');
 
     const inc = FieldValue.increment;
-    const notasAg = {};
-    for (const id of asignados) {
-      notasAg[id] = {};
-      for (const a of ATTRS) notasAg[id][a.key] = { suma: inc(notas[id][a.key]), cant: inc(1) };
-    }
-    tx.set(aref, { notas: notasAg, mvp: { [mvp]: inc(1) }, votaron: inc(1) }, { merge: true });
+    const cuenta = {};
+    ternas.forEach((tr, t) => {
+      for (const a of ATTRS) {
+        const v = notas[String(t)][a.key];
+        if (!v) continue;
+        const medio = tr.j.find(x => x !== v.mas && x !== v.menos);
+        for (const { g, p: pe } of paresDeTerna({ mas: v.mas, medio, menos: v.menos })) {
+          cuenta[a.key] = cuenta[a.key] || {};
+          const k = `${g}__${pe}`;
+          cuenta[a.key][k] = (cuenta[a.key][k] || 0) + 1;
+        }
+      }
+    });
+    const paresAg = {};
+    for (const [attr, m] of Object.entries(cuenta)) paresAg[attr] = Object.fromEntries(Object.entries(m).map(([k, n]) => [k, inc(n)]));
+    tx.set(aref, { pares: paresAg, mvp: { [mvp]: inc(1) }, votaron: inc(1) }, { merge: true });
     tx.create(vref, { ts: Timestamp.now() });
   });
   return { ok: true };
@@ -67,7 +84,7 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
     ]);
     const jug = Object.fromEntries(todos.docs.map(d => [d.id, d.data()]));
     const ag = as.exists ? as.data() : {};
-    const notas = ag.notas || {};
+    const paresAg = ag.pares || {};
     const eventos = p.eventos || {};
     const golesPorId = Object.fromEntries(Object.entries(eventos).map(([k, v]) => [k, (v && v.goles) || 0]));
     const mvps = calcularMvps(ag.mvp || {}, golesPorId);
@@ -79,6 +96,18 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
       golesO = suma(p.equipos?.oscuro); golesB = suma(p.equipos?.blanco);
     }
     const texto = golesO > golesB ? `Ganó Oscuro ${golesO}-${golesB}` : golesB > golesO ? `Ganó Blanco ${golesB}-${golesO}` : `Empate ${golesO}-${golesB}`;
+
+    // Niveles nuevos por atributo, comparando a todos contra todos con las comparaciones votadas.
+    const nivelesActuales = Object.fromEntries(jugadoresIds.map((id, i) => [id, niveles[i].exists ? (niveles[i].data().atributos || {}) : {}]));
+    const nivelesNuevos = {};
+    for (const a of ATTRS) {
+      const act = Object.fromEntries(jugadoresIds.map(id => [id, nivelesActuales[id][a.key] || 5]));
+      const pares = Object.entries(paresAg[a.key] || {}).flatMap(([k, n]) => {
+        const [g, pe] = k.split('__');
+        return act[g] !== undefined && act[pe] !== undefined ? Array.from({ length: n }, () => ({ g, p: pe })) : [];
+      });
+      nivelesNuevos[a.key] = actualizarNiveles(act, pares);
+    }
 
     const antes = ranking(Object.entries(jug).map(([id, j]) => ({ id, puntos: j.stats?.puntos || 0, goles: j.stats?.goles || 0 })));
     const despues = { ...jug };
@@ -100,16 +129,15 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
       const tendencia = {};
       let deltaTotal = 0;
       for (const a of ATTRS) {
-        const n = notas[id]?.[a.key];
-        if (n && n.cant > 0) {
+        const nuevo = nivelesNuevos[a.key][id];
+        if (nuevo !== undefined) {
           const antesV = actuales[a.key] || 5;
-          const nuevo = nuevoAtributo(antesV, n.suma, n.cant);
           nuevos[a.key] = nuevo;
-          tendencia[a.key] = Math.sign(+(nuevo - antesV).toFixed(2));
+          tendencia[a.key] = Math.abs(nuevo - antesV) < 0.02 ? 0 : Math.sign(nuevo - antesV);
           deltaTotal += nuevo - antesV;
         } else tendencia[a.key] = 0;
       }
-      cambiosVotacion[id] = { attrs: tendencia, general: Math.sign(+deltaTotal.toFixed(2)) };
+      cambiosVotacion[id] = { attrs: tendencia, general: Math.abs(deltaTotal) < 0.05 ? 0 : Math.sign(deltaTotal) };
       tx.set(gref.collection('jugadores').doc(id), { stats, racha, tendencia }, { merge: true });
       tx.set(gref.collection('niveles').doc(id), { atributos: nuevos, previos: actuales }, { merge: true });
       despues[id] = { ...jd, stats, racha };

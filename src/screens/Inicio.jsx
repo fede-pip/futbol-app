@@ -7,7 +7,7 @@ import { db } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
 import { anotarse, bajarse } from '../data/acciones.js';
 import { aFecha, diaSemana, faltan, titulo as tituloFecha, diaCorto } from '../lib/fechas.js';
-import { Btn, Card, CardB, Fila, Hint, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
+import { AvatarGrupo, Btn, Card, CardB, Fila, Hint, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
@@ -63,7 +63,7 @@ export default function Inicio() {
     <div className="scr">
       <BarraSuperior />
       <div className="grp-h">
-        <span className="gav">{iniciales(grupo.nombre)}</span>
+        <AvatarGrupo nombre={grupo.nombre} foto={grupo.foto} />
         <div className="grow"><b>{grupo.nombre}</b><div className="small">{grupo.miembros.length} {grupo.miembros.length === 1 ? 'jugador' : 'jugadores'}</div></div>
         {grupos.length > 1 ? (
           <select className="select" style={{ width: 'auto', minHeight: 36, fontSize: 14 }} value={gid} onChange={e => elegirGrupo(e.target.value)} aria-label="Cambiar de grupo">

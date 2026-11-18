@@ -7,7 +7,7 @@ import {
 } from '../data/acciones.js';
 import { FORMATOS, depurarInvitados, faltanN, pl } from '../lib/logica.js';
 import { aFecha, aInputFecha, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
-import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
+import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Hint, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';

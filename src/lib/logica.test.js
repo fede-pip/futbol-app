@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ATTRS, calcProm, calcPuntos, calcRacha, fmtNombre, balancear,
-  asignarVotaciones, depurarInvitados, faltanN, quedanN, pl, horasRestantes, reemplazarVars, nuevoAtributo,
+  asignarVotaciones, depurarInvitados, faltanN, quedanN, pl, horasRestantes, reemplazarVars, actualizarNiveles, paresDeTerna,
 } from './logica.js';
 import { arreglarPlural, llenar } from './catalogo.js';
 
@@ -89,19 +89,28 @@ describe('balancear', () => {
 });
 
 describe('asignarVotaciones', () => {
-  it('cada jugador vota hasta 3 compañeros, nunca a sí mismo ni a invitados', () => {
-    const asig = asignarVotaciones(['1', '2', '3', '4', '5', 'inv_x']);
-    expect(Object.keys(asig).sort()).toEqual(['1', '2', '3', '4', '5']);
-    for (const [dni, votados] of Object.entries(asig)) {
-      expect(votados.length).toBe(3);
-      expect(votados).not.toContain(dni);
-      expect(votados.some(v => v.startsWith('inv_'))).toBe(false);
-      expect(new Set(votados).size).toBe(votados.length);
+  it('cada jugador recibe 2 ternas de compañeros: sin sí mismo, sin invitados, sin repetidos', () => {
+    const asig = asignarVotaciones(['1', '2', '3', '4', '5', '6', '7', '8', 'inv_x']);
+    expect(Object.keys(asig).sort()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+    for (const [id, ternas] of Object.entries(asig)) {
+      expect(ternas.length).toBe(2);
+      const todos = ternas.flatMap(t => t.j);
+      for (const t of ternas) { expect(t.j.length).toBe(3); expect(new Set(t.j).size).toBe(3); }
+      expect(todos).not.toContain(id);
+      expect(todos.some(v => v.startsWith('inv_'))).toBe(false);
+      expect(new Set(todos).size).toBe(6); // las dos ternas no se pisan
     }
   });
-  it('con pocos jugadores asigna menos de 3', () => {
-    const asig = asignarVotaciones(['1', '2']);
-    expect(asig['1']).toEqual(['2']);
+  it('reparte parejo: todos aparecen en una cantidad parecida de ternas', () => {
+    const ids = Array.from({ length: 10 }, (_, i) => String(i));
+    const asig = asignarVotaciones(ids);
+    const veces = Object.fromEntries(ids.map(i => [i, 0]));
+    Object.values(asig).flatMap(t => t.flatMap(x => x.j)).forEach(i => { veces[i] += 1; });
+    const v = Object.values(veces);
+    expect(Math.max(...v) - Math.min(...v)).toBeLessThanOrEqual(2);
+  });
+  it('con menos de 4 jugadores no hay ternas', () => {
+    expect(asignarVotaciones(['1', '2', '3'])).toEqual({ 1: [], 2: [], 3: [] });
   });
 });
 
@@ -134,22 +143,35 @@ describe('reemplazarVars', () => {
   });
 });
 
-describe('nuevoAtributo', () => {
-  it('todos votan "mejor": sube 0.25', () => {
-    expect(nuevoAtributo(6, 5, 5)).toBe(6.25);
+describe('actualizarNiveles (votación comparativa)', () => {
+  it('paresDeTerna: más>medio, más>menos, medio>menos', () => {
+    expect(paresDeTerna({ mas: 'a', medio: 'b', menos: 'c' })).toEqual([{ g: 'a', p: 'b' }, { g: 'a', p: 'c' }, { g: 'b', p: 'c' }]);
   });
-  it('todos votan "peor": baja 0.25', () => {
-    expect(nuevoAtributo(6, -5, 5)).toBe(5.75);
+  it('el que gana sube y el que pierde baja', () => {
+    const n = actualizarNiveles({ a: 5, b: 5 }, [{ g: 'a', p: 'b' }]);
+    expect(n.a).toBeGreaterThan(5); expect(n.b).toBeLessThan(5);
   });
-  it('mayoría "igual": cambio chico', () => {
-    expect(nuevoAtributo(6, 1, 4)).toBe(6.06);
+  it('es suma cero: el promedio del grupo no se mueve (no hay inflación)', () => {
+    const act = { a: 7, b: 5, c: 3, d: 6 };
+    const pares = [{ g: 'a', p: 'b' }, { g: 'c', p: 'a' }, { g: 'd', p: 'c' }, { g: 'b', p: 'd' }, { g: 'a', p: 'c' }];
+    const n = actualizarNiveles(act, pares);
+    const dif = Object.keys(n).reduce((s, k) => s + (n[k] - act[k]), 0);
+    expect(Math.abs(dif)).toBeLessThan(0.05);
   });
-  it('respeta el rango 1 a 10', () => {
-    expect(nuevoAtributo(10, 3, 3)).toBe(10);
-    expect(nuevoAtributo(1, -3, 3)).toBe(1);
+  it('ganarle a un fuerte vale más que ganarle a uno flojo', () => {
+    const fuerte = actualizarNiveles({ a: 5, b: 8 }, [{ g: 'a', p: 'b' }]).a - 5;
+    const flojo = actualizarNiveles({ a: 5, b: 2 }, [{ g: 'a', p: 'b' }]).a - 5;
+    expect(fuerte).toBeGreaterThan(flojo * 2);
   });
-  it('sin votos no cambia', () => {
-    expect(nuevoAtributo(7, 0, 0)).toBe(7);
+  it('el mejor que sigue ganando casi no sube: ya no llega a 10 por inercia', () => {
+    let r = { top: 8, otro: 5 };
+    for (let i = 0; i < 20; i++) r = { ...r, ...actualizarNiveles(r, [{ g: 'top', p: 'otro' }]) };
+    expect(r.top).toBeLessThan(9.5);
+  });
+  it('respeta el rango 1 a 10 y no toca a quien no tuvo comparaciones', () => {
+    const n = actualizarNiveles({ a: 10, b: 1, c: 5 }, [{ g: 'b', p: 'a' }]);
+    expect(n.a).toBeGreaterThanOrEqual(1); expect(n.b).toBeLessThanOrEqual(10);
+    expect(n.c).toBeUndefined();
   });
 });
 
