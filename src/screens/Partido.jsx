@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { collection } from 'firebase/firestore';
+import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { db, mensajeError } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
 import {
@@ -17,6 +17,15 @@ import Equipos from './Equipos.jsx';
 import Goles from './Goles.jsx';
 import EnVivo from './EnVivo.jsx';
 import Votacion from './Votacion.jsx';
+
+// Datos de partida para el partido nuevo: lo mismo que el último, en la próxima fecha con el mismo día de la semana.
+function desdeUltimo(u) {
+  if (!u) return null;
+  const antes = aFecha(u.fechaHora);
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() !== antes.getDay());
+  return { fecha: aInputFecha(d), hora: horaTxt(antes), lugar: u.lugar || '', lugarId: u.lugarId, lat: u.lat, lng: u.lng, formato: u.formato || '6 vs 6' };
+}
 
 function proximoLunes() {
   const d = new Date(); const dias = (8 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + dias); return aInputFecha(d);
@@ -59,8 +68,11 @@ function Inscripcion() {
   const { uid, gid, grupo, partido: p, jugadores, esAdmin } = useSesion();
   const [anotando, setAnotando] = useState(false);
   const [buscar, setBuscar] = useState('');
+  const { ir } = useNav();
   const toast = useToast();
   const guardados = useColl(collection(db, `grupos/${gid}/invitados`), gid) || [];
+  // Para crear el próximo partido: se repite el día de la semana, la hora, la cancha y el formato del último.
+  const ultimos = useColl(esAdmin ? query(collection(db, `grupos/${gid}/partidos`), where('estado', '==', 'cerrado'), orderBy('fechaHora', 'desc'), limit(1)) : null, esAdmin ? gid : 'no');
   const registrados = depurarInvitados(guardados, Object.values(jugadores).flatMap(j => [j.nombre, j.apodo])).utiles;
   const [error, setError] = useState('');
   const [editando, setEditando] = useState(false);
@@ -75,7 +87,7 @@ function Inscripcion() {
     return esAdmin ? (
       <>
         <div><h2 className="t">Armá el partido</h2><p className="lead" style={{ marginTop: 2 }}>Avisamos a todo el grupo apenas lo crees.</p></div>
-        <FormPartido etiqueta="Crear partido" onGuardar={d => crearPartido(gid, d)} />
+        <FormPartido key={ultimos ? (ultimos[0] ? ultimos[0].id : 'sin') : 'cargando'} etiqueta="Crear partido" inicial={desdeUltimo(ultimos && ultimos[0])} onGuardar={d => crearPartido(gid, d)} />
       </>
     ) : <Vacio titulo="Todavía no hay partido" texto="Cuando el admin lo cree te avisamos." />;
   }
@@ -89,6 +101,7 @@ function Inscripcion() {
   const lleno = insc.length >= cupo;
   const cena = p.cena || [];
   const yoCena = cena.includes(uid);
+  const jugado = d.getTime() < Date.now();
   const nom = id => nombreDe(id, jugadores, p);
   const listaWA = encodeURIComponent([
     `⚽ *${mayus(diaLargo(d)).toUpperCase()}, ${horaTxt(d)}*`,
@@ -165,11 +178,20 @@ function Inscripcion() {
         </div>
       </Card>
 
+      {jugado ? (
+        <Hint icono="clock">
+          <b>El partido ya empezó.</b> {esAdmin ? 'Cargá el resultado y abrí la votación cuando termine.' : 'Cuando el admin cargue el resultado, se abre la votación.'}
+          {esAdmin ? <div style={{ marginTop: 8 }}><Btn v="pri" onClick={() => ir('partido', 'goles')}>Cargar el resultado</Btn></div> : null}
+        </Hint>
+      ) : (
+        <>
       {anotado
         ? <Btn disabled={cargando} onClick={() => ejecutar(() => bajarse(gid, p, uid))}>Me bajo</Btn>
         : enEspera >= 0
           ? <Btn disabled={cargando} onClick={() => ejecutar(() => bajarse(gid, p, uid))}>Salir de la lista de espera (puesto {enEspera + 1})</Btn>
           : <Btn v="pri" disabled={cargando} onClick={() => ejecutar(async () => { await anotarse(gid, p, uid); toast(lleno ? 'Quedaste en la lista de espera.' : `¡Anotado! Nos vemos el ${diaSemana(d)}.`); })}>{lleno ? 'Sumarme a la lista de espera' : 'Me anoto'}</Btn>}
+        </>
+      )}
       {error ? <div className="error" role="alert">{error}</div> : null}
       {espera.length ? <Card><Fila icono="clock" titulo={`Lista de espera: ${espera.length}`} sub="Si alguien se baja, sube el primero y le avisamos." /></Card> : null}
 

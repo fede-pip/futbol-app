@@ -82,7 +82,8 @@ export const unirsePorCodigo = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] },
   });
   if (nuevo) {
     const nombre = ((await uref.get()).data()?.nombre || '').split(' ')[0];
-    await disparar(gid, 'nuevo_miembro', { personaUid: uid, excluir: [uid], vars: { nombre }, clave: uid });
+    const miembros = String(((await gref.get()).data()?.miembros || []).length);
+    await disparar(gid, 'nuevo_miembro', { personaUid: uid, excluir: [uid], vars: { nombre, miembros }, clave: uid });
     await disparar(gid, 'bienvenida', { personaUids: [uid], clave: uid });
   }
   return { gid, nombre: nombreGrupo, nuevo };

@@ -107,6 +107,12 @@ export default function Perfil() {
       <Card><Fila icono="bell" titulo="Mis avisos" sub="Qué querés recibir en el celular" onClick={() => ir('misAvisos')} derecha={<Icono n="chev" />} /></Card>
       {esSuper(user) ? <Card><Fila icono="shield" titulo="Plataforma" sub="Migración de la versión anterior" onClick={() => ir('plataforma')} derecha={<Icono n="chev" />} /></Card> : null}
       <Btn onClick={() => signOut(auth)}><Icono n="logout" />Cerrar sesión</Btn>
+      <Card>
+        <div className="card-h"><h3 className="t">Ayuda y legal</h3></div>
+        <Fila icono="mail" titulo="Escribinos" sub="Dudas, problemas o ideas: hola@inmetricswetrust.com" onClick={() => { window.location.href = 'mailto:hola@inmetricswetrust.com?subject=Me%20Anoto'; }} derecha={<Icono n="chev" />} />
+        <Fila icono="shield" titulo="Política de privacidad" sub="Qué datos usamos y cómo borrarlos" onClick={() => window.open('/privacidad.html', '_blank', 'noopener')} derecha={<Icono n="chev" />} />
+        <Fila icono="info" titulo="Términos de uso" sub="Las reglas para usar la app" onClick={() => window.open('/terminos.html', '_blank', 'noopener')} derecha={<Icono n="chev" />} />
+      </Card>
       <BorrarCuenta />
     </div>
   );

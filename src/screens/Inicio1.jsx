@@ -128,6 +128,8 @@ export function PreguntaAnterior({ onListo, onDni }) {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   useEffect(() => { llamar('buscarCuentaAnterior').then(setHallada).catch(() => setHallada({ encontrada: false })); }, []);
+  // Quien no tiene una cuenta de Google anterior sigue directo: si jugaba antes, lo pide desde "Ya jugaba antes" al elegir grupo, o desde su perfil.
+  useEffect(() => { if (hallada && !hallada.encontrada) onListo(); }, [hallada]);
 
   async function confirmar() {
     setError(''); setCargando(true);

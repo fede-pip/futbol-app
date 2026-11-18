@@ -102,7 +102,7 @@ export function varsPartido(g, p, extra = {}) {
     comunidad: g.nombre, lugar: p.lugar || '', formato: p.formato || '', cupo: String(cupo),
     anotados: String(anot), restantes: String(Math.max(0, cupo - anot)), faltan: String(Math.max(0, cupo - anot)),
     en_espera: String((p.listaEspera || []).length), cena: String((p.cena || []).length),
-    ...(d ? { dia: diaDe(d), hora: horaDe(d), fecha: fechaLarga(d) } : {}),
+    ...(d ? { dia: diaDe(d), hora: horaDe(d), fecha: fechaLarga(d), proximo_txt: `El próximo partido es el ${diaDe(d)} a las ${horaDe(d)}.` } : {}),
     ...(p.marcador ? { golesO: String(p.marcador.oscuro ?? 0), golesB: String(p.marcador.blanco ?? 0) } : {}),
     ...(r.texto ? { resultado: r.texto } : {}),
     precio: g.precioCancha ? `$${g.precioCancha}` : '', pozo: g.pozo ? `$${g.pozo}` : '',

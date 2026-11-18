@@ -2,10 +2,10 @@
 // usan este mismo archivo (functions/src/compartido/ lo recibe copiado con `npm run sync`).
 
 export const AUD = {todos:['Todos',12], anot:['Anotados',10], noanot:['No anotados',2], espera:['Lista de espera',1], cena:['Se quedan a comer',6], novotaron:['Los que no votaron',2], admins:['Admins',2], persona:['Solo la persona involucrada',1]};
-export const MUESTRA = {comunidad:'Fútbol de los Lunes', destinatario:'Fede', nombre:'Nico', dia:'lunes', fecha:'lunes 19 de octubre', hora:'21:30', lugar:'Cancha Palermo', formato:'6 vs 6', cupo:'12', anotados:'10', restantes:'2', faltan:'2', en_espera:'1', cena:'6', golesO:'4', golesB:'3', resultado:'Ganó Oscuro 4-3', mi_equipo:'Oscuro', mvp:'Nico Ferrari', votaron:'8', faltan_votar:'2', horas_restantes:'6', racha:'3', puntos:'31', posicion:'2', goles:'9', precio:'$4.500', pozo:'$18.000', atributo:'Definición', partidos:'2'};
+export const MUESTRA = {miembros:'12',proximo_txt:'El próximo partido es el lunes a las 21:30.',comunidad:'Fútbol de los Lunes', destinatario:'Fede', nombre:'Nico', dia:'lunes', fecha:'lunes 19 de octubre', hora:'21:30', lugar:'Cancha Palermo', formato:'6 vs 6', cupo:'12', anotados:'10', restantes:'2', faltan:'2', en_espera:'1', cena:'6', golesO:'4', golesB:'3', resultado:'Ganó Oscuro 4-3', mi_equipo:'Oscuro', mvp:'Nico Ferrari', votaron:'8', faltan_votar:'2', horas_restantes:'6', racha:'3', puntos:'31', posicion:'2', goles:'9', precio:'$4.500', pozo:'$18.000', atributo:'Definición', partidos:'2'};
 export const VARS_DESC = {
-  Partido:{fecha:'Fecha completa',dia:'Día de la semana',hora:'Hora',lugar:'Lugar',formato:'Formato (6 vs 6)',cupo:'Lugares en total',anotados:'Cuántos se anotaron',restantes:'Lugares libres',faltan:'Cuántos faltan para completar',en_espera:'Personas en lista de espera',cena:'Cuántos se quedan a comer'},
-  Personas:{destinatario:'Nombre de quien lo recibe',nombre:'Nombre de quien hizo la acción',mi_equipo:'Equipo de quien lo recibe',comunidad:'Nombre del grupo'},
+  Partido:{proximo_txt:'Frase con el próximo partido',fecha:'Fecha completa',dia:'Día de la semana',hora:'Hora',lugar:'Lugar',formato:'Formato (6 vs 6)',cupo:'Lugares en total',anotados:'Cuántos se anotaron',restantes:'Lugares libres',faltan:'Cuántos faltan para completar',en_espera:'Personas en lista de espera',cena:'Cuántos se quedan a comer'},
+  Personas:{miembros:'Cuántos hay en el grupo',destinatario:'Nombre de quien lo recibe',nombre:'Nombre de quien hizo la acción',mi_equipo:'Equipo de quien lo recibe',comunidad:'Nombre del grupo'},
   Resultado:{golesO:'Goles de Oscuro',golesB:'Goles de Blanco',resultado:'Resultado en una frase',mvp:'Nombre del MVP'},
   Votación:{votaron:'Cuántos ya votaron',faltan_votar:'Cuántos faltan votar',horas_restantes:'Horas que quedan para votar'},
   Estadísticas:{racha:'Partidos seguidos ganando',puntos:'Puntos de la temporada',posicion:'Puesto en la tabla',goles:'Goles de la temporada',atributo:'Atributo que cambió',partidos:'Partidos jugados'},
@@ -40,8 +40,8 @@ export const CAT_DEF = [
  {id:'racha',g:2,ic:'trophy',t:'Racha ganadora',opts:['A partir de 3','A partir de 5'],sel:0,quien:['persona'],titulo:'Llevás {racha} victorias seguidas',cuerpo:'Ya sumás {puntos} puntos en la temporada.',vars:['racha','puntos','posicion'],on:true,nuevo:true},
  {id:'posicion',g:2,ic:'chart',t:'Cambió tu posición',opts:['Al cerrar la votación'],sel:0,quien:['persona'],titulo:'Estás en el puesto {posicion}',cuerpo:'Tenés {puntos} puntos y {goles} goles.',vars:['posicion','puntos','goles'],on:true,nuevo:true},
  {id:'pago',g:2,ic:'info',t:'Recordatorio de cancha',opts:['Al día siguiente','A los 2 días'],sel:0,quien:['anot'],titulo:'Cancha: {precio} por persona',cuerpo:'Pozo acumulado: {pozo}.',vars:['precio','pozo'],on:false,nuevo:true,aviso:'Necesita registrar quién pagó. Llega en una etapa posterior.'},
- {id:'nuevo_miembro',g:3,ic:'user',t:'Se unió alguien al grupo',opts:['Al instante'],sel:0,quien:['admins'],titulo:'{nombre} se unió a {comunidad}',cuerpo:'Ya son {cupo} jugadores.',vars:['nombre','comunidad'],on:true,nuevo:true},
- {id:'bienvenida',g:3,ic:'mailbox',t:'Bienvenida al grupo',opts:['Al instante'],sel:0,quien:['persona'],titulo:'Bienvenido a {comunidad}, {destinatario}',cuerpo:'El próximo partido es el {dia} a las {hora}.',vars:['comunidad','destinatario','dia','hora'],on:true,nuevo:true},
+ {id:'nuevo_miembro',g:3,ic:'user',t:'Se unió alguien al grupo',opts:['Al instante'],sel:0,quien:['admins'],titulo:'{nombre} se unió a {comunidad}',cuerpo:'Ya son {miembros} jugadores.',vars:['nombre','comunidad','miembros'],on:true,nuevo:true},
+ {id:'bienvenida',g:3,ic:'mailbox',t:'Bienvenida al grupo',opts:['Al instante'],sel:0,quien:['persona'],titulo:'Bienvenido a {comunidad}, {destinatario}',cuerpo:'{proximo_txt}',vars:['comunidad','destinatario','dia','hora'],on:true,nuevo:true},
  {id:'resumen',g:3,ic:'chart',t:'Resumen de la semana',opts:['Domingo 20:00','Lunes 9:00'],sel:0,quien:['todos'],titulo:'Tu semana en {comunidad}',cuerpo:'Jugaste {partidos} partidos, metiste {goles} goles y estás {posicion}.º.',vars:['comunidad','partidos','goles','posicion'],on:false,nuevo:true}
 ];
 
@@ -61,7 +61,8 @@ export const arreglarPlural = t => (t || '')
   .replace(/\b([Vv])otaron 1\b(?! ?\d)/g, (m, c) => `${c}otó 1`)
   .replace(/\b([Ss])omos 1\b(?! ?\d)/g, (m, c) => `${c === 'S' ? 'Hay' : 'hay'} 1`)
   .replace(/\b1 (lugares|jugadores|personas|partidos|goles|victorias|anotados|puntos|días|dias|horas|votos|compañeros)\b/g, (m, n) => `1 ${SINGULAR[n]}`)
-  .replace(/\b1 victoria seguidas\b/g, '1 victoria seguida');
+  .replace(/\b1 victoria seguidas\b/g, '1 victoria seguida')
+  .replace(/\s*Equipo:\s*\.(?=\s|$)/g, ''); // todavía no hay equipo asignado: no queda "Equipo: ."
 export const llenar = (t, vars = MUESTRA, vacio = false) =>
   arreglarPlural((t || '').replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : (vacio ? '' : m)));
 

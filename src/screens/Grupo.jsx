@@ -99,14 +99,14 @@ export default function Grupo() {
     <div className="scr">
       <BarraSuperior titulo="Grupo" />
       <div>
-        <h3 className="t" style={{ marginBottom: 8 }}>Mis grupos</h3>
-        <Card>
+        {grupos.length > 1 ? <h3 className="t" style={{ marginBottom: 8 }}>Mis grupos</h3> : null}
+        {grupos.length > 1 ? <Card>
           {grupos.map(g => (
             <Fila key={g.id} icono={g.id === gid ? 'check' : 'users'} hecho={g.id === gid} titulo={g.nombre} sub={g.id === gid ? 'Es el que estás viendo' : 'Tocá para verlo'}
               onClick={g.id === gid ? undefined : () => { elegirGrupo(g.id); toast(`Ahora ves ${g.nombre}`); }} derecha={g.id === gid ? <Pill t="tint">Actual</Pill> : <Icono n="chev" />} />
           ))}
-        </Card>
-        <button className="choice" style={{ marginTop: 10 }} onClick={() => setSumando(true)}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Sumar otro grupo</b><span>Unirte con un código o crear uno nuevo.</span></div><Icono n="chev" /></button>
+        </Card> : null}
+        <button className="choice" style={{ marginTop: grupos.length > 1 ? 10 : 0 }} onClick={() => setSumando(true)}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Sumar otro grupo</b><span>Unirte con un código o crear uno nuevo.</span></div><Icono n="chev" /></button>
       </div>
       {esAdmin ? <PedidosVinculo gid={gid} /> : null}
       <section className="kpi pitch">
@@ -196,14 +196,14 @@ export default function Grupo() {
         </div>
       ) : null}
 
-      <div><h3 className="t" style={{ marginBottom: 8 }}>Qué puede hacer cada uno</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <details className="plegable"><summary><span className="t" style={{ fontSize: 17, fontWeight: 650 }}>Qué puede hacer cada uno</span></summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
           {roles.map(r => (
             <CardB key={r[0]}><div className="row sp" style={{ marginBottom: 6 }}><b>{r[0]}</b>{r[1] ? <Pill t="tint"><Icono n="shield" />{r[1]}</Pill> : null}</div>
               {r[2].map(x => <div key={x} className="row" style={{ padding: '4px 0', color: 'var(--text-2)', fontSize: 13.5 }}><span style={{ color: 'var(--ok)', display: 'inline-flex' }}><Icono n="check" style={{ width: 16, height: 16 }} /></span>{x}</div>)}</CardB>
           ))}
         </div>
-      </div>
+      </details>
 
       <Card><Fila icono="user" titulo="Mi perfil" sub="Nombre, apodo y cuenta" onClick={() => ir('perfil')} derecha={<Icono n="chev" />} /></Card>
       {esCreador ? (

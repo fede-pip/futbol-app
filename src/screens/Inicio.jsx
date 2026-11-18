@@ -48,6 +48,7 @@ export default function Inicio() {
   const enEspera = partido && (partido.listaEspera || []).indexOf(uid);
   const lleno = partido && n >= cupo;
   const votando = partido && partido.estado === 'votando';
+  const jugado = !!(partido && d && d.getTime() < Date.now() && !votando); // ya empezó y todavía no se cargó el resultado
 
   async function accion(fn) {
     setError(''); setCargando(true);
@@ -73,18 +74,21 @@ export default function Inicio() {
       <BannerAvisos />
       <div>
         <h2 className="t">Hola, {(perfil.apodo || perfil.nombre).split(' ')[0]}</h2>
-        <p className="lead" style={{ marginTop: 2 }}>{partido && d ? faltan(d) + ' para el partido.' : 'Todavía no hay partido armado.'}</p>
+        <p className="lead" style={{ marginTop: 2 }}>{partido && d ? (votando ? 'Terminó el partido. Falta votar.' : jugado ? (esAdmin ? 'El partido ya se jugó: cargá el resultado.' : 'El partido ya se jugó. Falta que el admin cargue el resultado.') : faltan(d) + ' para el partido.') : 'Todavía no hay partido armado.'}</p>
       </div>
 
       {partido ? (
         <section className="kpi pitch" aria-label="Próximo partido: tocá para ver quiénes están anotados" role="link" tabIndex={0} style={{ cursor: 'pointer' }}
           onClick={e => { if (e.target.closest('a,button')) return; ir('partido', 'inscripcion'); }}
           onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('a,button')) { e.preventDefault(); ir('partido', 'inscripcion'); } }}>
-          <div className="lb">{votando ? 'Votación abierta' : 'Próximo partido'}</div>
+          <div className="lb">{votando ? 'Votación abierta' : jugado ? 'Partido jugado' : 'Próximo partido'}</div>
           <div className="v">{d ? tituloFecha(d) : ''}</div>
           <div className="s"><span><Icono n="pin" style={{ width: 15, height: 15 }} /><a href={urlMapa(partido)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}>{partido.lugar}</a></span><span>{partido.formato}</span></div>
           {votando ? (
             <Btn v="white" style={{ marginTop: 16 }} onClick={() => ir('partido', 'votar')}>Ir a votar</Btn>
+          ) : jugado ? (
+            esAdmin ? <Btn v="white" style={{ marginTop: 16 }} onClick={() => ir('partido', 'goles')}>Cargar el resultado</Btn>
+              : <div className="small" style={{ marginTop: 14, color: '#c9f0dc' }}>{n} {pl(n, 'jugador', 'jugadores')}. Cuando el admin cargue el resultado, se abre la votación.</div>
           ) : (
             <>
               <div className="row sp" style={{ margin: '16px 0 8px' }}><b className="num" style={{ fontSize: 15 }}>{n} de {cupo} {pl(n, 'anotado', 'anotados')}</b><span style={{ fontSize: 13, color: '#c9f0dc' }}>{lleno ? 'Completo' : quedanN(cupo - n)}</span></div>
@@ -113,8 +117,8 @@ export default function Inicio() {
         <Card>
           <div className="card-h"><h3 className="t">Qué sigue</h3></div>
           <div style={{ paddingTop: 6 }}>
-            <Fila icono={anotado ? 'check' : 'cal'} hecho={anotado} titulo="Anotarte al partido" sub={anotado ? 'Listo, ya estás en la lista' : lleno ? 'El cupo está completo' : `${quedanN(cupo - n)} ${pl(cupo - n, 'lugar', 'lugares')}`} />
-            <Fila icono="users" titulo="Ver los equipos" sub={partido.equipos && partido.equipos.publicado ? 'Ya están publicados' : 'Se publican antes del partido'} onClick={() => ir('partido', 'equipos')} derecha={<span className="go">Ver</span>} />
+            <Fila icono={anotado || jugado ? 'check' : 'cal'} hecho={anotado || jugado} titulo="Anotarte al partido" sub={jugado ? 'Ya se jugó' : anotado ? 'Listo, ya estás en la lista' : lleno ? 'El cupo está completo' : `${quedanN(cupo - n)} ${pl(cupo - n, 'lugar', 'lugares')}`} />
+            <Fila icono="users" titulo="Ver los equipos" sub={partido.equipos && partido.equipos.publicado ? 'Ya están publicados' : jugado ? 'Todavía no se publicaron' : 'Se publican antes del partido'} onClick={() => ir('partido', 'equipos')} derecha={<span className="go">Ver</span>} />
             <Fila icono="vote" titulo="Votar a tus compañeros" sub={votando ? 'Está abierta' : 'Se abre cuando termina el partido'} onClick={() => ir('partido', 'votar')} derecha={votando ? <Pill t="warn">Abierta</Pill> : null} />
           </div>
         </Card>

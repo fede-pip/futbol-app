@@ -2,7 +2,7 @@ import { pl } from '../lib/logica.js';
 import { useState } from 'react';
 import { mensajeError } from '../lib/firebase.js';
 import { finalizarPartido, guardarEvento, guardarMarcador } from '../data/acciones.js';
-import { Avatar, Btn, Card, Icono, Meter, Pill } from '../components/ui.jsx';
+import { Avatar, Btn, Card, Hint, Icono, Meter, Pill } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 
@@ -70,11 +70,14 @@ export default function Goles() {
         </div>
       </Card>
       {error ? <div className="error" role="alert">{error}</div> : null}
-      {confirma ? (
-        <div className="confirm"><b>Los goles no coinciden con el resultado</b><span className="muted">El resultado oficial va a ser {oscuro} a {blanco}. ¿Finalizar igual y abrir la votación?</span>
-          <div className="row"><Btn onClick={() => setConfirma(false)}>Revisar</Btn><Btn v="pri" disabled={cargando} onClick={finalizar}>Finalizar igual</Btn></div></div>
+      {!(eq && eq.publicado) ? (
+        <Hint icono="info" accion={<button className="chip on" onClick={() => ir('partido', 'equipos')}>Ir a equipos</button>}><b>Antes de finalizar, publicá los equipos.</b> Sin equipos no se puede saber quién ganó ni quién perdió, y las estadísticas quedarían mal.</Hint>
+      ) : confirma ? (
+        <div className="confirm"><b>{falta === 0 ? '¿Finalizar el partido?' : 'Los goles no coinciden con el resultado'}</b>
+          <span className="muted">El resultado va a ser Oscuro {oscuro} a {blanco} Blanco{falta === 0 ? '' : ` y faltan asignar goles a jugadores`}. Se abre la votación y no se puede volver atrás.</span>
+          <div className="row"><Btn onClick={() => setConfirma(false)}>Revisar</Btn><Btn v="pri" disabled={cargando} onClick={finalizar}>Sí, finalizar</Btn></div></div>
       ) : (
-        <Btn v="pri" disabled={cargando || insc.length < 2} onClick={() => (falta === 0 ? finalizar() : setConfirma(true))}>Finalizar partido y abrir la votación</Btn>
+        <Btn v="pri" disabled={cargando || insc.length < 2} onClick={() => setConfirma(true)}>Finalizar partido y abrir la votación</Btn>
       )}
       <p className="small">Al finalizar, los jugadores reciben un aviso y tienen 24 horas para votar.</p>
     </>

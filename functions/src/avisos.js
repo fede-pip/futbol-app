@@ -72,7 +72,7 @@ export async function entregar(gid, g, { tipo, titulo, cuerpo, uids, ctx = {}, c
     const [perfil, priv] = await Promise.all([db.doc(`usuarios/${uid}`).get(), db.doc(`privado/${uid}`).get()]);
     const nombre = (perfil.data()?.apodo || perfil.data()?.nombre || '').split(' ')[0];
     const equipo = p.equipos ? ((p.equipos.oscuro || []).includes(uid) ? 'Oscuro' : (p.equipos.blanco || []).includes(uid) ? 'Blanco' : '') : '';
-    const vars = { ...(ctx.vars || {}), destinatario: nombre, ...(equipo ? { mi_equipo: equipo } : {}), ...(ctx.varsPorUid?.[uid] || {}) };
+    const vars = { proximo_txt: 'Cuando el admin arme el próximo partido te avisamos.', ...(ctx.vars || {}), destinatario: nombre, ...(equipo ? { mi_equipo: equipo } : {}), ...(ctx.varsPorUid?.[uid] || {}) };
     const t = llenar(titulo, vars, true).replace(/\s+/g, ' ').trim();
     const c = llenar(cuerpo, vars, true).replace(/\s+/g, ' ').trim();
     if (!t) return;

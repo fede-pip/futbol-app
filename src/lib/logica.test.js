@@ -172,6 +172,10 @@ describe('singular y plural en los textos', () => {
     expect(llenar('Quedan {restantes} lugares el {dia}.', { restantes: 1, dia: 'lunes' })).toBe('Queda 1 lugar el lunes.');
     expect(llenar('Faltan {faltan} para completar', { faltan: 2 })).toBe('Faltan 2 para completar');
   });
+  it('si todavía no hay equipo, el aviso no queda con "Equipo: ."', () => {
+    expect(llenar('{lugar}. Equipo: {mi_equipo}. ¡Llevá agua!', { lugar: 'Cancha 5', mi_equipo: '' }, true)).toBe('Cancha 5. ¡Llevá agua!');
+    expect(llenar('{lugar}. Equipo: {mi_equipo}. ¡Llevá agua!', { lugar: 'Cancha 5', mi_equipo: 'Oscuro' }, true)).toBe('Cancha 5. Equipo: Oscuro. ¡Llevá agua!');
+  });
   it('los ayudantes de las pantallas', () => {
     expect(faltanN(1)).toBe('Falta 1'); expect(faltanN(4)).toBe('Faltan 4');
     expect(quedanN(1)).toBe('Queda 1'); expect(quedanN(0)).toBe('Quedan 0');
