@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { collection } from 'firebase/firestore';
 import { db, llamar, mensajeError } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
@@ -12,20 +12,23 @@ export default function Votacion() {
   const { uid, gid, partido: p, jugadores, esAdmin } = useSesion();
   const { ir } = useNav();
   const votos = useColl(collection(db, `grupos/${gid}/partidos/${p.id}/votos`), `${gid}/${p.id}`);
-  const [paso, setPaso] = useState(() => { try { return (JSON.parse(localStorage.getItem(`votoBorrador:${gid}:${p.id}:${uid}`)) || {}).paso || 0; } catch (e) { return 0; } });
   const claveBorrador = `votoBorrador:${gid}:${p.id}:${uid}`;
   const leerBorrador = () => { try { return JSON.parse(localStorage.getItem(claveBorrador)) || {}; } catch (e) { return {}; } };
   const [notas, setNotas] = useState(() => leerBorrador().notas || {});
   const [mvp, setMvp] = useState(() => leerBorrador().mvp || null);
+  const [sinMvp, setSinMvp] = useState(() => !!leerBorrador().sinMvp);
+  const [paso, setPaso] = useState(() => leerBorrador().paso || 0);   // grupo de 3 compañeros
+  const [sub, setSub] = useState(() => leerBorrador().sub || 0);      // atributo dentro del grupo
+  const clavePaso = useRef('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [confirma, setConfirma] = useState(false);
 
   // Se guarda lo votado en el celular hasta enviarlo: si salís o recargás no perdés nada.
-  useEffect(() => { try { localStorage.setItem(claveBorrador, JSON.stringify({ notas, mvp, paso })); } catch (e) { /* sin almacenamiento */ } }, [notas, mvp, paso]);
-  // Al pasar al grupo siguiente se vuelve arriba para ver los nombres nuevos.
-  useEffect(() => { window.scrollTo(0, 0); }, [paso]);
+  useEffect(() => { try { localStorage.setItem(claveBorrador, JSON.stringify({ notas, mvp, sinMvp, paso, sub })); } catch (e) { /* sin almacenamiento */ } }, [notas, mvp, sinMvp, paso, sub]);
+  // Al pasar a la pregunta siguiente se vuelve arriba.
+  useEffect(() => { window.scrollTo(0, 0); }, [paso, sub]);
 
   if (p.estado !== 'votando') {
     return (
@@ -49,21 +52,32 @@ export default function Votacion() {
   const vencido = cierra && Date.now() > cierra;
   const puedeVotar = esParte && !yoVote && !vencido && !formatoViejo;
   // notas[t][atributo] = { mas, menos } | null ("no los vi") | undefined (sin responder)
-  const completa = t => ATTRS.every(a => { const v = notas[t] && notas[t][a.key]; return v === null || (v && v.mas && v.menos); });
   const enMvp = paso >= ternas.length;
 
   const elegir = (t, clave, v) => setNotas(n => ({ ...n, [t]: { ...(n[t] || {}), [clave]: v } }));
-  // Toque sobre un compañero: primero el que MÁS, después el que MENOS; el que queda es el intermedio.
-  function tocar(t, clave, id) {
+  const nAttr = ATTRS.length;
+  const avanzar = (t, k) => { if (k < nAttr - 1) setSub(k + 1); else { setPaso(t + 1); setSub(0); } };
+  const retroceder = () => { if (sub > 0) setSub(sub - 1); else if (paso > 0) { setPaso(paso - 1); setSub(nAttr - 1); } };
+  // Toque sobre un compañero: primero el que MÁS, después el que MENOS; el que queda es el del medio.
+  // Cuando quedan los dos elegidos se pasa solo a la pregunta siguiente.
+  function tocar(t, k, id) {
+    const clave = ATTRS[k].key;
     const v = (notas[t] && notas[t][clave]) || {};
     const act = { mas: v.mas || null, menos: v.menos || null };
+    const estabaCompleto = !!(act.mas && act.menos);
     if (act.mas === id) act.mas = null;
     else if (act.menos === id) act.menos = null;
     else if (!act.mas) act.mas = id;
     else if (!act.menos) act.menos = id;
     else act.mas = id; // ya estaban los dos: tocar al del medio lo pasa a "más" y conserva el "menos"
     elegir(t, clave, act);
+    if (act.mas && act.menos && !estabaCompleto) {
+      const marca = `${t}-${k}-${Date.now()}`; clavePaso.current = marca;
+      setTimeout(() => { if (clavePaso.current === marca) avanzar(t, k); }, 450);
+    }
   }
+  const noLosVi = (t, k) => { clavePaso.current = ''; elegir(t, ATTRS[k].key, null); avanzar(t, k); };
+  const ningunoDelGrupo = t => { clavePaso.current = ''; setNotas(n => ({ ...n, [t]: Object.fromEntries(ATTRS.map(a => [a.key, null])) })); setPaso(t + 1); setSub(0); };
 
   async function enviar() {
     setError(''); setCargando(true);
@@ -117,63 +131,64 @@ export default function Votacion() {
     return <>{<Vacio titulo="No podés votar este partido" texto={motivo} />}{estado}{error ? <div className="error" role="alert">{error}</div> : null}{cierreAdmin}</>;
   }
 
+  const total = ternas.length * nAttr;
+  const hechas = enMvp ? total : paso * nAttr + sub;
+
   if (enMvp) {
     const candidatos = insc.filter(id => id !== uid);
+    const comparadas = ternas.reduce((n, _, t) => n + ATTRS.filter(a => notas[t] && notas[t][a.key]).length, 0);
     return (
       <>
-        <div className="prog" style={{ gridTemplateColumns: `repeat(${ternas.length + 1},1fr)` }}>{[...ternas, 'mvp'].map((_, i) => <i key={i} className="on" />)}</div>
-        <div><h2 className="t">¿Quién fue el MVP?</h2><p className="lead" style={{ marginTop: 2 }}>{ternas.length ? 'Elegí a uno de tus compañeros.' : 'Fueron pocos para comparar, así que solo elegí al MVP.'}</p></div>
+        <Meter pct={100} />
+        <div><h2 className="t">¿Quién fue el MVP?</h2><p className="lead" style={{ marginTop: 2 }}>{ternas.length ? 'El mejor del partido. Es opcional.' : 'Fueron pocos para comparar, así que solo podés elegir al MVP. Es opcional.'}</p></div>
         <Card>{candidatos.map(id => (
-          <button className="todo-r" key={id} onClick={() => setMvp(id)} aria-pressed={mvp === id}>
+          <button className="todo-r" key={id} onClick={() => { setMvp(id); setSinMvp(false); }} aria-pressed={mvp === id && !sinMvp}>
             <Avatar nombre={nombreDe(id, jugadores, p)} foto={jugadores[id] && jugadores[id].foto} />
             <span className="grow" style={{ fontWeight: 550, textAlign: 'left' }}>{nombreDe(id, jugadores, p)}</span>
-            {mvp === id ? <Pill t="warn"><Icono n="star" />MVP</Pill> : null}
+            {mvp === id && !sinMvp ? <Pill t="warn"><Icono n="star" />MVP</Pill> : null}
           </button>
         ))}</Card>
+        <button type="button" className="chip" aria-pressed={sinMvp} onClick={() => { setSinMvp(!sinMvp); if (!sinMvp) setMvp(null); }}>No elegir MVP</button>
+        {ternas.length ? <p className="small" role="status">Resumen: respondiste {comparadas} de {total} comparaciones · MVP: {sinMvp || !mvp ? 'ninguno' : nombreDe(mvp, jugadores, p)}.</p> : null}
         {error ? <div className="error" role="alert">{error}</div> : null}
-        <Btn v="pri" disabled={!mvp || cargando} onClick={enviar}>{cargando ? 'Enviando…' : 'Enviar votos'}</Btn>
-        {paso > 0 ? <Btn v="ghost" onClick={() => setPaso(paso - 1)}>Volver</Btn> : null}
+        <Btn v="pri" disabled={cargando || (!mvp && !sinMvp && !!candidatos.length)} onClick={enviar}>{cargando ? 'Enviando…' : 'Enviar votos'}</Btn>
+        {ternas.length ? <Btn v="ghost" onClick={() => { setPaso(ternas.length - 1); setSub(nAttr - 1); }}>Volver</Btn> : null}
       </>
     );
   }
 
   const trio = ternas[paso].j;
+  const a = ATTRS[sub];
+  const v = notas[paso] && notas[paso][a.key];
+  const salteada = v === null;
+  const mas = v && v.mas, menos = v && v.menos;
+  const completa = salteada || !!(mas && menos);
+  const pregunta = salteada ? 'Marcaste que no los viste en este punto.' : !mas ? a.pMas : !menos ? a.pMenos : 'Listo. Tocá a otro si querés cambiarlo.';
   return (
     <>
-      <div className="prog" style={{ gridTemplateColumns: `repeat(${ternas.length + 1},1fr)` }}>{[...ternas, 'mvp'].map((_, i) => <i key={i} className={i <= paso ? 'on' : ''} />)}</div>
-      <div><div className="cap">Grupo {paso + 1} de {ternas.length}</div>
-        <h2 className="t" style={{ fontSize: 22 }}>Compará a estos tres</h2>
-        <p className="muted" style={{ marginTop: 2 }}>Es anónimo. En cada punto tocá primero al mejor y después al peor: el que queda es el del medio. Si no los viste jugar, tocá "No los vi".</p></div>
-      {ATTRS.map(a => {
-        const v = notas[paso] && notas[paso][a.key];
-        const salteada = v === null;
-        const mas = v && v.mas, menos = v && v.menos;
-        const pregunta = salteada ? 'No los viste en este punto' : !mas ? a.pMas : !menos ? a.pMenos : 'Listo. Tocá a otro si querés cambiarlo';
-        return (
-          <CardB key={a.key} style={{ padding: '12px 14px' }}>
-            <div className="row sp" style={{ marginBottom: 8, alignItems: 'flex-start' }}>
-              <div><b style={{ fontWeight: 600 }}><span aria-hidden="true">{a.icon} </span>{a.label}</b><div className="small" style={{ marginTop: 2 }} aria-live="polite">{pregunta}</div></div>
-              <button type="button" className="chip" aria-pressed={salteada} onClick={() => elegir(paso, a.key, salteada ? undefined : null)}>No los vi</button>
-            </div>
-            {salteada ? null : (
-              <div className="terna" role="group" aria-label={`${a.label}: ${a.pMas}`}>{trio.map(id => {
-                const r = id === mas ? 'mas' : id === menos ? 'menos' : mas && menos ? 'medio' : '';
-                const etiqueta = r === 'mas' ? '▲ Más' : r === 'menos' ? '▼ Menos' : r === 'medio' ? 'Del medio' : '';
-                return (
-                  <button key={id} type="button" className="tj" data-r={r} aria-pressed={!!r} onClick={() => tocar(paso, a.key, id)}>
-                    <Avatar nombre={nombreDe(id, jugadores, p)} foto={jugadores[id] && jugadores[id].foto} />
-                    <span className="nm">{nombreDe(id, jugadores, p)}</span>
-                    <span className="tag">{etiqueta}</span>
-                  </button>
-                );
-              })}</div>
-            )}
-          </CardB>
-        );
-      })}
-      {completa(paso) ? null : <p className="small" role="status" style={{ textAlign: 'center' }}>Te falta: {ATTRS.filter(a => { const v = notas[paso] && notas[paso][a.key]; return !(v === null || (v && v.mas && v.menos)); }).map(a => a.label).join(', ')}</p>}
-      <Btn v="pri" disabled={!completa(paso)} onClick={() => setPaso(paso + 1)}>{paso + 1 < ternas.length ? 'Siguiente grupo' : 'Elegir al MVP'}</Btn>
-      {paso > 0 ? <Btn v="ghost" onClick={() => setPaso(paso - 1)}>Volver</Btn> : null}
+      <div><div className="row sp"><span className="cap">Grupo {paso + 1} de {ternas.length} · {sub + 1} de {nAttr}</span><span className="small">{hechas} de {total}</span></div><Meter pct={(hechas / total) * 100} /></div>
+      {paso === 0 && sub === 0 && !Object.keys(notas).length ? <p className="muted">Es anónimo. Vas a comparar a 3 compañeros por vez: tocá primero al mejor y después al peor, el que queda es el del medio.</p> : null}
+      <h2 className="t" style={{ fontSize: 22 }}><span aria-hidden="true">{a.icon} </span>{a.label}</h2>
+      <p className="lead" style={{ marginTop: -4 }} aria-live="polite">{pregunta}</p>
+      <div className="terna grande" role="group" aria-label={`${a.label}: ${a.pMas}`}>
+        {trio.map(id => {
+          const r = id === mas ? 'mas' : id === menos ? 'menos' : mas && menos ? 'medio' : '';
+          const etiqueta = r === 'mas' ? '▲ Más' : r === 'menos' ? '▼ Menos' : r === 'medio' ? 'Del medio' : '';
+          return (
+            <button key={id} type="button" className="tj" data-r={salteada ? '' : r} aria-pressed={!salteada && !!r} disabled={salteada} onClick={() => tocar(paso, sub, id)}>
+              <Avatar nombre={nombreDe(id, jugadores, p)} foto={jugadores[id] && jugadores[id].foto} lg />
+              <span className="nm">{nombreDe(id, jugadores, p)}</span>
+              <span className="tag">{salteada ? '' : etiqueta}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="chip" aria-pressed={salteada} onClick={() => (salteada ? elegir(paso, a.key, undefined) : noLosVi(paso, sub))}>{salteada ? 'Deshacer "No los vi"' : 'No los vi'}</button>
+        <button type="button" className="chip" onClick={() => ningunoDelGrupo(paso)}>No vi a ninguno de estos</button>
+      </div>
+      <Btn v="pri" disabled={!completa} onClick={() => { clavePaso.current = ''; avanzar(paso, sub); }}>{sub < nAttr - 1 ? 'Siguiente' : paso + 1 < ternas.length ? 'Siguiente grupo' : 'Elegir al MVP'}</Btn>
+      {paso > 0 || sub > 0 ? <Btn v="ghost" onClick={() => { clavePaso.current = ''; retroceder(); }}>Volver</Btn> : null}
     </>
   );
 }

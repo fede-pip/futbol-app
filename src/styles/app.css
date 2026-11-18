@@ -178,6 +178,7 @@ button.todo-r:hover { background:var(--surface-2); }
 .opt[aria-pressed="true"].i { background:var(--surface-3); border-color:var(--line-3); color:var(--text); }
 .opt[aria-pressed="true"].p { background:var(--bad-bg); border-color:var(--bad); color:var(--bad); }
 .opt svg { width:16px; height:16px; }
+.terna.grande .tj { min-height:150px; font-size:15px; gap:8px; }
 .terna { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .tj { min-height:92px; border-radius:var(--r-md); border:1px solid var(--line-2); background:var(--card); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:8px 4px; color:var(--text-2); font-size:13px; font-weight:600; text-align:center; min-width:0; }
 .tj .nm { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }

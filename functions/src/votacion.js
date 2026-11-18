@@ -39,7 +39,7 @@ export const votar = onCall(opts, async req => {
         if (!v || !trio.includes(v.mas) || !trio.includes(v.menos) || v.mas === v.menos) throw new HttpsError('invalid-argument', 'Voto inválido en ' + a.label + '.');
       }
     }
-    if (!mvp || mvp === uid || !(p.inscriptos || []).includes(mvp)) throw new HttpsError('invalid-argument', 'Elegí un MVP entre tus compañeros.');
+    if (mvp && (mvp === uid || !(p.inscriptos || []).includes(mvp))) throw new HttpsError('invalid-argument', 'Elegí un MVP entre tus compañeros.');
 
     const inc = FieldValue.increment;
     const cuenta = {};
@@ -57,7 +57,7 @@ export const votar = onCall(opts, async req => {
     });
     const paresAg = {};
     for (const [attr, m] of Object.entries(cuenta)) paresAg[attr] = Object.fromEntries(Object.entries(m).map(([k, n]) => [k, inc(n)]));
-    tx.set(aref, { pares: paresAg, mvp: { [mvp]: inc(1) }, votaron: inc(1) }, { merge: true });
+    tx.set(aref, { pares: paresAg, ...(mvp ? { mvp: { [mvp]: inc(1) } } : {}), votaron: inc(1) }, { merge: true });
     tx.create(vref, { ts: Timestamp.now() });
   });
   return { ok: true };
