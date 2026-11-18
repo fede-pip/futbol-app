@@ -338,10 +338,10 @@ describe('partido en vivo', () => {
 describe('votación y cierre', () => {
   it('el admin finaliza el partido y abre la votación', async () => {
     await updateDoc(doc(A.db, 'grupos', gid, 'partidos', pid), {
-      inscriptos: [A.uid, B.uid, 'f1', 'f2', 'inv_t1', 'inv_t2'],
-      equipos: { oscuro: [A.uid, 'f1', 'inv_t1'], blanco: [B.uid, 'f2', 'inv_t2'], publicado: true },
+      inscriptos: [A.uid, B.uid, 'l_f1', 'l_f2', 'inv_t1', 'inv_t2'],
+      equipos: { oscuro: [A.uid, 'l_f1', 'inv_t1'], blanco: [B.uid, 'l_f2', 'inv_t2'], publicado: true },
       marcador: { oscuro: 3, blanco: 1 }, eventos: { [A.uid]: { goles: 2, amarillas: 0 }, [B.uid]: { goles: 1, amarillas: 1 } },
-      asignaciones: { [A.uid]: [{ j: [B.uid, 'f1', 'f2'] }], [B.uid]: [{ j: [A.uid, 'f1', 'f2'] }] },
+      asignaciones: { [A.uid]: [{ j: [B.uid, 'l_f1', 'l_f2'] }], [B.uid]: [{ j: [A.uid, 'l_f1', 'l_f2'] }] },
       estado: 'votando', fechaFin: Timestamp.now()
     });
   });
@@ -351,17 +351,17 @@ describe('votación y cierre', () => {
   const vacia = () => ({ 0: Object.fromEntries(ATTRS.map(a => [a, null])) });
 
   it('no se puede votar sin ser parte, a quien no te tocó, ni con votos incompletos o mal armados', async () => {
-    await falla(C.call('votar', { gid, pid, notas: orden(A.uid, 'f1'), mvp: A.uid }), 'permission-denied');
-    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, 'f1'), mvp: B.uid }), 'invalid-argument');
-    await falla(B.call('votar', { gid, pid, notas: orden(C.uid, 'f1'), mvp: A.uid }), 'invalid-argument'); // C no está en su terna
+    await falla(C.call('votar', { gid, pid, notas: orden(A.uid, 'l_f1'), mvp: A.uid }), 'permission-denied');
+    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, 'l_f1'), mvp: B.uid }), 'invalid-argument');
+    await falla(B.call('votar', { gid, pid, notas: orden(C.uid, 'l_f1'), mvp: A.uid }), 'invalid-argument'); // C no está en su terna
     await falla(B.call('votar', { gid, pid, notas: orden(A.uid, A.uid), mvp: A.uid }), 'invalid-argument'); // más = menos
-    await falla(B.call('votar', { gid, pid, notas: { 0: { velocidad: { mas: A.uid, menos: 'f1' } } }, mvp: A.uid }), 'invalid-argument'); // faltan atributos
+    await falla(B.call('votar', { gid, pid, notas: { 0: { velocidad: { mas: A.uid, menos: 'l_f1' } } }, mvp: A.uid }), 'invalid-argument'); // faltan atributos
     await falla(B.call('votar', { gid, pid, notas: {}, mvp: A.uid }), 'invalid-argument');
   });
 
   it('votar registra el voto una sola vez y es anónimo', async () => {
-    await B.call('votar', { gid, pid, notas: orden(A.uid, 'f2'), mvp: A.uid });
-    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, 'f2'), mvp: A.uid }), 'already-exists');
+    await B.call('votar', { gid, pid, notas: orden(A.uid, 'l_f2'), mvp: A.uid });
+    await falla(B.call('votar', { gid, pid, notas: orden(A.uid, 'l_f2'), mvp: A.uid }), 'already-exists');
     const votos = await getDocs(collection(A.db, 'grupos', gid, 'partidos', pid, 'votos'));
     expect(votos.docs.map(d => d.id)).toEqual([B.uid]);
     expect(Object.keys(votos.docs[0].data())).toEqual(['ts']); // no guarda qué votó
@@ -370,7 +370,7 @@ describe('votación y cierre', () => {
   });
 
   it('solo el admin cierra la votación', async () => {
-    await A.call('votar', { gid, pid, notas: { 0: { ...vacia()[0], velocidad: { mas: B.uid, menos: 'f2' } } }, mvp: B.uid }); // en el resto "no los vi"
+    await A.call('votar', { gid, pid, notas: { 0: { ...vacia()[0], velocidad: { mas: B.uid, menos: 'l_f2' } } }, mvp: B.uid }); // en el resto "no los vi"
 
     await falla(B.call('cerrarVotacion', { gid, pid }), 'permission-denied');
   });
@@ -399,7 +399,7 @@ describe('votación y cierre', () => {
     expect(ja.tendencia.velocidad).toBe(1);
 
     const nv = async id => (await getDoc(doc(A.db, 'grupos', gid, 'niveles', id))).data().atributos.velocidad;
-    const [na, nb, n1, n2] = [await nv(A.uid), await nv(B.uid), await nv('f1'), await nv('f2')];
+    const [na, nb, n1, n2] = [await nv(A.uid), await nv(B.uid), await nv('l_f1'), await nv('l_f2')];
     expect(na).toBeGreaterThan(5); expect(nb).toBeGreaterThan(5);
     expect(n2).toBeLessThan(5);
     expect(na + nb + n1 + n2).toBeCloseTo(20, 1); // suma cero: el promedio del grupo no se infla

@@ -109,6 +109,15 @@ describe('asignarVotaciones', () => {
     const v = Object.values(veces);
     expect(Math.max(...v) - Math.min(...v)).toBeLessThanOrEqual(2);
   });
+  it('con 4 jugadores hay una sola terna (la segunda sería idéntica)', () => {
+    const asig = asignarVotaciones(['1', '2', '3', '4']);
+    for (const t of Object.values(asig)) expect(t.length).toBe(1);
+  });
+  it('los perfiles sin vincular (l_) no votan, pero sí pueden ser comparados', () => {
+    const asig = asignarVotaciones(['1', '2', '3', '4', 'l_5']);
+    expect(asig['l_5']).toBeUndefined();
+    expect(Object.values(asig).flatMap(t => t.flatMap(x => x.j))).toContain('l_5');
+  });
   it('con menos de 4 jugadores no hay ternas', () => {
     expect(asignarVotaciones(['1', '2', '3'])).toEqual({ 1: [], 2: [], 3: [] });
   });

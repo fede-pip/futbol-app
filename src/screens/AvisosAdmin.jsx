@@ -91,7 +91,7 @@ export function AvisosAdmin() {
                       <div className="grow"><b>{c.t}{c.nuevo ? <> <span className="pill nuevo">Nuevo</span></> : null}</b><small>{c.cuando} · {quienTxt(c.quien)}</small></div>
                       <Icono n="chev" style={{ color: 'var(--text-3)' }} />
                     </button>
-                    <Switch on={c.on} label={`Activar ${c.t}`} onChange={() => alternar(c)} />
+                    <Switch on={c.on} label={c.t} onChange={() => alternar(c)} />
                   </div>
                 ))}
               </Card>

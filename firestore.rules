@@ -101,7 +101,7 @@ service cloud.firestore {
         (request.auth.uid in resource.data.admins
           && request.resource.data.creadorUid == resource.data.creadorUid
           && fotoValida(request.resource.data, resource.data)
-          && (!('activos' in request.resource.data) || request.resource.data.activos.size() <= 2)
+          && (!('activos' in request.resource.data) || (request.resource.data.activos is list && request.resource.data.activos.size() <= 2))
           && resource.data.creadorUid in request.resource.data.admins
           && (request.resource.data.admins == resource.data.admins || request.auth.uid == resource.data.creadorUid)
           && request.resource.data.miembros.toSet().difference(resource.data.miembros.toSet()).size() == 0)

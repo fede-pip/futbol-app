@@ -1,13 +1,13 @@
 // Lógica pura de App8 (sin React ni Firebase): fácil de testear.
 
 export const ATTRS = [
-  { key:"velocidad",   label:"Velocidad",   icon:"⚡", ej:"corrió" },
-  { key:"pases",       label:"Pases",       icon:"🎯", ej:"pasó la pelota" },
-  { key:"definicion",  label:"Definición",  icon:"🥅", ej:"definió" },
-  { key:"amagues",     label:"Amagues",     icon:"🕺", ej:"gambeteó" },
-  { key:"defensa",     label:"Defensa",     icon:"🛡️", ej:"defendió" },
-  { key:"resistencia", label:"Resistencia", icon:"💪", ej:"aguantó físicamente" },
-  { key:"arquero",     label:"Arquero",     icon:"🧤", ej:"atajó" },
+  { key:"velocidad",   label:"Velocidad",   icon:"⚡", pMas:"¿Quién fue más rápido?", pMenos:"¿Y quién fue menos rápido?", ej:"corrió" },
+  { key:"pases",       label:"Pases",       icon:"🎯", pMas:"¿Quién pasó mejor?", pMenos:"¿Y quién pasó peor?", ej:"pasó la pelota" },
+  { key:"definicion",  label:"Definición",  icon:"🥅", pMas:"¿Quién definió mejor?", pMenos:"¿Y quién definió peor?", ej:"definió" },
+  { key:"amagues",     label:"Amagues",     icon:"🕺", pMas:"¿Quién gambeteó mejor?", pMenos:"¿Y quién gambeteó peor?", ej:"gambeteó" },
+  { key:"defensa",     label:"Defensa",     icon:"🛡️", pMas:"¿Quién defendió mejor?", pMenos:"¿Y quién defendió peor?", ej:"defendió" },
+  { key:"resistencia", label:"Resistencia", icon:"💪", pMas:"¿Quién aguantó más el ritmo?", pMenos:"¿Y quién aguantó menos?", ej:"aguantó físicamente" },
+  { key:"arquero",     label:"Arquero",     icon:"🧤", pMas:"¿Quién atajó mejor?", pMenos:"¿Y quién atajó peor?", ej:"atajó" },
 ];
 
 export const FORMATOS = [
@@ -137,19 +137,22 @@ export function balancear(lista) {
 // Se reparte parejo para que todos aparezcan en una cantidad parecida de ternas.
 // Devuelve { uid: [{ j:[a,b,c] }, ...] } (Firestore no admite arreglos anidados).
 export function asignarVotaciones(inscriptos, cuantas = 2) {
-  const jugadores = inscriptos.filter(id => !id.startsWith('inv_'));
+  // Solo votan quienes tienen cuenta: no los invitados (inv_) ni los perfiles sin vincular (l_).
+  const jugadores = inscriptos.filter(id => !id.startsWith('inv_') && !id.startsWith('l_'));
+  const todos = inscriptos.filter(id => !id.startsWith('inv_'));
+  const mezclar = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const asig = {};
-  const veces = Object.fromEntries(jugadores.map(id => [id, 0]));
-  [...jugadores].sort(() => Math.random() - .5).forEach(votante => {
-    const otros = jugadores.filter(d => d !== votante);
+  const veces = Object.fromEntries(todos.map(id => [id, 0]));
+  mezclar(jugadores).forEach(votante => {
+    const otros = todos.filter(d => d !== votante);
     if (otros.length < 3) { asig[votante] = []; return; }
+    const n = otros.length === 3 ? 1 : cuantas; // con justo 3 compañeros, una sola terna (la segunda sería idéntica)
     const usados = new Set();
     const ternas = [];
-    for (let t = 0; t < cuantas; t++) {
+    for (let t = 0; t < n; t++) {
       const libres = otros.filter(d => !usados.has(d));
       const base = libres.length >= 3 ? libres : otros;
-      const orden = [...base].sort((x, y) => (veces[x] - veces[y]) || (Math.random() - .5));
-      const terna = orden.slice(0, 3);
+      const terna = mezclar(base).sort((x, y) => veces[x] - veces[y]).slice(0, 3);
       terna.forEach(d => { usados.add(d); veces[d] += 1; });
       ternas.push({ j: terna });
     }

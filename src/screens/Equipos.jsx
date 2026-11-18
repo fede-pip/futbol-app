@@ -14,6 +14,7 @@ export default function Equipos() {
   const { gid, partido: p, jugadores, esAdmin } = useSesion();
   const niveles = aMapa(useColl(esAdmin ? collection(db, `grupos/${gid}/niveles`) : null, esAdmin ? gid : 'no'));
   const [borrador, setBorrador] = useState(null);
+  const [confirmaRehacer, setConfirmaRehacer] = useState(false);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -109,7 +110,9 @@ export default function Equipos() {
           <Btn v="pri" disabled={cargando} onClick={() => ejecutar(async () => { await guardarEquipos(gid, p, equipos.oscuro, equipos.blanco, true); setBorrador(null); })}>Publicar equipos</Btn>
         </>
       ) : null}
-      {esAdmin && publicado ? <Btn v="ghost" disabled={cargando} onClick={() => ejecutar(async () => { await borrarEquipos(gid, p); setBorrador(null); })}>Rehacer los equipos</Btn> : null}
+      {esAdmin && publicado && p.estado === 'abierto' ? (confirmaRehacer
+        ? <div className="confirm"><b>¿Rehacer los equipos?</b><span className="muted">Se borran los equipos publicados y se vuelve a avisar cuando publiques los nuevos.</span><div className="row"><Btn onClick={() => setConfirmaRehacer(false)}>No, volver</Btn><Btn v="pri" disabled={cargando} onClick={() => ejecutar(async () => { await borrarEquipos(gid, p); setBorrador(null); setConfirmaRehacer(false); })}>Sí, rehacer</Btn></div></div>
+        : <Btn v="ghost" disabled={cargando} onClick={() => setConfirmaRehacer(true)}>Rehacer los equipos</Btn>) : null}
       {publicado || esAdmin ? <Btn onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener')}><Icono n="share" />Compartir por WhatsApp</Btn> : null}
     </>
   );

@@ -6,8 +6,8 @@ import { disparar, ONESIGNAL_API_KEY } from './avisos.js';
 
 const opts = { region: REGION, cors: true, maxInstances: 20 };
 
-// Registra los votos de una persona. El servidor guarda solo totales: nadie (ni el admin)
-// puede saber quién votó qué.
+// Registra los votos de una persona. El servidor guarda solo conteos y no se cierra con muy pocos
+// votos, así que nadie (ni el admin) puede saber quién votó qué.
 export const votar = onCall(opts, async req => {
   const { uid, gref } = await requireMiembro(req, req.data?.gid);
   const pid = String(req.data?.pid || '');
@@ -26,7 +26,7 @@ export const votar = onCall(opts, async req => {
     if (!(p.inscriptos || []).includes(uid)) throw new HttpsError('permission-denied', 'Solo votan quienes jugaron.');
     if (vs.exists) throw new HttpsError('already-exists', 'Ya enviaste tus votos.');
     const ternas = (p.asignaciones || {})[uid] || [];
-    if (!ternas.length) throw new HttpsError('failed-precondition', 'No tenés compañeros asignados para votar.');
+    if (ternas.some(x => !x || !Array.isArray(x.j) || x.j.length !== 3)) throw new HttpsError('failed-precondition', 'Esta votación se armó con un formato anterior. Pedile al admin que la vuelva a abrir.');
     // Por cada terna y cada atributo: quién fue el que más, el que menos (el del medio queda implícito)
     // o nada si no los vio. El servidor verifica que sean justo los tres que le tocaban.
     for (let t = 0; t < ternas.length; t++) {
@@ -77,14 +77,22 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
     if (!ps.exists) throw new HttpsError('not-found', 'No encontramos el partido.');
     const p = ps.data();
     if (p.estado !== 'votando') throw new HttpsError('failed-precondition', 'La votación ya está cerrada o todavía no se abrió.');
-    const jugadoresIds = (p.inscriptos || []).filter(id => !esInvitado(id));
-    const [as, todos, gs, ...niveles] = await Promise.all([
-      tx.get(aref), tx.get(gref.collection('jugadores')), tx.get(gref),
+    const gs = await tx.get(gref);
+    const miembros = gs.data().miembros || [];
+    // Quien se fue del grupo mientras se votaba no suma estadísticas (ni se le crea un perfil fantasma).
+    const jugadoresIds = (p.inscriptos || []).filter(id => !esInvitado(id) && (!esUid(id) || miembros.includes(id)));
+    const [as, todos, ...niveles] = await Promise.all([
+      tx.get(aref), tx.get(gref.collection('jugadores')),
       ...jugadoresIds.map(id => tx.get(gref.collection('niveles').doc(id)))
     ]);
     const jug = Object.fromEntries(todos.docs.map(d => [d.id, d.data()]));
     const ag = as.exists ? as.data() : {};
     const paresAg = ag.pares || {};
+    // Para que nadie pueda deducir el voto de una persona, no se cierra con 1 o 2 votos sueltos:
+    // hace falta un mínimo (3, o todos si son menos) o que no haya ninguno.
+    const votantesPosibles = jugadoresIds.filter(esUid).length;
+    const minimo = Math.min(3, votantesPosibles);
+    if ((ag.votaron || 0) > 0 && (ag.votaron || 0) < minimo) throw new HttpsError('failed-precondition', `Esperá a que voten al menos ${minimo} personas: con menos votos se podría deducir quién votó qué.`);
     const eventos = p.eventos || {};
     const golesPorId = Object.fromEntries(Object.entries(eventos).map(([k, v]) => [k, (v && v.goles) || 0]));
     const mvps = calcularMvps(ag.mvp || {}, golesPorId);
@@ -154,7 +162,7 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
   // Avisos (fuera de la transacción: si fallan, el cierre ya quedó guardado).
   try {
     const { p, texto, mvps, cambios, antes, pos } = salida;
-    const mvpNombre = mvps[0] ? (await gref.collection('jugadores').doc(mvps[0]).get()).data()?.nombre || '' : '';
+    const mvpNombre = mvps[0] ? (esInvitado(mvps[0]) ? p.invitados?.[mvps[0]]?.nombre || '' : (await gref.collection('jugadores').doc(mvps[0]).get()).data()?.nombre || '') : '';
     await disparar(gid, 'resultado', { partido: p, vars: { resultado: texto, mvp: mvpNombre }, clave: pid });
     const mvpUids = mvps.filter(esUid);
     if (mvpUids.length) await disparar(gid, 'mvp', { partido: p, personaUids: mvpUids, clave: pid, varsPorUid: Object.fromEntries(mvpUids.map(u => [u, { goles: String(p.eventos?.[u]?.goles || 0) }])) });

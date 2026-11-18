@@ -31,13 +31,12 @@ export function SesionProvider({ children }) {
   const jugadores = useMemo(() => aMapa(jugadoresL), [jugadoresL]);
   // Puede haber hasta 2 partidos a la vez (por ejemplo, uno pendiente de votación y otro próximo).
   // `activos` es la lista; `partidoActivo` es el campo de antes (un solo partido).
-  const idsActivos = useMemo(() => (grupo ? (grupo.activos || (grupo.partidoActivo ? [grupo.partidoActivo] : [])) : []), [grupo]);
+  const idsActivos = useMemo(() => (grupo ? (grupo.activos && grupo.activos.length ? grupo.activos : (grupo.partidoActivo ? [grupo.partidoActivo] : [])) : []), [grupo]);
   const [pidSel, setPidSel] = useState(null);
-  const pidActivo = idsActivos.includes(pidSel) ? pidSel : idsActivos[0] || null;
   const p0 = useDoc(gid && idsActivos[0] ? doc(db, `grupos/${gid}/partidos/${idsActivos[0]}`) : null, `${gid}/${idsActivos[0]}`);
   const p1 = useDoc(gid && idsActivos[1] ? doc(db, `grupos/${gid}/partidos/${idsActivos[1]}`) : null, `${gid}/${idsActivos[1]}`);
   const partidos = [p0, p1].filter((x, i) => x && idsActivos[i]);
-  const partido = partidos.find(x => x.id === pidActivo) || null;
+  const partido = partidos.find(x => x.id === pidSel) || partidos[0] || null; // el elegido, o el primero que exista
   const elegirPartido = useCallback(id => setPidSel(id), []);
 
   const esAdmin = !!(grupo && uid && grupo.admins.includes(uid));

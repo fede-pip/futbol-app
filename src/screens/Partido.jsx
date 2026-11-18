@@ -101,7 +101,8 @@ function Inscripcion() {
   const lleno = insc.length >= cupo;
   const cena = p.cena || [];
   const yoCena = cena.includes(uid);
-  const jugado = d.getTime() < Date.now();
+  const votandoP = p.estado === 'votando';
+  const jugado = !votandoP && d.getTime() < Date.now();
   const nom = id => nombreDe(id, jugadores, p);
   const listaWA = encodeURIComponent([
     `⚽ *${mayus(diaLargo(d)).toUpperCase()}, ${horaTxt(d)}*`,
@@ -172,7 +173,7 @@ function Inscripcion() {
               <span className="grow" style={{ fontWeight: 550 }}>{nombreDe(id, jugadores, p)}</span>
               {cena.includes(id) ? <span title="Se queda a comer" aria-label="Se queda a comer" style={{ display: 'inline-flex', color: 'var(--primary)' }}><Icono n="food" style={{ width: 18, height: 18 }} /></span> : null}
               {id === uid ? <Pill t="tint">Vos</Pill> : id.startsWith('inv_') ? <Pill>Invitado</Pill> : null}
-              {esAdmin ? <button className="iconbtn" style={{ width: 36, height: 36 }} aria-label={`Sacar a ${nombreDe(id, jugadores, p)}`} onClick={() => ejecutar(() => quitarInscripto(gid, p, id))}><Icono n="minus" /></button> : null}
+              {esAdmin && p.estado === 'abierto' ? <button className="iconbtn" style={{ width: 44, height: 44 }} aria-label={`Sacar a ${nombreDe(id, jugadores, p)}`} onClick={() => ejecutar(() => quitarInscripto(gid, p, id))}><Icono n="minus" /></button> : null}
             </div>
           ))}
         </div>
@@ -195,6 +196,10 @@ function Inscripcion() {
       {error ? <div className="error" role="alert">{error}</div> : null}
       {espera.length ? <Card><Fila icono="clock" titulo={`Lista de espera: ${espera.length}`} sub="Si alguien se baja, sube el primero y le avisamos." /></Card> : null}
 
+      {votandoP ? (
+        <Hint icono="vote"><b>El partido terminó.</b> Ya se pueden votar a los compañeros.<div style={{ marginTop: 8 }}><Btn v="pri" onClick={() => ir('partido', 'votar')}>Ir a votar</Btn></div></Hint>
+      ) : (
+      <>
       <Card>
         <Fila icono="food" titulo="Tercer tiempo" sub={yoCena ? `Estás anotado. ${cena.length === 1 ? 'Sos el único' : `Somos ${cena.length}`} para comer.` : `¿Te quedás a comer? ${cena.length === 0 ? 'Todavía no hay nadie.' : cena.length === 1 ? 'Hay 1 persona.' : `Somos ${cena.length}.`}`}
           derecha={<button className={`chip ${yoCena ? 'on' : ''}`} aria-pressed={yoCena} onClick={() => ejecutar(() => (yoCena ? salirCena(gid, p, uid) : sumarseCena(gid, p, uid)))}>{yoCena ? 'Me quedo' : 'Sumarme'}</button>} />
@@ -223,8 +228,10 @@ function Inscripcion() {
 
       <Btn v="pri" onClick={() => window.open(`https://wa.me/?text=${listaWA}`, '_blank', 'noopener')}><Icono n="share" />Enviar la lista por WhatsApp</Btn>
       <Btn onClick={() => window.open(`https://wa.me/?text=${mensajeWA}`, '_blank', 'noopener')}><Icono n="share" />Invitar a anotarse</Btn>
+      </>
+      )}
 
-      {esAdmin ? (
+      {esAdmin && p.estado === 'abierto' ? (
         <Card>
           <div className="card-h"><h3 className="t">Solo admin</h3><Pill t="tint"><Icono n="shield" />Admin</Pill></div>
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -245,8 +252,8 @@ export default function Partido() {
   const { param, ir } = useNav();
   const [nuevo, setNuevo] = useState(false);
   const ultimos = useColl(esAdmin ? query(collection(db, `grupos/${gid}/partidos`), where('estado', '==', 'cerrado'), orderBy('fechaHora', 'desc'), limit(1)) : null, esAdmin ? gid : 'no');
-  const tab = param || 'inscripcion';
   const votando = partido && partido.estado === 'votando';
+  const tab = param || (votando ? 'votar' : 'inscripcion');
   const tabs = [
     { id: 'inscripcion', label: 'Inscripción' },
     { id: 'equipos', label: 'Equipos' },
@@ -275,10 +282,11 @@ export default function Partido() {
             </button>
           ))}
           {esAdmin && idsActivos.length < 2 ? <button type="button" className="chip" onClick={() => setNuevo(true)}><Icono n="plus" />Otro partido</button> : null}
+          {esAdmin && idsActivos.length >= 2 ? <span className="small" style={{ alignSelf: 'center' }}>Máximo 2 partidos a la vez</span> : null}
         </div>
       ) : null}
       {partido ? <HbTabs items={tabs} cur={tab} onSel={t => ir('partido', t)} /> : null}
-      {tab === 'equipos' && partido ? <Equipos /> : tab === 'vivo' && partido && partido.estado === 'abierto' ? <EnVivo /> : tab === 'goles' && partido && esAdmin ? <Goles /> : tab === 'votar' && partido ? <Votacion /> : <Inscripcion />}
+      {tab === 'equipos' && partido ? <Equipos key={partido.id} /> : tab === 'vivo' && partido && partido.estado === 'abierto' ? <EnVivo key={partido.id} /> : tab === 'goles' && partido && esAdmin ? <Goles key={partido.id} /> : tab === 'votar' && partido ? <Votacion key={partido.id} /> : <Inscripcion key={partido ? partido.id : 'nuevo'} />}
     </div>
   );
 }

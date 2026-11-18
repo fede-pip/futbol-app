@@ -48,11 +48,13 @@ const datosLugar = geo => (geo && geo.lugarId ? { lugarId: geo.lugarId, lat: geo
 export async function crearPartido(gid, { fecha, hora, lugar, formato, cupo, geo }, activos = []) {
   if (activos.length >= 2) throw new Error('Ya hay dos partidos en curso. Cerrá o cancelá uno para crear otro.');
   const pref = doc(collection(db, `grupos/${gid}/partidos`));
-  await setDoc(pref, {
+  const lote = writeBatch(db);
+  lote.set(pref, {
     estado: 'abierto', fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo, ...(geo && geo.lugarId ? datosLugar(geo) : {}),
     inscriptos: [], listaEspera: [], cena: [], invitados: {}, equipos: null, eventos: {}, creadoEn: Timestamp.now()
   });
-  await updateDoc(refGrupo(gid), { activos: [...activos, pref.id], partidoActivo: null });
+  lote.update(refGrupo(gid), { activos: [...activos, pref.id], partidoActivo: null });
+  await lote.commit(); // el partido y la lista de partidos en curso se guardan juntos o no se guarda nada
   return pref.id;
 }
 export function editarPartido(gid, p, { fecha, hora, lugar, formato, cupo, geo }) {

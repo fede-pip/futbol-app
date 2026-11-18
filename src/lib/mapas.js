@@ -11,7 +11,7 @@ function cargarPlaces() {
       const s = document.createElement('script');
       s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(CLAVE)}&loading=async&language=es&region=AR`;
       s.async = true;
-      s.onload = () => window.google.maps.importLibrary('places').then(ok, mal);
+      s.onload = () => window.google.maps.importLibrary('places').then(ok, e => { cargando = null; mal(e); });
       s.onerror = () => { cargando = null; mal(new Error('no-carga')); };
       document.head.appendChild(s);
     });

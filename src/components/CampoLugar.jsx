@@ -28,7 +28,7 @@ export default function CampoLugar({ id, value, onCambio, placeholder }) {
   }
 
   async function tomar(s) {
-    setAbierto(false); setLista([]);
+    setAbierto(false); setLista([]); ultimo.current++; clearTimeout(espera.current);
     try { const e = await elegir(s.prediccion); sesion.current = null; onCambio(e.texto, { lugarId: e.lugarId, lat: e.lat, lng: e.lng }); }
     catch { onCambio(`${s.principal}${s.secundario ? ', ' + s.secundario : ''}`, null); }
   }

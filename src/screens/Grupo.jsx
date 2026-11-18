@@ -137,7 +137,7 @@ export default function Grupo() {
                 <div className="field"><label htmlFor="g-nombre">Nombre del grupo</label><input id="g-nombre" value={nombre} onChange={e => setNombre(e.target.value)} maxLength={60} /></div>
                 <div className="field"><label htmlFor="g-precio">Precio por persona ($)</label><input id="g-precio" type="number" inputMode="numeric" min="0" value={precio} onChange={e => setPrecio(e.target.value)} /></div>
                 <div className="field"><label htmlFor="g-pozo">Pozo acumulado ($)</label><input id="g-pozo" type="number" inputMode="numeric" min="0" value={pozo} onChange={e => setPozo(e.target.value)} /></div>
-                <div className="row"><Btn onClick={() => setEditando(false)}>Cancelar</Btn>
+                <div className="row"><Btn onClick={() => { setEditando(false); setFotoG(grupo.foto || ''); setNombre(grupo.nombre); }}>Cancelar</Btn>
                   <Btn v="pri" onClick={() => ejecutar(async () => { await actualizarGrupo(gid, { nombre: nombre.trim(), precioCancha: Number(precio) || 0, pozo: Number(pozo) || 0, ...(fotoG !== (grupo.foto || '') ? { foto: fotoG } : {}) }); setEditando(false); }, 'Cambios guardados')}>Guardar</Btn></div>
               </div>
             ) : <Fila icono="edit" titulo="Foto, nombre, precio y pozo" sub={`${grupo.nombre}${grupo.precioCancha ? ` · $${grupo.precioCancha} por persona` : ''}${grupo.pozo ? ` · pozo $${grupo.pozo}` : ''}`} onClick={() => setEditando(true)} derecha={<Icono n="chev" />} />}

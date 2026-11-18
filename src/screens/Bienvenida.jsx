@@ -17,15 +17,15 @@ function Arte({ i }) {
   );
   if (i === 1) return (
     <div className="art"><div className="teams">
-      <div className="team o"><h4>Oscuro<span>6</span></h4><ul><li>F. Pipkin</li><li>N. Ferrari</li><li>A. Dal Maso</li></ul></div>
+      <div className="team o"><h4>Oscuro<span>6</span></h4><ul><li>J. Pérez</li><li>N. Ferrari</li><li>A. Gómez</li></ul></div>
       <div className="team b"><h4>Blanco<span>6</span></h4><ul><li>J. Roca</li><li>T. Vega</li><li>L. Ibarra</li></ul></div>
     </div></div>
   );
   return (
     <div className="art">
-      <div className="mini"><b className="grow">Definición</b></div>
-      <div className="opts"><div className="opt m" aria-pressed="true">Mejor</div><div className="opt i">Igual</div><div className="opt p">Peor</div></div>
-      <span className="small">Es anónimo y lleva menos de un minuto.</span>
+      <div className="mini"><b className="grow">¿Quién definió mejor?</b></div>
+      <div className="terna"><div className="tj" data-r="mas"><span className="nm">Juan</span><span className="tag">▲ Más</span></div><div className="tj" data-r="medio"><span className="nm">Pedro</span><span className="tag">Del medio</span></div><div className="tj" data-r="menos"><span className="nm">Luis</span><span className="tag">▼ Menos</span></div></div>
+      <span className="small">Es anónimo: comparás a 3 compañeros por vez.</span>
     </div>
   );
 }
