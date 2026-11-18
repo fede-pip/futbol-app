@@ -369,9 +369,9 @@ describe('votación y cierre', () => {
     await denegado(setDoc(doc(B.db, 'grupos', gid, 'partidos', pid, 'votos', C.uid), { ts: Timestamp.now() }));
   });
 
-  it('el MVP es opcional', async () => {
-    // (se prueba con quien todavía no votó: Alicia vota después; acá solo se valida el rechazo de un MVP inválido)
+  it('el MVP es obligatorio y no puede ser uno mismo', async () => {
     await falla(A.call('votar', { gid, pid, notas: orden(B.uid, 'l_f2'), mvp: A.uid }), 'invalid-argument');
+    await falla(A.call('votar', { gid, pid, notas: orden(B.uid, 'l_f2') }), 'invalid-argument');
   });
 
   it('solo el admin cierra la votación', async () => {

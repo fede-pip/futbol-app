@@ -16,7 +16,6 @@ export default function Votacion() {
   const leerBorrador = () => { try { return JSON.parse(localStorage.getItem(claveBorrador)) || {}; } catch (e) { return {}; } };
   const [notas, setNotas] = useState(() => leerBorrador().notas || {});
   const [mvp, setMvp] = useState(() => leerBorrador().mvp || null);
-  const [sinMvp, setSinMvp] = useState(() => !!leerBorrador().sinMvp);
   const [paso, setPaso] = useState(() => leerBorrador().paso || 0);   // grupo de 3 compañeros
   const [sub, setSub] = useState(() => leerBorrador().sub || 0);      // atributo dentro del grupo
   const clavePaso = useRef('');
@@ -26,7 +25,7 @@ export default function Votacion() {
   const [confirma, setConfirma] = useState(false);
 
   // Se guarda lo votado en el celular hasta enviarlo: si salís o recargás no perdés nada.
-  useEffect(() => { try { localStorage.setItem(claveBorrador, JSON.stringify({ notas, mvp, sinMvp, paso, sub })); } catch (e) { /* sin almacenamiento */ } }, [notas, mvp, sinMvp, paso, sub]);
+  useEffect(() => { try { localStorage.setItem(claveBorrador, JSON.stringify({ notas, mvp, paso, sub })); } catch (e) { /* sin almacenamiento */ } }, [notas, mvp, paso, sub]);
   // Al pasar a la pregunta siguiente se vuelve arriba.
   useEffect(() => { window.scrollTo(0, 0); }, [paso, sub]);
 
@@ -140,18 +139,17 @@ export default function Votacion() {
     return (
       <>
         <Meter pct={100} />
-        <div><h2 className="t">¿Quién fue el MVP?</h2><p className="lead" style={{ marginTop: 2 }}>{ternas.length ? 'El mejor del partido. Es opcional.' : 'Fueron pocos para comparar, así que solo podés elegir al MVP. Es opcional.'}</p></div>
+        <div><h2 className="t">¿Quién fue el MVP?</h2><p className="lead" style={{ marginTop: 2 }}>{ternas.length ? 'Elegí al mejor del partido. Es obligatorio.' : 'Fueron pocos para comparar, así que solo elegí al MVP.'}</p></div>
         <Card>{candidatos.map(id => (
-          <button className="todo-r" key={id} onClick={() => { setMvp(id); setSinMvp(false); }} aria-pressed={mvp === id && !sinMvp}>
+          <button className="todo-r" key={id} onClick={() => setMvp(id)} aria-pressed={mvp === id}>
             <Avatar nombre={nombreDe(id, jugadores, p)} foto={jugadores[id] && jugadores[id].foto} />
             <span className="grow" style={{ fontWeight: 550, textAlign: 'left' }}>{nombreDe(id, jugadores, p)}</span>
-            {mvp === id && !sinMvp ? <Pill t="warn"><Icono n="star" />MVP</Pill> : null}
+            {mvp === id ? <Pill t="warn"><Icono n="star" />MVP</Pill> : null}
           </button>
         ))}</Card>
-        <button type="button" className="chip" aria-pressed={sinMvp} onClick={() => { setSinMvp(!sinMvp); if (!sinMvp) setMvp(null); }}>No elegir MVP</button>
-        {ternas.length ? <p className="small" role="status">Resumen: respondiste {comparadas} de {total} comparaciones · MVP: {sinMvp || !mvp ? 'ninguno' : nombreDe(mvp, jugadores, p)}.</p> : null}
+        {ternas.length ? <p className="small" role="status">Resumen: respondiste {comparadas} de {total} comparaciones · MVP: {mvp ? nombreDe(mvp, jugadores, p) : 'sin elegir'}.</p> : null}
         {error ? <div className="error" role="alert">{error}</div> : null}
-        <Btn v="pri" disabled={cargando || (!mvp && !sinMvp && !!candidatos.length)} onClick={enviar}>{cargando ? 'Enviando…' : 'Enviar votos'}</Btn>
+        <Btn v="pri" disabled={cargando || !mvp} onClick={enviar}>{cargando ? 'Enviando…' : 'Enviar votos'}</Btn>
         {ternas.length ? <Btn v="ghost" onClick={() => { setPaso(ternas.length - 1); setSub(nAttr - 1); }}>Volver</Btn> : null}
       </>
     );
