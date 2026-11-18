@@ -1,49 +1,33 @@
 import { useState } from 'react';
 import {
-  createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithCustomToken, signInWithEmailAndPassword, signInWithPopup, updateProfile
+  createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, updateProfile
 } from 'firebase/auth';
 import { auth, llamar, mensajeError, proveedorGoogle } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
-import { useDniAbierto } from '../lib/ingreso.js';
 import { Btn, Campo, CampoClave, CardB, Icono, IconoGoogle, Marca } from '../components/ui.jsx';
 
 const CLAVE_EMAIL = 'meanoto_email_ingreso';
 const leerEmailGuardado = () => { try { const v = sessionStorage.getItem(CLAVE_EMAIL) || ''; sessionStorage.removeItem(CLAVE_EMAIL); return v; } catch (e) { return ''; } };
 export const guardarEmailParaIngreso = v => { try { sessionStorage.setItem(CLAVE_EMAIL, v); } catch (e) { /* sin almacenamiento */ } };
 
-function IngresoDni({ onAtras, onEmail }) {
-  const [dni, setDni] = useState('');
-  const [clave, setClave] = useState('');
-  const [error, setError] = useState('');
-  const [cargando, setCargando] = useState(false);
-  async function entrar(e) {
-    e.preventDefault(); setError('');
-    if (!dni.trim() || !clave) return setError('Completá tu DNI y tu clave de siempre.');
-    setCargando(true);
-    try { const r = await llamar('ingresarConDni', { dni, clave }); await signInWithCustomToken(auth, r.token); }
-    catch (err) { setError(mensajeError(err)); }
-    setCargando(false);
-  }
+// El ingreso con DNI y clave ya no existe: quien jugaba antes crea su cuenta y pide que lo unan a su historial.
+function HistorialAnterior({ onAtras, onGoogle, onEmail, cargando }) {
   return (
-    <form className="scr" style={{ flex: 1 }} onSubmit={entrar} noValidate>
+    <div className="scr" style={{ flex: 1 }}>
       <div className="bar-top"><button type="button" className="back" onClick={onAtras}><Icono n="back" />Volver</button><Marca /></div>
-      <div><h2 className="t">Entrá con tu DNI</h2><p className="lead" style={{ marginTop: 4 }}>Usá el DNI y la clave con la que jugabas antes. Es la última vez: en el próximo paso elegís un email para entrar de ahora en adelante.</p></div>
-      <Campo label="Tu DNI" id="dni-ing" inputMode="numeric" value={dni} onChange={e => setDni(e.target.value)} placeholder="38123456" autoComplete="off" />
-      <CampoClave label="Tu clave de antes, o el código que te mandó el admin" id="clave-ing" value={clave} onChange={e => setClave(e.target.value)} placeholder="Tu clave o el código de 6 números" autoComplete="off" ayuda="Si el admin del grupo te mandó un código por WhatsApp, escribí ese código acá." />
-      {error ? <div className="error" role="alert">{error}</div> : null}
-      <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Verificando…' : 'Entrar'}</Btn>
-      <div className="sep">¿Algo no sale?</div>
-      <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div><b>No me acuerdo de mi clave</b><p className="muted" style={{ marginTop: 2 }}>Pedile al admin de tu grupo una clave temporal. Te la manda por WhatsApp y con ella entrás igual que acá.</p></div>
-        <div><b>Ya elegí un email antes</b><p className="muted" style={{ marginTop: 2 }}>Entonces el DNI ya no sirve: entrá con ese email.</p></div>
-        <Btn type="button" onClick={onEmail}><Icono n="mail" />Entrar con mi email</Btn>
+      <div><h2 className="t">Si jugabas antes</h2><p className="lead" style={{ marginTop: 4 }}>Ya no se entra con el DNI. Tu historial no se pierde: se une a tu cuenta nueva en tres pasos.</p></div>
+      <CardB style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}><b className="num" style={{ fontSize: 22 }}>1</b><div><b>Creá tu cuenta</b><div className="muted">Con Google o con tu email.</div></div></div>
+        <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}><b className="num" style={{ fontSize: 22 }}>2</b><div><b>Tocá "Ya jugaba antes"</b><div className="muted">Escribí tu DNI para pedir que te unan a tu jugador de antes.</div></div></div>
+        <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}><b className="num" style={{ fontSize: 22 }}>3</b><div><b>Un admin lo confirma</b><div className="muted">Te avisamos apenas esté: ahí aparecen tus partidos, goles y MVP.</div></div></div>
       </CardB>
-    </form>
+      <Btn type="button" v="pri" onClick={onGoogle} disabled={cargando}><IconoGoogle />Seguir con Google</Btn>
+      <Btn type="button" onClick={onEmail}><Icono n="mail" />Crear cuenta con email</Btn>
+    </div>
   );
 }
 
 export default function Cuenta({ onAtras }) {
-  const dniAbierto = useDniAbierto();
   const [guardado] = useState(leerEmailGuardado);
   const [vista, setVista] = useState(guardado ? 'email' : 'inicio'); // inicio | email | dni
   const [modo, setModo] = useState(guardado ? 'login' : 'registro');
@@ -94,7 +78,7 @@ export default function Cuenta({ onAtras }) {
     catch (e) { setError(mensajeError(e)); }
   }
 
-  if (vista === 'dni') return <IngresoDni onAtras={() => setVista('inicio')} onEmail={() => { setVista('email'); setModo('login'); }} />;
+  if (vista === 'dni') return <HistorialAnterior onAtras={() => setVista('inicio')} onGoogle={conGoogle} onEmail={() => { setVista('email'); setModo('registro'); }} cargando={cargando} />;
   const cambiarModo = m => { setModo(m); setError(''); setAviso(''); };
 
   if (vista === 'inicio') return (
@@ -110,7 +94,7 @@ export default function Cuenta({ onAtras }) {
       {error ? <div className="error" role="alert">{error}</div> : null}
       <Btn type="button" onClick={conGoogle} disabled={cargando}><IconoGoogle />Seguir con Google</Btn>
       <button type="button" className="choice" onClick={() => setVista('email')}><span className="ti"><Icono n="mail" /></span><div className="grow"><b>Con mi email y contraseña</b><span>Para entrar si ya tenés cuenta, o crearla si sos nuevo.</span></div><Icono n="chev" /></button>
-      {dniAbierto ? <button type="button" className="choice" onClick={() => setVista('dni')}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Jugaba antes con mi DNI</b><span>Con tu DNI y tu clave de siempre. Después elegís un email.</span></div><Icono n="chev" /></button> : null}
+      <button type="button" className="choice" onClick={() => setVista('dni')}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Jugaba antes en la versión anterior</b><span>Recuperá tu historial con tu cuenta nueva.</span></div><Icono n="chev" /></button>
     </div>
   );
 
@@ -141,7 +125,7 @@ export default function Cuenta({ onAtras }) {
           <div className="sep">¿Entrabas de otra forma?</div>
           <div className="row" style={{ gap: 8 }}>
             <Btn type="button" onClick={conGoogle} disabled={cargando}><IconoGoogle />Google</Btn>
-            {dniAbierto ? <Btn type="button" onClick={() => setVista('dni')}><Icono n="refresh" />Con mi DNI</Btn> : null}
+            <Btn type="button" onClick={() => setVista('dni')}><Icono n="refresh" />Jugaba antes</Btn>
           </div>
         </>
       ) : null}

@@ -3,7 +3,6 @@ import { EmailAuthProvider, linkWithCredential, sendEmailVerification, signOut }
 import { auth, llamar, mensajeError } from '../lib/firebase.js';
 import { crearPerfil } from '../data/acciones.js';
 import { guardarEmailParaIngreso } from './Cuenta.jsx';
-import { useDniAbierto } from '../lib/ingreso.js';
 import { Btn, Campo, CampoClave, Card, CardB, Icono, Lockup, Marca, Fila } from '../components/ui.jsx';
 import { activarPush, esAppInstalada, esIPhone, estadoPermiso } from '../lib/push.js';
 
@@ -30,46 +29,46 @@ export function CompletarPerfil({ uid, sugerido = '' }) {
   );
 }
 
-// ---- Recuperar el historial de la versión anterior (DNI + clave de siempre) ----
+// ---- Pedir que te unan a tu historial de la versión anterior (lo confirma un admin) ----
 export function MigrarDni({ onListo, onOmitir }) {
   const [dni, setDni] = useState('');
-  const [clave, setClave] = useState('');
   const [error, setError] = useState('');
-  const [exito, setExito] = useState(null);
+  const [enviado, setEnviado] = useState(false);
   const [cargando, setCargando] = useState(false);
 
-  async function vincular(e) {
+  async function pedir(e) {
     e.preventDefault();
     setError('');
-    if (!dni.trim() || !clave) return setError('Completá tu DNI y tu clave de siempre.');
+    if (dni.replace(/\D/g, '').length < 6) return setError('Escribí tu DNI, solo números.');
     setCargando(true);
-    try { setExito(await llamar('vincularCuentaAnterior', { dni, clave })); }
+    try { await llamar('solicitarVinculo', { dni }); setEnviado(true); }
     catch (err) { setError(mensajeError(err)); }
     setCargando(false);
   }
 
-  if (exito) return (
+  if (enviado) return (
     <div className="scr" style={{ flex: 1 }}>
       <div className="bar-top"><Lockup /></div>
-      <div><h2 className="t">¡Listo, {exito.nombre.split(' ')[0]}!</h2><p className="lead" style={{ marginTop: 4 }}>Tu historial viene con vos: partidos, goles y MVP.</p></div>
-      {exito.grupos.length ? <Card>{exito.grupos.map(g => <Fila key={g.id} icono="users" titulo={g.nombre} sub="Ya sos parte de este grupo" />)}</Card> : null}
+      <div><h2 className="t">Pedido enviado</h2><p className="lead" style={{ marginTop: 4 }}>Si el DNI es correcto, los admins de tu grupo lo van a ver y te unen a tu historial. Te avisamos en la app cuando esté.</p></div>
+      <Card>
+        <Fila icono="clock" titulo="Mientras tanto" sub="Podés unirte a tu grupo con el código que te pasen." />
+        <Fila icono="check" titulo="Si pasan unos días" sub="Revisá que el DNI esté bien escrito y pedilo de nuevo, o avisale a un admin." />
+      </Card>
       <Btn v="pri" onClick={onListo}>Continuar</Btn>
     </div>
   );
 
   return (
-    <form className="scr" style={{ flex: 1 }} onSubmit={vincular}>
+    <form className="scr" style={{ flex: 1 }} onSubmit={pedir}>
       <div className="bar-top"><Lockup /></div>
-      <div><h2 className="t">Recuperá tu historial</h2><p className="lead" style={{ marginTop: 4 }}>Ingresá el DNI y la clave con la que jugabas antes. Es la última vez que los vas a necesitar.</p></div>
+      <div><h2 className="t">Recuperá tu historial</h2><p className="lead" style={{ marginTop: 4 }}>Escribí el DNI con el que jugabas antes. Un admin de tu grupo confirma que sos vos y te une a tu historial.</p></div>
       <Card>
-        <Fila icono="user" titulo="Con tu DNI y tu clave de siempre" sub="Confirmamos que esa cuenta es tuya" />
-        <Fila icono="mail" titulo="Tu email queda como acceso nuevo" sub="Ya lo creaste en el paso anterior" />
+        <Fila icono="user" titulo="Un admin lo confirma" sub="Así nadie se hace pasar por otra persona" />
         <Fila icono="check" titulo="Tus partidos y estadísticas se mantienen" sub="Nada se pierde" />
       </Card>
-      <Campo label="Tu DNI" id="dni" inputMode="numeric" value={dni} onChange={e => setDni(e.target.value)} placeholder="38123456" autoComplete="off" />
-      <CampoClave label="Tu clave de antes, o el código que te mandó el admin" id="clave-vieja" value={clave} onChange={e => setClave(e.target.value)} placeholder="Tu clave o el código de 6 números" autoComplete="off" ayuda="Si el admin del grupo te mandó un código por WhatsApp, escribí ese código acá." />
+      <Campo label="Tu DNI de antes" id="dni" inputMode="numeric" value={dni} onChange={e => setDni(e.target.value)} placeholder="38123456" autoComplete="off" />
       {error ? <div className="error" role="alert">{error}</div> : null}
-      <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Verificando…' : 'Recuperar mi historial'}</Btn>
+      <Btn type="submit" v="pri" disabled={cargando}>{cargando ? 'Enviando…' : 'Pedir que me unan'}</Btn>
       <Btn type="button" v="ghost" onClick={onOmitir}>No jugaba antes</Btn>
     </form>
   );
@@ -125,13 +124,10 @@ export function AgregarEmail({ nombre, onListo }) {
 
 // ---- Primera vez: ¿ya jugabas en la versión anterior? ----
 export function PreguntaAnterior({ onListo, onDni }) {
-  const dniAbierto = useDniAbierto();
   const [hallada, setHallada] = useState(undefined); // undefined: buscando
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   useEffect(() => { llamar('buscarCuentaAnterior').then(setHallada).catch(() => setHallada({ encontrada: false })); }, []);
-  // Con el ingreso por DNI cerrado, quien no tiene una cuenta de Google anterior sigue directo.
-  useEffect(() => { if (hallada && !hallada.encontrada && !dniAbierto) onListo(); }, [hallada, dniAbierto]);
 
   async function confirmar() {
     setError(''); setCargando(true);
@@ -156,8 +152,8 @@ export function PreguntaAnterior({ onListo, onDni }) {
   return (
     <div className="scr" style={{ flex: 1 }}>
       <div className="bar-top"><Lockup /></div>
-      <div><h2 className="t">¿Ya jugabas antes?</h2><p className="lead" style={{ marginTop: 4 }}>Si jugabas antes con tu DNI, recuperá tus partidos, goles y MVP. Si sos nuevo, seguí.</p></div>
-      <button className="choice" onClick={onDni}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Sí, jugaba con mi DNI</b><span>Ponés tu DNI y tu clave de antes y recuperás todo.</span></div><Icono n="chev" /></button>
+      <div><h2 className="t">¿Ya jugabas antes?</h2><p className="lead" style={{ marginTop: 4 }}>Si jugabas en la versión anterior, recuperá tus partidos, goles y MVP. Si sos nuevo, seguí.</p></div>
+      <button className="choice" onClick={onDni}><span className="ti"><Icono n="refresh" /></span><div className="grow"><b>Sí, jugaba antes</b><span>Pedís recuperar tu historial y un admin lo confirma.</span></div><Icono n="chev" /></button>
       <button className="choice" onClick={onListo}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>No, soy nuevo</b><span>Seguimos con tu cuenta nueva.</span></div><Icono n="chev" /></button>
     </div>
   );

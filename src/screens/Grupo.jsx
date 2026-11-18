@@ -9,6 +9,7 @@ import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
 import { BarraSuperior } from '../app/Shell.jsx';
 import { GrupoElegir } from './Inicio1.jsx';
+import PedidosVinculo from '../components/PedidosVinculo.jsx';
 import { useToast } from '../components/ui.jsx';
 
 function EditorNombre({ gid, id, j, onCerrar }) {
@@ -107,6 +108,7 @@ export default function Grupo() {
         </Card>
         <button className="choice" style={{ marginTop: 10 }} onClick={() => setSumando(true)}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Sumar otro grupo</b><span>Unirte con un código o crear uno nuevo.</span></div><Icono n="chev" /></button>
       </div>
+      {esAdmin ? <PedidosVinculo gid={gid} /> : null}
       <section className="kpi pitch">
         <div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div>
         <div className="s"><span>{grupo.miembros.length} {pl(grupo.miembros.length, 'jugador', 'jugadores')}</span>{grupo.precioCancha ? <span>${grupo.precioCancha} por persona</span> : null}{grupo.pozo ? <span>Pozo: ${grupo.pozo}</span> : null}</div>

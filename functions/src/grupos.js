@@ -1,7 +1,7 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
-import { db, Timestamp, FieldValue, HttpsError, REGION, URL_APP, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
-import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido, esPendiente } from './puro.js';
+import { db, Timestamp, FieldValue, HttpsError, REGION, URL_APP, SUPER_EMAILS, requireAuth, requireAdmin, requireSuper, crearCodigoUnico, lotes } from './util.js';
+import { statsVacias, hashPwdLegacy, deepReplace, cambio, varsPartido, esPendiente, esUid } from './puro.js';
 import { AUD } from './compartido/catalogo.js';
 import { disparar, entregar, audiencia, ONESIGNAL_API_KEY } from './avisos.js';
 
@@ -16,14 +16,6 @@ async function leerIntentos(ref) {
 }
 const sumarFallo = (ref, i) => ref.set({ n: i.vigente ? i.n + 1 : 1, desde: i.vigente ? i.desde : Date.now() });
 
-// El ingreso y la vinculación por DNI son para la transición desde la versión anterior: el dueño los cierra cuando terminó.
-async function dniAbierto() {
-  const c = await db.doc('config/ingreso').get();
-  return !(c.exists && c.data().dniCerrado === true);
-}
-async function exigirDniAbierto() {
-  if (!(await dniAbierto())) throw new HttpsError('failed-precondition', 'El ingreso con DNI ya no está disponible. Entrá con tu email o con Google, o pedile ayuda al admin del grupo.');
-}
 
 export const crearGrupo = onCall(opts, async req => {
   const uid = requireAuth(req);
@@ -217,66 +209,7 @@ export const vincularCuentaAnterior = onCall(opts, async req => {
     return completarVinculo(uid, c.dni, c.ld);
   }
 
-  // Camino 2: DNI y clave de siempre.
-  const dni = String(req.data?.dni || '').replace(/\D/g, '');
-  const clave = String(req.data?.clave || '');
-  if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
-
-  await exigirDniAbierto();
-
-  // Máximo 5 intentos fallidos por hora por DNI (el mismo contador que el ingreso con DNI, sin importar desde qué cuenta se pruebe)
-  // y 10 por hora por cuenta, para que crear cuentas nuevas no dé intentos nuevos.
-  const iDni = db.doc(`intentosDni/${dni}`), iUid = db.doc(`intentosVinculo/${uid}`);
-  const [idni, iuid] = await Promise.all([leerIntentos(iDni), leerIntentos(iUid)]);
-  if (idni.vigente && idni.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos con ese DNI. Probá de nuevo en una hora.');
-  if (iuid.vigente && iuid.n >= 10) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Probá de nuevo en una hora.');
-
-  const l = await db.doc(`app8_users/${dni}`).get();
-  const ld = l.exists ? l.data() : null;
-  if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
-    await Promise.all([sumarFallo(iDni, idni), sumarFallo(iUid, iuid)]);
-    throw new HttpsError('permission-denied', 'El DNI o la clave no coinciden.');
-  }
-  if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('already-exists', 'Esa cuenta ya se pasó a otro usuario.');
-  await Promise.all([iDni.delete().catch(() => {}), iUid.delete().catch(() => {})]);
-  return completarVinculo(uid, dni, ld);
-});
-
-// Ingreso de quien jugaba con DNI: una última vez con DNI y clave de siempre. Se le devuelve un
-// acceso temporal y la app le pide que agregue un email, que pasa a ser su forma de entrar.
-// Cuando la cuenta ya tiene email, este camino se cierra (la clave vieja es débil y no debe quedar
-// como puerta trasera).
-export const ingresarConDni = onCall(opts, async req => {
-  const dni = String(req.data?.dni || '').replace(/\D/g, '');
-  const clave = String(req.data?.clave || '');
-  if (dni.length < 6 || dni.length > 9 || !clave) throw new HttpsError('invalid-argument', 'Completá tu DNI y tu clave.');
-  await exigirDniAbierto();
-
-  // Máximo 5 intentos fallidos por hora por DNI.
-  const iref = db.doc(`intentosDni/${dni}`);
-  const i = await leerIntentos(iref);
-  if (i.vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Demasiados intentos con ese DNI. Probá de nuevo en una hora.');
-
-  const lref = db.doc(`app8_users/${dni}`);
-  const l = await lref.get();
-  const ld = l.exists ? l.data() : null;
-  if (!ld || !ld.passHash || ld.passHash !== hashPwdLegacy(clave)) {
-    await sumarFallo(iref, i);
-    throw new HttpsError('permission-denied', 'El DNI o la clave no coinciden.');
-  }
-
-  const uid = `d${dni}`;
-  if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('failed-precondition', 'Esa cuenta ya pasó a email. Ingresá con tu email.');
-  const auth = getAuth();
-  let existente = null;
-  try { existente = await auth.getUser(uid); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
-  if (existente && existente.email) throw new HttpsError('failed-precondition', 'Esa cuenta ya pasó a email. Ingresá con tu email.');
-  if (!existente) await auth.createUser({ uid, displayName: ld.nombre || 'Jugador' });
-
-  await iref.delete().catch(() => {});
-  await completarVinculo(uid, dni, ld); // crea el perfil y le devuelve su lugar en los grupos (se puede repetir sin problema)
-  const token = await auth.createCustomToken(uid);
-  return { token, nombre: ld.nombre || 'Jugador' };
+  throw new HttpsError('failed-precondition', 'El ingreso con DNI y clave ya no está disponible. Pedí que te unan a tu historial desde la app.');
 });
 
 export const enviarAvisoManual = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] }, async req => {
@@ -299,18 +232,6 @@ export const enviarAvisoManual = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] 
   return r;
 });
 
-
-// Qué formas de ingreso están abiertas (la usa la pantalla de ingreso; no necesita sesión).
-export const estadoIngreso = onCall(opts, async () => ({ dni: await dniAbierto() }));
-
-// El dueño cierra o reabre el ingreso con DNI cuando termina la transición desde la versión anterior.
-export const configurarIngreso = onCall(opts, async req => {
-  const quien = requireSuper(req);
-  const dniCerrado = !!req.data?.dniCerrado;
-  await db.doc('config/ingreso').set({ dniCerrado, actualizado: Timestamp.now(), por: quien }, { merge: true });
-  console.log(`configurarIngreso: dniCerrado=${dniCerrado} por ${quien}`);
-  return { dni: !dniCerrado };
-});
 
 // Borra un grupo con todo lo que tiene (partidos, jugadores, niveles, invitados) y su código. Solo el creador.
 async function borrarGrupoCompleto(gref, g) {
@@ -363,4 +284,108 @@ export const borrarMiCuenta = onCall({ ...opts, timeoutSeconds: 300 }, async req
   try { await getAuth().deleteUser(uid); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
   console.log(`borrarMiCuenta: ${uid}`);
   return { ok: true };
+});
+
+
+// ---------- Pedir que te unan a tu historial anterior ----------
+// Reemplaza al ingreso con DNI y clave: la persona crea su cuenta normal y pide que la unan a su jugador de antes.
+// Un admin del grupo (que la conoce) o el dueño de la plataforma lo confirma. Nadie recibe información sobre los DNI.
+const nombreCorto = n => { const p = String(n || 'Jugador').split(' ').filter(Boolean); return p.length > 1 ? `${p[0]} ${p[1][0]}.` : (p[0] || 'Jugador'); };
+
+export const solicitarVinculo = onCall(opts, async req => {
+  const uid = requireAuth(req);
+  const dni = String(req.data?.dni || '').replace(/\D/g, '');
+  if (dni.length < 6 || dni.length > 9) throw new HttpsError('invalid-argument', 'Revisá el DNI: tiene que tener entre 6 y 9 números.');
+  if ((await db.doc(`privado/${uid}`).get()).data()?.legacyDni) throw new HttpsError('failed-precondition', 'Tu cuenta ya tiene un historial unido.');
+  // Hasta 5 pedidos por hora por cuenta: evita usar esto para probar DNI.
+  const ic = db.doc(`intentosSolicitud/${uid}`);
+  const i = await leerIntentos(ic);
+  if (i.vigente && i.n >= 5) throw new HttpsError('resource-exhausted', 'Hiciste varios pedidos seguidos. Probá de nuevo en una hora.');
+  await sumarFallo(ic, i);
+
+  // La respuesta es siempre la misma exista o no el DNI, para no revelar quién jugaba antes.
+  const l = await db.doc(`app8_users/${dni}`).get();
+  const ld = l.exists ? l.data() : null;
+  if (ld && (!ld.nuevoUid || ld.nuevoUid === uid)) {
+    const gs = await db.collection('grupos').where('miembros', 'array-contains', `l_${dni}`).get();
+    const gids = gs.docs.map(d => d.id);
+    const perfil = (await db.doc(`usuarios/${uid}`).get()).data() || {};
+    await db.doc(`solicitudesVinculo/${uid}`).set({ uid, dni, nombreAnterior: ld.nombre || 'Jugador', solicitante: perfil.nombre || '', gids, estado: 'pendiente', creadoEn: Timestamp.now() });
+    // Aviso en la bandeja de los admins de esos grupos.
+    const admins = new Set();
+    gs.docs.forEach(d => (d.data().admins || []).filter(a => esUid(a)).forEach(a => admins.add(a)));
+    for (const a of admins) {
+      await db.doc(`privado/${a}/avisos/solicitud_${uid}`).create({
+        tipo: 'solicitud_vinculo', titulo: `${perfil.nombre || 'Alguien'} pide unirse a su historial`,
+        cuerpo: `Dice ser ${nombreCorto(ld.nombre)} de la versión anterior. Confirmalo en Grupo → Pedidos para unir cuentas.`,
+        gid: gids[0] || null, pid: null, creadoEn: Timestamp.now(), leido: false
+      }).catch(() => {});
+    }
+  }
+  return { ok: true };
+});
+
+async function pedidosDe(gid) {
+  const q = await db.collection('solicitudesVinculo').where('gids', 'array-contains', gid).get();
+  return q.docs.map(d => d.data()).filter(x => x.estado === 'pendiente');
+}
+async function conEmail(items) {
+  const auth = getAuth();
+  return Promise.all(items.map(async x => {
+    let email = '';
+    try { email = (await auth.getUser(x.uid)).email || ''; } catch { /* la cuenta ya no existe */ }
+    return { uid: x.uid, nombreAnterior: x.nombreAnterior, dniFin: x.dni.slice(-3), solicitante: x.solicitante, email, creadoEn: x.creadoEn?.toMillis?.() || 0 };
+  }));
+}
+
+// Pedidos pendientes: los de un grupo (si sos admin de ese grupo) o todos (si sos el dueño de la plataforma).
+export const listarSolicitudes = onCall(opts, async req => {
+  if (req.data?.todos) {
+    requireSuper(req);
+    const q = await db.collection('solicitudesVinculo').get();
+    return { pedidos: await conEmail(q.docs.map(d => d.data()).filter(x => x.estado === 'pendiente')) };
+  }
+  const { gref } = await requireAdmin(req, req.data?.gid);
+  return { pedidos: await conEmail(await pedidosDe(gref.id)) };
+});
+
+export const resolverSolicitud = onCall(opts, async req => {
+  const quien = requireAuth(req);
+  const uid = String(req.data?.uid || '');
+  const aprobar = !!req.data?.aprobar;
+  const sref = db.doc(`solicitudesVinculo/${uid}`);
+  const ss = await sref.get();
+  if (!ss.exists || ss.data().estado !== 'pendiente') throw new HttpsError('not-found', 'Ese pedido ya no está pendiente.');
+  const x = ss.data();
+  // Puede resolverlo un admin de alguno de los grupos del jugador anterior, o el dueño de la plataforma.
+  const t = req.auth.token || {};
+  const esDueno = !!t.email_verified && SUPER_EMAILS.includes(String(t.email || '').toLowerCase());
+  let esAdminDelGrupo = false;
+  if (!esDueno) {
+    for (const gid of x.gids || []) {
+      const g = (await db.doc(`grupos/${gid}`).get()).data();
+      if (g && (g.admins || []).includes(quien)) { esAdminDelGrupo = true; break; }
+    }
+  }
+  if (!esDueno && !esAdminDelGrupo) throw new HttpsError('permission-denied', 'Solo un admin del grupo puede resolver este pedido.');
+  if (quien === uid) throw new HttpsError('permission-denied', 'No podés aprobar tu propio pedido.');
+
+  if (!aprobar) {
+    await sref.update({ estado: 'rechazada', resueltoPor: quien, resueltoEn: Timestamp.now() });
+    return { ok: true, aprobada: false };
+  }
+  const l = await db.doc(`app8_users/${x.dni}`).get();
+  if (!l.exists) throw new HttpsError('not-found', 'No encontramos al jugador anterior.');
+  const ld = l.data();
+  if (ld.nuevoUid && ld.nuevoUid !== uid) throw new HttpsError('already-exists', 'Ese jugador anterior ya está unido a otra cuenta.');
+  const previo = (await db.doc(`privado/${uid}`).get()).data()?.legacyDni;
+  if (previo && previo !== x.dni) throw new HttpsError('already-exists', 'Esa cuenta ya tiene otro historial unido.');
+  const r = await completarVinculo(uid, x.dni, ld);
+  await sref.update({ estado: 'aprobada', resueltoPor: quien, resueltoEn: Timestamp.now() });
+  await db.doc(`privado/${uid}/avisos/vinculo_${uid}`).set({
+    tipo: 'vinculo', titulo: 'Recuperamos tu historial', cuerpo: 'Un admin confirmó que sos vos. Tus partidos, goles y MVP ya están en tu cuenta.',
+    gid: r.grupos[0]?.id || null, pid: null, creadoEn: Timestamp.now(), leido: false
+  }).catch(() => {});
+  console.log(`resolverSolicitud: aprobada ${uid} <- ${x.dni.slice(0, 2)}***${x.dni.slice(-2)} por ${quien}`);
+  return { ok: true, aprobada: true, nombre: ld.nombre || 'Jugador', grupos: r.grupos };
 });

@@ -3,8 +3,8 @@ import { esProduccion, llamar, mensajeError } from '../lib/firebase.js';
 import { Btn, Card, CardB, Fila, Hint, Pill, useToast } from '../components/ui.jsx';
 import { useSesion } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
-import { olvidarEstadoIngreso } from '../lib/ingreso.js';
 import { BarraSuperior } from '../app/Shell.jsx';
+import PedidosVinculo from '../components/PedidosVinculo.jsx';
 
 export const SUPER_EMAILS = ['fede@inmetricswetrust.com', 'hola@inmetricswetrust.com'];
 export const esSuper = user => !!(user && user.emailVerified && SUPER_EMAILS.includes((user.email || '').toLowerCase()));
@@ -24,16 +24,8 @@ function AyudaAcceso() {
   const dniDe = id => (id.startsWith('l_') ? id.slice(2) : /^d\d+$/.test(id) ? id.slice(1) : '');
   async function generar(id, nombre) {
     setError(''); setRes(null); setCargando(true);
-    try {
-      // Quien todavía no pasó a email (no se acuerda de su clave de antes): clave temporal. El resto: enlace para elegir contraseña.
-      if (id.startsWith('l_')) { const r = await llamar('claveTemporalDni', { dni: dniDe(id) }); setRes({ ...r, nombre, temporal: true }); }
-      else {
-        try { const r = await llamar('enlaceDeAcceso', { uid: id }); setRes({ ...r, nombre }); }
-        catch (e) {
-          if (dniDe(id)) { const r = await llamar('claveTemporalDni', { dni: dniDe(id) }); setRes({ ...r, nombre, temporal: true }); } else throw e;
-        }
-      }
-    } catch (e) { setError(mensajeError(e)); }
+    try { const r = await llamar('enlaceDeAcceso', { uid: id }); setRes({ ...r, nombre }); }
+    catch (e) { setError(mensajeError(e)); }
     setCargando(false);
   }
   async function vincular() {
@@ -42,7 +34,7 @@ function AyudaAcceso() {
     catch (e) { setError(mensajeError(e)); }
     setCargando(false);
   }
-  const mensaje = r => r.temporal ? `Hola ${r.nombre.split(' ')[0]}! Para entrar a Me Anoto: abrí meanoto.com.ar, tocá "Entrar con mi DNI de antes", poné tu DNI y esta clave: ${r.clave}. Después elegí tu email y una contraseña nueva.` : `Hola ${r.nombre.split(' ')[0]}! Entrá a este enlace para elegir una contraseña nueva en Me Anoto (es solo para vos): ${r.enlace}`;
+  const mensaje = r => `Hola ${r.nombre.split(' ')[0]}! Entrá a este enlace para elegir una contraseña nueva en Me Anoto (es solo para vos): ${r.enlace}`;
   return (
     <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <h3 className="t">Ayudar a alguien a entrar</h3>
@@ -56,7 +48,6 @@ function AyudaAcceso() {
           <span className="muted">Entraba con DNI. Elegí cómo ayudarlo.</span>
           <div className="field"><label htmlFor="vinc-email">Escribí el email con el que va a entrar. Si ya tiene cuenta, la unimos a su historial; si no, le creamos el acceso y te damos un enlace para que elija su contraseña</label><input id="vinc-email" type="email" value={emailV} onChange={e => setEmailV(e.target.value)} placeholder="email@ejemplo.com" autoComplete="off" /></div>
           <Btn v="pri" disabled={cargando || !/^\S+@\S+\.\S+$/.test(emailV.trim())} onClick={vincular}>Crear su acceso con ese email</Btn>
-          <Btn disabled={cargando} onClick={() => { const x = sel; setSel(null); generar(x.id, x.nombre); }}>Darle un enlace o una clave temporal</Btn>
           <Btn v="ghost" onClick={() => setSel(null)}>Cancelar</Btn>
         </div>
       ) : null}
@@ -75,11 +66,6 @@ function AyudaAcceso() {
                 </div>
               ) : null}
             </>
-          ) : res.temporal ? (
-            <>
-              <b>Clave temporal para {res.nombre}: <span className="num" style={{ fontSize: 20 }}>{res.clave}</span></b>
-              <span className="muted">Tiene que entrar a meanoto.com.ar, tocar "Entrar con mi DNI de antes", poner su DNI y esta clave, y después elegir su email y contraseña nueva.</span>
-            </>
           ) : (
             <>
               <b>Enlace para {res.nombre}</b>
@@ -87,35 +73,11 @@ function AyudaAcceso() {
             </>
           )}
           {res.vinculado ? null : <div className="row" style={{ gap: 8 }}>
-            <Btn onClick={async () => { try { await navigator.clipboard.writeText(res.temporal ? res.clave : res.enlace); toast('Copiado'); } catch (e) { toast('No se pudo copiar'); } }}>Copiar</Btn>
+            <Btn onClick={async () => { try { await navigator.clipboard.writeText(res.enlace); toast('Copiado'); } catch (e) { toast('No se pudo copiar'); } }}>Copiar</Btn>
             <Btn v="pri" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(mensaje(res))}`, '_blank', 'noopener')}>WhatsApp</Btn>
           </div>}
         </div>
       ) : null}
-    </CardB>
-  );
-}
-
-function IngresoDni() {
-  const [abierto, setAbierto] = useState(null);
-  const [error, setError] = useState('');
-  const [cargando, setCargando] = useState(false);
-  const [confirma, setConfirma] = useState(false);
-  useEffect(() => { llamar('estadoIngreso').then(r => setAbierto(!!r.dni)).catch(() => {}); }, []);
-  async function cambiar(cerrar) {
-    setError(''); setCargando(true);
-    try { const r = await llamar('configurarIngreso', { dniCerrado: cerrar }); setAbierto(!!r.dni); olvidarEstadoIngreso(); setConfirma(false); } catch (e) { setError(mensajeError(e)); }
-    setCargando(false);
-  }
-  return (
-    <CardB style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="row sp"><h3 className="t">Ingreso con DNI</h3><Pill t={abierto === false ? 'ok' : 'warn'}>{abierto === null ? '…' : abierto ? 'Abierto' : 'Cerrado'}</Pill></div>
-      <p className="muted">Sirve para que los jugadores de la versión anterior recuperen su historial con la clave de antes. Es el punto más débil de la seguridad: conviene cerrarlo cuando ya pasaron todos. Si lo cerrás, quienes falten los ayudás desde acá con "Ayudar a alguien a entrar".</p>
-      {error ? <div className="error" role="alert">{error}</div> : null}
-      {abierto === true ? (confirma
-        ? <div className="confirm"><b>¿Cerrar el ingreso con DNI?</b><span className="muted">Nadie más va a poder entrar ni vincularse con DNI y clave. Se puede reabrir cuando quieras.</span><div className="row"><Btn onClick={() => setConfirma(false)}>No</Btn><Btn v="pri" disabled={cargando} onClick={() => cambiar(true)}>Sí, cerrarlo</Btn></div></div>
-        : <Btn onClick={() => setConfirma(true)}>Cerrar el ingreso con DNI</Btn>) : null}
-      {abierto === false ? <Btn disabled={cargando} onClick={() => cambiar(false)}>Reabrir el ingreso con DNI</Btn> : null}
     </CardB>
   );
 }
@@ -167,7 +129,7 @@ export default function Plataforma() {
       <div><h2 className="t">Plataforma</h2><p className="lead" style={{ marginTop: 2 }}>Datos de la versión anterior · {esProduccion ? 'PRODUCCIÓN' : 'pruebas'}</p></div>
       <AyudaAcceso />
       <RecuperarFotos />
-      <IngresoDni />
+      <PedidosVinculo todos />
       <Hint>Primero mirá qué se migraría. Migrar crea los grupos nuevos con cada jugador como perfil pendiente; no borra nada de lo anterior y no pisa grupos ya migrados.</Hint>
       <Btn disabled={cargando} onClick={() => correr({ dryRun: true })}>{cargando ? 'Mirando…' : 'Ver qué se migraría'}</Btn>
       {!esProduccion ? <Btn disabled={cargando} onClick={() => correr({ dryRun: true, sembrar: true, forzar: true })}>Sembrar datos anteriores de prueba</Btn> : null}
