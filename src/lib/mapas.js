@@ -1,5 +1,6 @@
 // Google Maps (Places) para elegir la cancha. Sin clave (VITE_GOOGLE_MAPS_KEY) el campo funciona como texto libre.
-const CLAVE = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+// La clave es pública por diseño: está restringida a meanoto.com.ar y localhost y solo a Places/Maps JS.
+const CLAVE = import.meta.env.VITE_GOOGLE_MAPS_KEY || 'AIzaSyA9h0v24YgiHAZNi1lLM_54MWiTR6QRj0M';
 export const hayMapas = Boolean(CLAVE);
 
 let cargando = null;
