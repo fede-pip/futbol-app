@@ -78,6 +78,7 @@ export default function Grupo() {
   const [fotoG, setFotoG] = useState(grupo.foto || '');
   const [error, setError] = useState('');
   const [confirmaSalir, setConfirmaSalir] = useState(false);
+  const [confirmaCodigo, setConfirmaCodigo] = useState(false);
   const [sumando, setSumando] = useState(false);
   const [borrando, setBorrando] = useState(false);
   const [confBorrar, setConfBorrar] = useState('');
@@ -124,7 +125,9 @@ export default function Grupo() {
         <div className="cap">Código de invitación</div>
         <div className="code" aria-label={`Código ${grupo.codigo}`}>{grupo.codigo}</div>
         <div className="row"><Btn onClick={copiar}><Icono n="copy" />Copiar</Btn><Btn v="pri" onClick={() => window.open(`https://wa.me/?text=${texto}`, '_blank', 'noopener')}><Icono n="share" />Compartir</Btn></div>
-        {esAdmin ? <button className="link" onClick={() => ejecutar(async () => { await llamar('nuevoCodigo', { gid }); }, 'Código nuevo creado')}>Generar un código nuevo</button> : null}
+        {esAdmin ? (confirmaCodigo
+          ? <div className="confirm"><b>¿Generar un código nuevo?</b><span className="muted">El código anterior deja de funcionar. Tenés que volver a compartir el nuevo.</span><div className="row"><Btn onClick={() => setConfirmaCodigo(false)}>No, volver</Btn><Btn v="pri" onClick={() => { setConfirmaCodigo(false); ejecutar(async () => { await llamar('nuevoCodigo', { gid }); }, 'Código nuevo creado'); }}>Sí, generar</Btn></div></div>
+          : <button className="link" onClick={() => setConfirmaCodigo(true)}>Generar un código nuevo</button>) : null}
       </CardB>
 
       {esAdmin ? (
