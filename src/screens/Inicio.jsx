@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { db } from '../lib/firebase.js';
 import { useColl } from '../data/hooks.js';
 import { anotarse, bajarse } from '../data/acciones.js';
-import { aFecha, diaSemana, faltan, titulo as tituloFecha, diaCorto } from '../lib/fechas.js';
+import { aFecha, diaSemana, faltan, titulo as tituloFecha, diaCorto, mayus } from '../lib/fechas.js';
 import { AvatarGrupo, Btn, Card, CardB, Fila, Hint, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
@@ -32,7 +32,7 @@ function BannerAvisos() {
 }
 
 export default function Inicio() {
-  const { uid, perfil, grupo, grupos, gid, elegirGrupo, partido, jugadores, esAdmin } = useSesion();
+  const { uid, perfil, grupo, grupos, gid, elegirGrupo, partido, partidos, elegirPartido, jugadores, esAdmin } = useSesion();
   const { ir } = useNav();
   const toast = useToast();
   const [error, setError] = useState('');
@@ -77,6 +77,11 @@ export default function Inicio() {
         <p className="lead" style={{ marginTop: 2 }}>{partido && d ? (votando ? 'Terminó el partido. Falta votar.' : jugado ? (esAdmin ? 'El partido ya se jugó: cargá el resultado.' : 'El partido ya se jugó. Falta que el admin cargue el resultado.') : faltan(d) + ' para el partido.') : 'Todavía no hay partido armado.'}</p>
       </div>
 
+      {partidos.length > 1 ? (
+        <div className="chips" role="group" aria-label="Partidos en curso">
+          {partidos.map(x => <button key={x.id} type="button" className={`chip ${partido && x.id === partido.id ? 'on' : ''}`} aria-pressed={!!partido && x.id === partido.id} onClick={() => elegirPartido(x.id)}>{mayus(diaCorto(aFecha(x.fechaHora)))}{x.estado === 'votando' ? ' · votación' : ''}</button>)}
+        </div>
+      ) : null}
       {partido ? (
         <section className="kpi pitch" aria-label="Próximo partido: tocá para ver quiénes están anotados" role="link" tabIndex={0} style={{ cursor: 'pointer' }}
           onClick={e => { if (e.target.closest('a,button')) return; ir('partido', 'inscripcion'); }}

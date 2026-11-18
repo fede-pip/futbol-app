@@ -6,7 +6,7 @@ import {
   agregarInvitado, anotarJugador, anotarse, bajarse, cancelarPartido, crearPartido, editarPartido, quitarInscripto, salirCena, sumarseCena
 } from '../data/acciones.js';
 import { FORMATOS, depurarInvitados, faltanN, pl } from '../lib/logica.js';
-import { aFecha, aInputFecha, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
+import { aFecha, aInputFecha, diaCorto, diaLargo, diaSemana, hora as horaTxt, mayus, titulo as tituloFecha } from '../lib/fechas.js';
 import { Avatar, Btn, Card, CardB, Campo, Fila, HbTabs, Hint, Icono, Meter, Pill, Vacio, useToast } from '../components/ui.jsx';
 import { useSesion, nombreDe } from '../app/sesion.jsx';
 import { useNav } from '../app/nav.jsx';
@@ -65,7 +65,7 @@ function FormPartido({ inicial, onGuardar, onCancelar, etiqueta }) {
 }
 
 function Inscripcion() {
-  const { uid, gid, grupo, partido: p, jugadores, esAdmin } = useSesion();
+  const { idsActivos, uid, gid, grupo, partido: p, jugadores, esAdmin } = useSesion();
   const [anotando, setAnotando] = useState(false);
   const [buscar, setBuscar] = useState('');
   const { ir } = useNav();
@@ -87,7 +87,7 @@ function Inscripcion() {
     return esAdmin ? (
       <>
         <div><h2 className="t">Armá el partido</h2><p className="lead" style={{ marginTop: 2 }}>Avisamos a todo el grupo apenas lo crees.</p></div>
-        <FormPartido key={ultimos ? (ultimos[0] ? ultimos[0].id : 'sin') : 'cargando'} etiqueta="Crear partido" inicial={desdeUltimo(ultimos && ultimos[0])} onGuardar={d => crearPartido(gid, d)} />
+        <FormPartido key={ultimos ? (ultimos[0] ? ultimos[0].id : 'sin') : 'cargando'} etiqueta="Crear partido" inicial={desdeUltimo(ultimos && ultimos[0])} onGuardar={d => crearPartido(gid, d, idsActivos)} />
       </>
     ) : <Vacio titulo="Todavía no hay partido" texto="Cuando el admin lo cree te avisamos." />;
   }
@@ -231,7 +231,7 @@ function Inscripcion() {
             <Btn onClick={() => setEditando(true)}><Icono n="edit" />Editar día, hora o lugar</Btn>
             {confirmaCancelar ? (
               <div className="confirm"><b>¿Cancelar el partido?</b><span className="muted">Se avisa a todo el grupo y se cierra. No se puede deshacer.</span>
-                <div className="row"><Btn onClick={() => setConfirmaCancelar(false)}>No, volver</Btn><Btn v="pri" disabled={cargando} onClick={() => ejecutar(() => cancelarPartido(gid, p))}>Sí, cancelar</Btn></div></div>
+                <div className="row"><Btn onClick={() => setConfirmaCancelar(false)}>No, volver</Btn><Btn v="pri" disabled={cargando} onClick={() => ejecutar(() => cancelarPartido(gid, p, idsActivos))}>Sí, cancelar</Btn></div></div>
             ) : <Btn v="ghost" onClick={() => setConfirmaCancelar(true)}><Icono n="trash" />Cancelar el partido</Btn>}
           </div>
         </Card>
@@ -241,8 +241,10 @@ function Inscripcion() {
 }
 
 export default function Partido() {
-  const { partido, esAdmin } = useSesion();
+  const { partido, partidos, idsActivos, elegirPartido, esAdmin, gid } = useSesion();
   const { param, ir } = useNav();
+  const [nuevo, setNuevo] = useState(false);
+  const ultimos = useColl(esAdmin ? query(collection(db, `grupos/${gid}/partidos`), where('estado', '==', 'cerrado'), orderBy('fechaHora', 'desc'), limit(1)) : null, esAdmin ? gid : 'no');
   const tab = param || 'inscripcion';
   const votando = partido && partido.estado === 'votando';
   const tabs = [
@@ -252,9 +254,29 @@ export default function Partido() {
     ...(esAdmin ? [{ id: 'goles', label: 'Goles' }] : []),
     { id: 'votar', label: 'Votación', badge: votando ? '!' : '' }
   ];
+  if (nuevo && esAdmin) {
+    return (
+      <div className="scr">
+        <BarraSuperior titulo="Partido" />
+        <div><h2 className="t">Otro partido</h2><p className="lead" style={{ marginTop: 2 }}>Se suma al que ya tenés. Avisamos a todo el grupo.</p></div>
+        <FormPartido key={ultimos ? (ultimos[0] ? ultimos[0].id : 'sin') : 'cargando'} etiqueta="Crear partido" inicial={desdeUltimo(ultimos && ultimos[0])} onCancelar={() => setNuevo(false)}
+          onGuardar={async d => { const id = await crearPartido(gid, d, idsActivos); elegirPartido(id); setNuevo(false); ir('partido', 'inscripcion'); }} />
+      </div>
+    );
+  }
   return (
     <div className="scr">
       <BarraSuperior titulo="Partido" />
+      {partidos.length > 1 || (esAdmin && partido) ? (
+        <div className="chips" role="group" aria-label="Partidos en curso">
+          {partidos.map(x => (
+            <button key={x.id} type="button" className={`chip ${partido && x.id === partido.id ? 'on' : ''}`} aria-pressed={!!partido && x.id === partido.id} onClick={() => elegirPartido(x.id)}>
+              {mayus(diaCorto(aFecha(x.fechaHora)))}{x.estado === 'votando' ? ' · votación' : ''}
+            </button>
+          ))}
+          {esAdmin && idsActivos.length < 2 ? <button type="button" className="chip" onClick={() => setNuevo(true)}><Icono n="plus" />Otro partido</button> : null}
+        </div>
+      ) : null}
       {partido ? <HbTabs items={tabs} cur={tab} onSel={t => ir('partido', t)} /> : null}
       {tab === 'equipos' && partido ? <Equipos /> : tab === 'vivo' && partido && partido.estado === 'abierto' ? <EnVivo /> : tab === 'goles' && partido && esAdmin ? <Goles /> : tab === 'votar' && partido ? <Votacion /> : <Inscripcion />}
     </div>

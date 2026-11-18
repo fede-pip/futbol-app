@@ -45,22 +45,23 @@ export async function borrarInvitados(gid, ids) {
 
 // ---- Partido (admin) ----
 const datosLugar = geo => (geo && geo.lugarId ? { lugarId: geo.lugarId, lat: geo.lat, lng: geo.lng } : { lugarId: deleteField(), lat: deleteField(), lng: deleteField() });
-export async function crearPartido(gid, { fecha, hora, lugar, formato, cupo, geo }) {
+export async function crearPartido(gid, { fecha, hora, lugar, formato, cupo, geo }, activos = []) {
+  if (activos.length >= 2) throw new Error('Ya hay dos partidos en curso. Cerrá o cancelá uno para crear otro.');
   const pref = doc(collection(db, `grupos/${gid}/partidos`));
   await setDoc(pref, {
     estado: 'abierto', fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo, ...(geo && geo.lugarId ? datosLugar(geo) : {}),
     inscriptos: [], listaEspera: [], cena: [], invitados: {}, equipos: null, eventos: {}, creadoEn: Timestamp.now()
   });
-  await updateDoc(refGrupo(gid), { partidoActivo: pref.id });
+  await updateDoc(refGrupo(gid), { activos: [...activos, pref.id], partidoActivo: null });
   return pref.id;
 }
 export function editarPartido(gid, p, { fecha, hora, lugar, formato, cupo, geo }) {
   return updateDoc(refPartido(gid, p.id), { fechaHora: Timestamp.fromDate(new Date(`${fecha}T${hora}:00-03:00`)), lugar: lugar.trim(), formato, cupo, ...datosLugar(geo) });
 }
-export async function cancelarPartido(gid, p) {
+export async function cancelarPartido(gid, p, activos = []) {
   const b = writeBatch(db);
   b.update(refPartido(gid, p.id), { estado: 'cancelado' });
-  b.update(refGrupo(gid), { partidoActivo: null });
+  b.update(refGrupo(gid), { activos: activos.filter(x => x !== p.id), partidoActivo: null });
   await b.commit();
 }
 export const guardarEquipos = (gid, p, oscuro, blanco, publicado) =>

@@ -221,8 +221,9 @@ export const enviarAvisoManual = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY] 
   const aud = (Array.isArray(req.data?.aud) ? req.data.aud : []).filter(k => AUD[k] && k !== 'persona');
   if (!titulo || !cuerpo || !aud.length) throw new HttpsError('invalid-argument', 'Completá el título, el mensaje y para quién es.');
   let partido = null;
-  if (g.partidoActivo) {
-    const s = await db.doc(`grupos/${gid}/partidos/${g.partidoActivo}`).get();
+  const pidAviso = (g.activos && g.activos[0]) || g.partidoActivo;
+  if (pidAviso) {
+    const s = await db.doc(`grupos/${gid}/partidos/${pidAviso}`).get();
     if (s.exists) partido = { id: s.id, ...s.data() };
   }
   const ctx = { partido, clave: `manual_${Date.now()}`, quienTxt: aud.map(k => AUD[k][0]).join(', ') };

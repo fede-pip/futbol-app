@@ -29,15 +29,23 @@ export function SesionProvider({ children }) {
 
   const jugadoresL = useColl(gid ? collection(db, `grupos/${gid}/jugadores`) : null, gid);
   const jugadores = useMemo(() => aMapa(jugadoresL), [jugadoresL]);
-  const pidActivo = grupo ? grupo.partidoActivo : null;
-  const partido = useDoc(gid && pidActivo ? doc(db, `grupos/${gid}/partidos/${pidActivo}`) : null, `${gid}/${pidActivo}`);
+  // Puede haber hasta 2 partidos a la vez (por ejemplo, uno pendiente de votación y otro próximo).
+  // `activos` es la lista; `partidoActivo` es el campo de antes (un solo partido).
+  const idsActivos = useMemo(() => (grupo ? (grupo.activos || (grupo.partidoActivo ? [grupo.partidoActivo] : [])) : []), [grupo]);
+  const [pidSel, setPidSel] = useState(null);
+  const pidActivo = idsActivos.includes(pidSel) ? pidSel : idsActivos[0] || null;
+  const p0 = useDoc(gid && idsActivos[0] ? doc(db, `grupos/${gid}/partidos/${idsActivos[0]}`) : null, `${gid}/${idsActivos[0]}`);
+  const p1 = useDoc(gid && idsActivos[1] ? doc(db, `grupos/${gid}/partidos/${idsActivos[1]}`) : null, `${gid}/${idsActivos[1]}`);
+  const partidos = [p0, p1].filter((x, i) => x && idsActivos[i]);
+  const partido = partidos.find(x => x.id === pidActivo) || null;
+  const elegirPartido = useCallback(id => setPidSel(id), []);
 
   const esAdmin = !!(grupo && uid && grupo.admins.includes(uid));
   const esCreador = !!(grupo && uid && grupo.creadorUid === uid);
   const sinLeer = (avisos || []).filter(a => !a.leido).length;
   const cargando = user === undefined || (user && (perfil === undefined || priv === undefined || grupos === undefined));
 
-  const valor = { rev, refrescar, user, uid, perfil, priv, grupos, grupo, gid, elegirGrupo, jugadores, partido, esAdmin, esCreador, avisos: avisos || [], sinLeer, cargando };
+  const valor = { rev, refrescar, user, uid, perfil, priv, grupos, grupo, gid, elegirGrupo, jugadores, partido, partidos, idsActivos, elegirPartido, esAdmin, esCreador, avisos: avisos || [], sinLeer, cargando };
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
 

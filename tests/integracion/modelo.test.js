@@ -375,6 +375,13 @@ describe('votación y cierre', () => {
     await falla(B.call('cerrarVotacion', { gid, pid }), 'permission-denied');
   });
 
+  it('puede haber hasta 2 partidos en curso, no 3, y el admin lo permite', async () => {
+    const g = doc(A.db, 'grupos', gid);
+    await updateDoc(g, { activos: [pid, 'otro'] });
+    await denegado(updateDoc(g, { activos: [pid, 'otro', 'tercero'] }));
+    await updateDoc(g, { activos: [pid, 'otro'] });
+  });
+
   it('el cierre actualiza estadísticas, niveles y deja el partido en el historial', async () => {
     const r = await A.call('cerrarVotacion', { gid, pid });
     expect(r.resultado).toBe('Ganó Oscuro 3-1');
@@ -398,6 +405,7 @@ describe('votación y cierre', () => {
     expect(na + nb + n1 + n2).toBeCloseTo(20, 1); // suma cero: el promedio del grupo no se infla
     const g = (await getDoc(doc(A.db, 'grupos', gid))).data();
     expect(g.partidoActivo).toBeNull();
+    expect(g.activos).toEqual(['otro']); // cerrar uno deja el otro en curso
   });
 
   it('un partido cerrado ya no se puede modificar', async () => {

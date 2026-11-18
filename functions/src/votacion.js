@@ -144,7 +144,7 @@ export const cerrarVotacion = onCall({ ...opts, secrets: [ONESIGNAL_API_KEY], ti
       cambios.push({ id, racha, stats });
     });
     tx.update(pref, { estado: 'cerrado', resultado: { texto, golesO, golesB }, mvps, cambiosVotacion, fechaCierre: Timestamp.now() });
-    if (gs.data().partidoActivo === pid) tx.update(gref, { partidoActivo: null });
+    tx.update(gref, { activos: FieldValue.arrayRemove(pid), ...(gs.data().partidoActivo === pid ? { partidoActivo: null } : {}) });
     if (as.exists) tx.delete(aref);
 
     const pos = ranking(Object.entries(despues).map(([id, j]) => ({ id, puntos: j.stats?.puntos || 0, goles: j.stats?.goles || 0 })));
