@@ -147,6 +147,7 @@ button.todo-r:hover { background:var(--surface-2); }
 /* pestañas de sección */
 .hb { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line); margin-inline:-16px; padding-inline:10px; }
 .hb::-webkit-scrollbar { display:none; }
+.hb { -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent); padding-right:30px; }
 .hb button { padding:11px 12px; font-size:13.5px; font-weight:550; color:var(--text-2); border-bottom:3px solid transparent; white-space:nowrap; margin-bottom:-1px; min-height:44px; display:inline-flex; gap:7px; align-items:center; }
 .hb button.on { color:var(--primary); border-bottom-color:var(--primary); }
 .hb em { font-style:normal; font-size:11px; font-weight:700; background:var(--primary); color:#fff; border-radius:99px; padding:0 7px; line-height:17px; }

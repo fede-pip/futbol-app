@@ -100,7 +100,7 @@ export default function Grupo() {
   return (
     <div className="scr">
       <BarraSuperior titulo="Grupo" />
-      <div>
+      {grupos.length > 1 ? <div>
         {grupos.length > 1 ? <h3 className="t" style={{ marginBottom: 8 }}>Mis grupos</h3> : null}
         {grupos.length > 1 ? <Card>
           {grupos.map(g => (
@@ -108,8 +108,7 @@ export default function Grupo() {
               onClick={g.id === gid ? undefined : () => { elegirGrupo(g.id); toast(`Ahora ves ${g.nombre}`); }} derecha={g.id === gid ? <Pill t="tint">Actual</Pill> : <Icono n="chev" />} />
           ))}
         </Card> : null}
-        <button className="choice" style={{ marginTop: grupos.length > 1 ? 10 : 0 }} onClick={() => setSumando(true)}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Sumar otro grupo</b><span>Unirte con un código o crear uno nuevo.</span></div><Icono n="chev" /></button>
-      </div>
+      </div> : null}
       {esAdmin ? <PedidosVinculo gid={gid} /> : null}
       <section className="kpi pitch">
         <div className="row" style={{ gap: 12 }}><AvatarGrupo nombre={grupo.nombre} foto={grupo.foto} style={{ width: 52, height: 52, fontSize: 18 }} /><div><div className="lb">Tu grupo</div><div className="v">{grupo.nombre}</div></div></div>
@@ -219,6 +218,7 @@ export default function Grupo() {
               <Btn v="pri" disabled={confBorrar.trim().toUpperCase() !== 'BORRAR'} onClick={() => ejecutar(async () => { await llamar('borrarGrupo', { gid, confirmar: 'BORRAR' }); toast('Grupo borrado'); ir('inicio'); })}>Borrar el grupo</Btn></div></div>
         ) : <Btn v="ghost" onClick={() => setBorrando(true)}><Icono n="trash" />Borrar el grupo</Btn>
       ) : null}
+      <button className="choice" onClick={() => setSumando(true)}><span className="ti"><Icono n="plus" /></span><div className="grow"><b>Sumar otro grupo</b><span>Unirte con un código o crear uno nuevo.</span></div><Icono n="chev" /></button>
       {!esCreador ? (
         confirmaSalir ? (
           <div className="confirm"><b>¿Salir de {grupo.nombre}?</b><span className="muted">Para volver vas a necesitar el código.</span>

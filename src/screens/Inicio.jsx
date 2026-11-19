@@ -21,9 +21,10 @@ function BannerAvisos() {
   const { uid } = useSesion();
   const [permiso, setPermiso] = useState(estadoPermiso());
   const [fallo, setFallo] = useState(false);
+  const [oculto, setOculto] = useState(() => { try { return localStorage.getItem('avisosBloqueadosOculto') === '1'; } catch { return false; } });
   if (permiso === 'granted' || permiso === 'unsupported') return null;
   if (esIPhone() && !esAppInstalada()) return <Hint icono="bell"><b>Para recibir avisos en iPhone,</b> abrí Me Anoto en Safari, tocá compartir y elegí "Agregar a pantalla de inicio". Después abrila desde el ícono.</Hint>;
-  if (permiso === 'denied') return <Hint icono="bell"><b>Bloqueaste los avisos.</b> Para recibirlos, activalos en los ajustes del navegador o de la app para este sitio.</Hint>;
+  if (permiso === 'denied') return oculto ? null : <Hint icono="bell" accion={<button className="chip sm" onClick={() => { try { localStorage.setItem('avisosBloqueadosOculto', '1'); } catch {} setOculto(true); }}>Entendido</button>}><b>Bloqueaste los avisos.</b> Para recibirlos, activalos en los ajustes del navegador o de la app para este sitio.</Hint>;
   return (
     <Hint icono="bell" accion={<button className="chip on" onClick={async () => { const r = await activarPush(uid); setPermiso(estadoPermiso()); setFallo(!r.ok); }}>Activar</button>}>
       <b>Activá los avisos</b> para enterarte de los partidos, los equipos y los lugares que se liberan.{fallo ? ' No pudimos activarlos: probá de nuevo.' : ''}

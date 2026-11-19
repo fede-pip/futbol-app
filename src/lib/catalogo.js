@@ -62,6 +62,7 @@ export const arreglarPlural = t => (t || '')
   .replace(/\b([Ss])omos 1\b(?! ?\d)/g, (m, c) => `${c === 'S' ? 'Hay' : 'hay'} 1`)
   .replace(/\b1 (lugares|jugadores|personas|partidos|goles|victorias|anotados|puntos|días|dias|horas|votos|compañeros)\b/g, (m, n) => `1 ${SINGULAR[n]}`)
   .replace(/\b1 victoria seguidas\b/g, '1 victoria seguida')
+  .replace(/\bYa son\s+jugadores\./g, 'Ya hay un jugador más.')
   .replace(/\s*Equipo:\s*\.(?=\s|$)/g, ''); // todavía no hay equipo asignado: no queda "Equipo: ."
 export const llenar = (t, vars = MUESTRA, vacio = false) =>
   arreglarPlural((t || '').replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : (vacio ? '' : m)));

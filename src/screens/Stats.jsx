@@ -62,7 +62,7 @@ export default function Stats() {
           })
         )
       ) : !hayDatos ? (
-        <Vacio titulo="Todavía no hay estadísticas" texto="Se arman con el primer partido que se cierre." />
+        <Vacio titulo="Todavía no hay puntos ni goles" texto={cerrados && cerrados.length ? 'Las estadísticas se cargan al cerrar la votación. Mirá los partidos en la pestaña Partidos.' : 'Se arman con el primer partido que se cierre.'} />
       ) : (
         <>
           <Card>
